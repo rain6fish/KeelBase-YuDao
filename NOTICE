@@ -1,0 +1,44 @@
+KeelBase-YuDao — notices and attribution
+
+This repository embeds the KeelBase runtime into an upstream enterprise application platform. It is a
+downstream derivative and it contains two separately licensed parts. This file says which is which,
+so that neither licence is read as covering the other.
+
+1. Upstream components — MIT, notices retained in place
+
+   Backend platform: `YunaiV/ruoyi-vue-pro` ("yudao"), MIT, `Copyright (c) 2021 ruoyi-vue-pro`.
+   Its licence is retained unmodified at the repository root, `LICENSE`.
+
+   The tree was taken at branch `master-jdk25`, commit
+   `994605b51080fbc1f4c7838f80ac0468f1d0e67c` (2026-10-07), `revision 2026.09-jdk25-SNAPSHOT`.
+   Upstream's own README follows this project's preamble in `README.md`, unedited.
+
+   The MIT text requires the copyright notice and the permission notice to be included in all copies
+   or substantial portions of the software. It stays where upstream put it and is not edited.
+
+2. KeelBase additions — Apache-2.0
+
+   Files added by this project are licensed under Apache-2.0. They are:
+
+   - the runtime and host glue under `yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/`;
+   - the seam points in `yudao-server/pom.xml` (the `keelbase4j-core` dependency) and in upstream's
+     `AuthController` (an explicit bean name, so the two classes of that name stop colliding);
+   - this file.
+
+   The root `LICENSE` is the upstream MIT text and describes the upstream code; it is not a statement
+   about these additions.
+
+3. History is not upstream's
+
+   This repository was initialised fresh and does **not** carry upstream's commit history. There is
+   no merge base with upstream, and no commit in this repository is upstream's. The derivation is
+   stated here and in `README.md` instead, so that it is readable without reading a log.
+
+4. No affiliation
+
+   This project is not affiliated with, sponsored by, or endorsed by the upstream project or its
+   authors. "Yudao" and "ruoyi-vue-pro" are used descriptively, to say what this repository is built
+   on — they are not this project's name and not a claim of association. KeelBase is this project's
+   own name.
+
+   Neither licence grants any trademark right, and upstream names and logos remain their owners'.
