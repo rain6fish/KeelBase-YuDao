@@ -35,6 +35,12 @@ bash scripts/jdk25.sh mvn -pl yudao-server -am -DskipTests -Dmaven.test.skip=tru
 
 ## 运行
 
+`scripts/run-server.sh` 一条命令就是全部，上面的验证就是用它跑的：
+
+```bash
+bash scripts/run-server.sh
+```
+
 数据存储与运行时自己的设置一律走**命令行参数**，**不写进**上游的 `application-local.yaml`。两个理由：
 上游那个文件保持一字未动；同一份检出可以指向另一套栈而不必改任何东西。
 
@@ -63,11 +69,19 @@ bash scripts/bootstrap-datastore.sh          # 库不在就建，空就灌
 RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
 ```
 
-**⚠ 尚未跑过。** 脚本与 compose 文件是**备好的**，但**还没用它们起过任何栈**：写它们的时候 Docker 没在跑，
-而在本机起它需要提权。**请当成未验证。**
+**已端到端验证（2026-10-08）。** 栈起得来、扩展报 `vector 0.8.7`、上游那份转换 schema 灌成 **49 张表**，
+服务对着它起得来：Flyway 应用了运行时的四条迁移、`/auth/me` 作答、一次对话路由到工具并**从 PostgreSQL 里
+读出一行真数据**、审计链对自己的行校验通过。
+
+**第一次跑发现的一件事，已在 `yudao-server/pom.xml` 修掉：** 上游是按 MySQL 构建的、**不管理任何 PG 驱动**，
+故在没有它之前平台启动即报 `ClassNotFoundException: org.postgresql.Driver`。该依赖现已声明在那里。
 
 读失败信息之前有一件关于 schema 的事值得先知道：`sql/postgresql/ruoyi-vue-pro.sql` 是**从 MySQL 机器转换**来的
-——它自己的文件头写着，还带着 `dual` 这样的残留。那里出错，是**那份转换文件**的事实。
+——它自己的文件头写着，还带着 `dual` 这样的残留。**它在这里是干净导入的**；若那里出错，那是**那份转换文件**的
+事实、不是本线的。
+
+**⚠ 未覆盖：** pgvector 在位，是运行时知识层走**语义路径**的前提；但那条路还要一个嵌入模型，而这里没配
+——故**语义路径本身没有跑过**，只验了扩展在位。
 
 ## 本线的记录在哪
 

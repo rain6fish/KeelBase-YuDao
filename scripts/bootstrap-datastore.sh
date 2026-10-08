@@ -26,6 +26,8 @@ COMPOSE="$HERE/docker-compose.datastore.yml"
 SCHEMA="$HERE/../sql/postgresql/ruoyi-vue-pro.sql"
 PROJECT=keelbase-yudao
 PG=keelbase-yudao-pg
+# ⚠ 缓存容器叫 `-cache`：机器上已有一个 `keelbase-yudao-redis`（别人的、非 compose 建的），显式名会撞。
+# The cache container is named `-cache`: a `keelbase-yudao-redis` already existed on this machine.
 DB=ruoyi-vue-pro
 USER=root
 

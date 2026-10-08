@@ -37,6 +37,13 @@ that are not wired into the server. The artifact is a fat jar under `yudao-serve
 
 ## Run
 
+`scripts/run-server.sh` is the whole thing in one command, and it is what the verification above was run
+with:
+
+```bash
+bash scripts/run-server.sh
+```
+
 The datastore and the runtime's own settings are passed as **command-line parameters**, not written into
 upstream's `application-local.yaml`. Two reasons: upstream's file stays untouched, and the same checkout
 can be pointed at a different stack without editing anything.
@@ -68,13 +75,23 @@ bash scripts/bootstrap-datastore.sh          # create if absent, load if empty
 RESET=1 bash scripts/bootstrap-datastore.sh  # drop and reload
 ```
 
-**⚠ Not yet run.** The script and the compose file are prepared, but no stack has been brought up with
-them: Docker was not running when they were written, and starting it on this machine needs elevation.
-Treat them as **untested**.
+**Verified end to end (2026-10-08).** The stack comes up, the extension reports `vector 0.8.7`, upstream's
+converted schema loads to 49 tables, and the server starts against it: Flyway applies the runtime's four
+migrations, `/auth/me` answers, a chat routes to a tool and reads a real row out of PostgreSQL, and the
+audit chain verifies over its own rows.
 
-One fact about the schema worth having before reading any failure: `sql/postgresql/ruoyi-vue-pro.sql`
-is **machine-converted** from MySQL — its own header says so, and it carries leftovers such as a `dual`
-table. A failure there is a fact about that converted file.
+**One thing the first run found, fixed in `yudao-server/pom.xml`:** upstream builds for MySQL and manages
+no PostgreSQL driver, so the platform fails at startup with `ClassNotFoundException:
+org.postgresql.Driver` until one is added. That dependency is now declared there.
+
+One fact about the schema worth having before reading any failure: `sql/postgresql/ruoyi-vue-pro.sql` is
+**machine-converted** from MySQL — its own header says so, and it carries leftovers such as a `dual`
+table. It loaded cleanly here; a failure in it would be a fact about that converted file, not about this
+line.
+
+**⚠ Not covered:** pgvector being present is what lets the runtime's knowledge layer take its semantic
+path, but that path also needs an embedding model, and none is configured here — so the **semantic path
+itself has not been exercised**, only the extension's presence.
 
 ## Where the line's records are
 

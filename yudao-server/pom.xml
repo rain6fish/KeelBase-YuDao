@@ -39,6 +39,20 @@
             <version>0.1.4</version>
         </dependency>
 
+        <!-- PostgreSQL driver. This line's datastore is PostgreSQL (see keelbase-docs/KEELBASE-DEV.md),
+             and upstream builds for MySQL and manages no PostgreSQL driver — without this the platform
+             fails at startup with `ClassNotFoundException: org.postgresql.Driver`, which is what the
+             first run against PostgreSQL produced. The version is explicit because upstream's dependency
+             management does not carry one.
+             / PostgreSQL 驱动。本线的数据存储是 PostgreSQL（见 keelbase-docs/KEELBASE-DEV.md），而上游是按
+             MySQL 构建的、**不管理任何 PG 驱动**——没有它，平台启动即以 `ClassNotFoundException:
+             org.postgresql.Driver` 失败，这正是第一次对着 PG 跑出来的东西。版本写明，是因为上游的依赖管理里没有它。 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.13</version>
+        </dependency>
+
         <!-- 会员中心。默认注释，保证编译速度 -->
 <!--        <dependency>-->
 <!--            <groupId>cn.iocoder.boot</groupId>-->

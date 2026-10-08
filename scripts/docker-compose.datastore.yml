@@ -35,7 +35,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: keelbase-yudao-redis
+    # Named `-cache` rather than `-redis`: a container called `keelbase-yudao-redis` already existed on
+    # this machine when this file was first brought up (someone else's, created outside compose), and an
+    # explicit `container_name` collides with it even while that container is stopped.
+    # 叫 `-cache` 而不是 `-redis`：本文件第一次起栈时，机器上**已存在**一个叫 `keelbase-yudao-redis` 的容器
+    # （别人的、在 compose 之外建的），而**显式 `container_name` 即使对方已停也会撞**。
+    container_name: keelbase-yudao-cache
     ports:
       - "56389:6379"
     healthcheck:
