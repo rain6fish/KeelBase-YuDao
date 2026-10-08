@@ -89,7 +89,9 @@ RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
 它存在，是因为**本仓的历史是全新起算**的，而这意味着通常的 fork 工作流**用不了**：
 
 > **`git merge upstream/master-jdk25` 与 `git rebase` 会被拒绝**——两条历史**无共同祖先**
-> （`refusing to merge unrelated histories`）。这个 remote 的用途是 **diff / 打补丁 / 取文件**，**不是合并**。
+> （`refusing to merge unrelated histories`）。这个 remote 的用途是 **diff / 打补丁 / 取文件**，
+> **不是合并**、也**不是推送**：它的 **push URL 已被刻意设成哨兵**（`DISABLED-READ-ONLY`），
+> 好让手滑**推不到上游**去。
 
 ```bash
 git fetch --depth=1 upstream master-jdk25     # 刻意保持浅；要更深用 --deepen

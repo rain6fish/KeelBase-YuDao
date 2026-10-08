@@ -101,7 +101,8 @@ started fresh**, which means the usual fork workflow is not available:
 
 > **`git merge upstream/master-jdk25` and `git rebase` are refused** — the two histories share no
 > ancestor (`refusing to merge unrelated histories`). This remote is for **diffing, patching and
-> taking files**, not for merging.
+> taking files**, not for merging — and not for pushing either: its **push URL is deliberately set to
+> a sentinel** (`DISABLED-READ-ONLY`) so that a slip cannot publish to upstream.
 
 ```bash
 git fetch --depth=1 upstream master-jdk25     # kept shallow on purpose; deepen with --deepen
