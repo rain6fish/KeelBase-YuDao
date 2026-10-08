@@ -60,8 +60,13 @@ licence surface of upstream's module dependency tree are all unmeasured.
   this repository is built on; they are not this project's name and not a claim of association.
 - **It does not settle who owns what.** In a host that brings its own tenancy, its own data-range
   engine and its own AI module, three questions have to be answered before anything moves here:
-  organisation / tenant, data range, and AI. Those are **open**. Nothing in this repository presumes
-  their answers, and no part of it should be read as having settled them.
+  organisation / tenant, data range, and AI. They **were answered on 2026-10-08**, in the project's
+  internal record rather than in this file: the tenant becomes a first-class contract dimension,
+  landing on the contract line and not on this one; row visibility for governed tables belongs to
+  KeelBase's pointcuts alone, so this host's data-permission engine is not registered for them; and
+  the AI layer reuses this host as its carrier, with KeelBase governing on top. **What this repository
+  does not do is implement those answers** — it is still the spike that was run to its first evidence,
+  and its code predates them.
 
 ## The runtime's guarantee is unchanged
 
