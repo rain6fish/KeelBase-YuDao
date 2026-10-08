@@ -83,6 +83,34 @@ RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
 **⚠ 未覆盖：** pgvector 在位，是运行时知识层走**语义路径**的前提；但那条路还要一个嵌入模型，而这里没配
 ——故**语义路径本身没有跑过**，只验了扩展在位。
 
+## 上游，以及怎么对着它比
+
+`upstream` 指向 `https://github.com/YunaiV/ruoyi-vue-pro.git`——**规范源**；项目的 Gitee 镜像这里**没配**。
+它存在，是因为**本仓的历史是全新起算**的，而这意味着通常的 fork 工作流**用不了**：
+
+> **`git merge upstream/master-jdk25` 与 `git rebase` 会被拒绝**——两条历史**无共同祖先**
+> （`refusing to merge unrelated histories`）。这个 remote 的用途是 **diff / 打补丁 / 取文件**，**不是合并**。
+
+```bash
+git fetch --depth=1 upstream master-jdk25     # 刻意保持浅；要更深用 --deepen
+git diff upstream/master-jdk25 HEAD --stat
+```
+
+**读 diff 之前有两件事值得知道，都是踩出来的：**
+
+1. **这里的 fetch 要用 HTTP/1.1。** 直接 `git fetch upstream` 会以
+   `Failed to connect to github.com port 443` 失败，**而同一时刻** `git ls-remote upstream` 与
+   `curl https://github.com` **都是通的**。用
+   `git -c http.version=HTTP/1.1 fetch --depth=1 upstream master-jdk25` 才成。
+2. **只有模式变了，`git diff` 也会报成 modified。** 约 **130 个文件**与上游只差**可执行位**——
+   上游记的是 `100755`，这份拷贝在**经 Windows 过来时丢了那个位**。要看**内容**改动，比 blob：
+
+   ```bash
+   git diff --name-only upstream/master-jdk25 HEAD | while read -r p; do
+     [ "$(git rev-parse "HEAD:$p")" != "$(git rev-parse "upstream/master-jdk25:$p")" ] && echo "$p"
+   done
+   ```
+
 ## 本线的记录在哪
 
 | | |

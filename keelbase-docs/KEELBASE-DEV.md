@@ -93,6 +93,36 @@ line.
 path, but that path also needs an embedding model, and none is configured here — so the **semantic path
 itself has not been exercised**, only the extension's presence.
 
+## Upstream, and how to compare against it
+
+`upstream` points at `https://github.com/YunaiV/ruoyi-vue-pro.git` — the canonical source; the
+project's Gitee mirror is not configured here. It exists because **this repository's history was
+started fresh**, which means the usual fork workflow is not available:
+
+> **`git merge upstream/master-jdk25` and `git rebase` are refused** — the two histories share no
+> ancestor (`refusing to merge unrelated histories`). This remote is for **diffing, patching and
+> taking files**, not for merging.
+
+```bash
+git fetch --depth=1 upstream master-jdk25     # kept shallow on purpose; deepen with --deepen
+git diff upstream/master-jdk25 HEAD --stat
+```
+
+**Two things worth knowing before reading a diff, both learned the hard way:**
+
+1. **Fetching needs HTTP/1.1 here.** A plain `git fetch upstream` fails with `Failed to connect to
+   github.com port 443` even while `git ls-remote upstream` and `curl https://github.com` succeed.
+   `git -c http.version=HTTP/1.1 fetch --depth=1 upstream master-jdk25` works.
+2. **`git diff` reports a file as modified when only its mode changed.** Roughly 130 files differ
+   from upstream by the executable bit alone — upstream tracks them `100755`, this copy lost that
+   when the tree came across Windows. To see **content** changes only, compare the blobs:
+
+   ```bash
+   git diff --name-only upstream/master-jdk25 HEAD | while read -r p; do
+     [ "$(git rev-parse "HEAD:$p")" != "$(git rev-parse "upstream/master-jdk25:$p")" ] && echo "$p"
+   done
+   ```
+
 ## Where the line's records are
 
 | | |
