@@ -57,6 +57,25 @@ can be pointed at a different stack without editing anything.
 - Chinese passed to `curl` as a command-line argument through this shell is corrupted; use
   `--data-binary @file`.
 
+## Datastore
+
+This line's datastore is **PostgreSQL with pgvector, plus Redis**, in `scripts/docker-compose.datastore.yml`.
+Upstream ships a compose of its own that runs MySQL; that file is upstream's and is left alone — this is
+ours, and it is what this line runs against.
+
+```bash
+bash scripts/bootstrap-datastore.sh          # create if absent, load if empty
+RESET=1 bash scripts/bootstrap-datastore.sh  # drop and reload
+```
+
+**⚠ Not yet run.** The script and the compose file are prepared, but no stack has been brought up with
+them: Docker was not running when they were written, and starting it on this machine needs elevation.
+Treat them as **untested**.
+
+One fact about the schema worth having before reading any failure: `sql/postgresql/ruoyi-vue-pro.sql`
+is **machine-converted** from MySQL — its own header says so, and it carries leftovers such as a `dual`
+table. A failure there is a fact about that converted file.
+
 ## Where the line's records are
 
 | | |

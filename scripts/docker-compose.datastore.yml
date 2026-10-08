@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# This line's datastore: PostgreSQL with pgvector, plus Redis.
+#
+# Upstream ships a compose of its own — `script/docker/docker-compose.yml` — and it runs **MySQL**. That
+# file is upstream's and is left untouched; this is ours, and it is the one this line runs against,
+# because the decisions for this line put the datastore on PostgreSQL with the vector extension
+# available (the runtime's knowledge layer only takes its semantic path when the store has pgvector).
+#
+# Ports are off this machine's reserved ranges (`netsh int ipv4 show excludedportrange protocol=tcp`)
+# and away from the other host line's stacks, which run on the same machine.
+#
+# 本线的数据存储：PostgreSQL + pgvector，加 Redis。
+#
+# 上游自带一份 compose——`script/docker/docker-compose.yml`——它跑的是 **MySQL**。那个文件是上游的、**一字不动**；
+# 这份是我们的，也是本线实际对着跑的那份：本线的决定把数据存储放在 **PostgreSQL**，并让**向量扩展**可用
+# （运行时的知识层只有在存储带 pgvector 时才走语义路径）。
+#
+# 端口避开本机的保留段（`netsh int ipv4 show excludedportrange protocol=tcp`），也避开同机另一条宿主线的栈。
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: keelbase-yudao-pg
+    environment:
+      POSTGRES_DB: ruoyi-vue-pro
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d ruoyi-vue-pro"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: keelbase-yudao-redis
+    ports:
+      - "56389:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

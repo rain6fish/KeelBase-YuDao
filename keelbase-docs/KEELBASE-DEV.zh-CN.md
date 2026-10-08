@@ -53,6 +53,22 @@ bash scripts/jdk25.sh mvn -pl yudao-server -am -DskipTests -Dmaven.test.skip=tru
   它**曾经落进生成代码的注释里**。
 - 中文经本 shell 作为**命令行参数**传给 `curl` 会坏；改用 `--data-binary @文件`。
 
+## 数据存储
+
+本线的数据存储是 **PostgreSQL + pgvector，加 Redis**，在 `scripts/docker-compose.datastore.yml`。
+上游自带一份跑 MySQL 的 compose；那个文件是上游的、**一字不动**——这份是我们的，也是本线实际对着跑的。
+
+```bash
+bash scripts/bootstrap-datastore.sh          # 库不在就建，空就灌
+RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
+```
+
+**⚠ 尚未跑过。** 脚本与 compose 文件是**备好的**，但**还没用它们起过任何栈**：写它们的时候 Docker 没在跑，
+而在本机起它需要提权。**请当成未验证。**
+
+读失败信息之前有一件关于 schema 的事值得先知道：`sql/postgresql/ruoyi-vue-pro.sql` 是**从 MySQL 机器转换**来的
+——它自己的文件头写着，还带着 `dual` 这样的残留。那里出错，是**那份转换文件**的事实。
+
 ## 本线的记录在哪
 
 | | |
