@@ -53,10 +53,11 @@ bash scripts/run-server.sh
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | 让运行时的响应信封**不套在**本宿主自己的控制器上 |
 | `--yudao.tenant.ignore-tables=…` | 点名**由 KeelBase 治理**的表，好让宿主的租户拦截器**不再**去收束它们（一行的权威只有一个——见本线的决定索引） |
 | `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | 宿主自己的值是 `SELECT 1 FROM DUAL`，那是 **MySQL**——PostgreSQL 没有 `DUAL` |
+| `--spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource` | **换掉连接池**。见下——用 Druid 时约一半的登录会失败 |
 
-## ⚠ 这套栈上的一个缺陷，**未解**
+## 池被换掉了，以及为什么
 
-在 PostgreSQL 上，**约一半的登录返回 500**：
+在 PostgreSQL + **Druid** 上，约一半的登录返回 500：
 
 ```
 org.postgresql.util.PSQLException: 这个 statement 已经被关闭
@@ -65,14 +66,17 @@ org.postgresql.util.PSQLException: 这个 statement 已经被关闭
   …  MybatisMapperMethod → AdminUserMapper.selectWithCursor
 ```
 
-它**不是**宿主有 bug、也**不是**我们弄坏的——它坐在 **MyBatis-Plus 3.5.17、Druid 与 PostgreSQL** 三者相遇的地方，且就在**最普通的登录路径**上复现。两条假设都试过、**两条都错**，写下来是为了**别再重跑**：
+**换成 Hikari 就一次都不发生**——连打十二次登录、以及门禁转绿。改动就是上面那条 `…master.type` 参数，而且它是**命令行参数**：**没有一个上游文件为它而被改**。
 
-- **Druid 的预备语句缓存** —— 两个属性前缀都设成 `false`，并**验证过前缀确实绑定**（在同一个前缀上放一个刻意非法的值会让启动失败）。故障**不变**。
-- **Druid 的 `stat` 过滤器** —— 关掉，**不变**。
+走到那里绕了一段**值得留着**的弯路。第一轮得出的结论是「**Druid 的预备语句缓存已排除**」，并把它当成定论报了出去。**那是假绿灯**：验证过的是「**属性会绑定**」、**不是**「**池真的变了**」。去读池自己的状态（Druid 的 `/druid/datasource.json`）才看到，它一直是 `PoolPreparedStatements = true`。而随后是那条**更有用**的发现：
 
-对本仓意味着什么：**门禁已写好，而它因为这个原因是红的**。`scripts/run-generated-module-scenarios.mjs` 断言 Spike 观测到的那些行为，而它**过不了登录那一关**、进不到断言。那是**栈**的缺陷、不是门禁的缺陷，也是**本线距离「可重跑门禁」之间唯一挡着的那样东西**。
+> **这个 Druid 池**无法从应用外面配置**。**`spring.datasource.dynamic.druid.pool-prepared-statements=false`——**命令行参数**也好、**优先级更高的外部配置文件**也好——都改不动它；姊妹前缀 `spring.datasource.druid.*` 也不行；**连改 `application-local.yaml` 再重新打包**也不行——那次之后**核对过 jar 里确实是 `false`，而池仍报 `true`**。
 
-上面那条 `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` **保留**，因为 PostgreSQL 确实没有 `DUAL`；它**不是**上面那个缺陷的修法，也**没有**声称是。
+⇒ **「拿属性去调 Druid」这一整类修法在这里是死路**，下一件该试的**不是另一个属性**。JDBC URL 上的 `prepareThreshold=0` 也试过，同样没用。
+
+**门禁该干的事，门禁随后就干了**：对着修好后的栈**第一次跑**，它在**生成模块**里抓到**两处方言错配**——一是 `deleted` 用 `boolean`，而宿主的逻辑删除拿 **`0`/`1`** 去比（它自己的 schema 写的是 `deleted int2 not null default 0`）；二是 `id` 后面**没有序列**（宿主的惯例是 `id int8 not null` 加一个 `<table>_seq`，而它生成的 DO 带着 `@KeySequence`）。**两处都已在 Spec 适配器里修掉**，而它们**从 Spike 起就一直躺在那份模块里**。
+
+上面那条 `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` **保留**，因为 PostgreSQL 确实没有 `DUAL`；它**不是**这次修法的一部分，也**没有**声称是。
 
 **⚠ 两个坑，都是在本宿主上量出来的**——跑的过程见 Spike 记录：
 

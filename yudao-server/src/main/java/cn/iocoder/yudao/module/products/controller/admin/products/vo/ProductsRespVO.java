@@ -12,31 +12,31 @@ import cn.idev.excel.annotation.*;
 @ExcelIgnoreUnannotated
 public class ProductsRespVO {
 
-    @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "14661")
+    @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "31906")
     @ExcelProperty("编号")
     private Long id;
 
-    @Schema(description = "产品名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "芋艿")
+    @Schema(description = "产品名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "赵六")
     @ExcelProperty("产品名称")
     private String name;
 
-    @Schema(description = "价格", example = "24883")
+    @Schema(description = "价格", example = "32710")
     @ExcelProperty("价格")
     private Long price;
 
-    @Schema(description = "状态", example = "1")
+    @Schema(description = "状态", example = "2")
     @ExcelProperty("状态")
     private String status;
 
-    @Schema(description = "属主用户", requiredMode = Schema.RequiredMode.REQUIRED, example = "3510")
+    @Schema(description = "属主用户", requiredMode = Schema.RequiredMode.REQUIRED, example = "29080")
     @ExcelProperty("属主用户")
     private String ownerUserId;
 
-    @Schema(description = "所属组织", example = "3431")
+    @Schema(description = "所属组织", example = "2701")
     @ExcelProperty("所属组织")
     private Long orgId;
 
-    @Schema(description = "所属部门", example = "24361")
+    @Schema(description = "所属部门", example = "9334")
     @ExcelProperty("所属部门")
     private Long deptId;
 

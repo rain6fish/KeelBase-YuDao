@@ -35,6 +35,7 @@ PG_URL="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
 exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar" \
   --server.port="$PORT" \
   --spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=0 \
+  --spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource \
   --spring.datasource.dynamic.datasource.master.url="$PG_URL" \
   --spring.datasource.dynamic.datasource.master.username="$PG_USER" \
   --spring.datasource.dynamic.datasource.master.password="$PG_PASSWORD" \

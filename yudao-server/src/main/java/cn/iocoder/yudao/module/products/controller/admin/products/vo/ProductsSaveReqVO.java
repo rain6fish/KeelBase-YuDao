@@ -9,27 +9,27 @@ import jakarta.validation.constraints.*;
 @Data
 public class ProductsSaveReqVO {
 
-    @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "14661")
+    @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "31906")
     private Long id;
 
-    @Schema(description = "产品名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "芋艿")
+    @Schema(description = "产品名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "赵六")
     @NotEmpty(message = "产品名称不能为空")
     private String name;
 
-    @Schema(description = "价格", example = "24883")
+    @Schema(description = "价格", example = "32710")
     private Long price;
 
-    @Schema(description = "状态", example = "1")
+    @Schema(description = "状态", example = "2")
     private String status;
 
-    @Schema(description = "属主用户", requiredMode = Schema.RequiredMode.REQUIRED, example = "3510")
+    @Schema(description = "属主用户", requiredMode = Schema.RequiredMode.REQUIRED, example = "29080")
     @NotEmpty(message = "属主用户不能为空")
     private String ownerUserId;
 
-    @Schema(description = "所属组织", example = "3431")
+    @Schema(description = "所属组织", example = "2701")
     private Long orgId;
 
-    @Schema(description = "所属部门", example = "24361")
+    @Schema(description = "所属部门", example = "9334")
     private Long deptId;
 
 }

@@ -23,7 +23,9 @@ const DB = process.env.PG_DB || 'ruoyi-vue-pro';
 const TENANT = '1';
 const MODULE = process.env.MODULE || 'products';
 const ENTITY = MODULE.charAt(0).toUpperCase() + MODULE.slice(1);
-const SECOND_USER = process.env.SECOND_USER || 'gate-sales';
+// The host rejects a username that is not alphanumeric (`用户账号由 数字、字母 组成`) — measured.
+// 宿主拒绝非字母数字的用户名（`用户账号由 数字、字母 组成`）——实测。
+const SECOND_USER = process.env.SECOND_USER || 'gatesales';
 const SECOND_PASS = process.env.SECOND_PASS || 'gate-pass-1234';
 
 let pass = 0;
@@ -68,6 +70,13 @@ async function chat(token, message, extra = {}) {
 
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
+// The audit chain is signed with `keelbase.audit.hmac-key`, so rows written under a different key can
+// never verify — a chain signed by one key and checked by another reads as broken at its first row.
+// That is not a defect; it is what an HMAC chain does. This gate therefore clears the table first, and
+// says so, rather than reporting a failure it caused itself.
+// 审计链用 `keelbase.audit.hmac-key` 签名，故**换过 key** 的行永远验不过——一把钥匙签、另一把钥匙验，会在
+// **第一行**就报断。那不是缺陷，是 HMAC 链的性质。故本门禁**先清表、并说出来**，而不是报一个它自己造成的失败。
+psql('truncate table ai_audit_logs');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
 
 const admin = await login('admin', 'admin123');
@@ -108,20 +117,30 @@ const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
 
 console.log('== 场景 2 · 列表工具只回本人行 ==');
-const beforeMine = Number(psql(`select count(*) from ${MODULE} where owner_user_id = '1'`));
-const beforeTheirs = Number(psql(`select count(*) from ${MODULE} where owner_user_id = '${secondId}'`));
-psql(`insert into ${MODULE}(name, owner_user_id) values ('gate-admin-row', '1')`);
-psql(`insert into ${MODULE}(name, owner_user_id) values ('gate-sales-row', '${secondId}')`);
+// A marker unique to this run, not a delta: the first version counted the caller's rows before and
+// expected one more of a **fixed** name, which is wrong the second time the gate runs — a row of that
+// name from the previous run is already there. Unique names make the assertion hold on a database the
+// gate has already been run against, without weakening what it says.
+// 本次唯一的标记名，而不是增量：第一版数的是调用方**改前**的行数、再拿一个**固定名字**去期望「多一行」——门禁
+// **第二次**跑就错了，因为上一遍那行同名行还在。唯一名让断言在一个**已经跑过的库**上照样成立，且没有放宽它说的话。
+const marker = `gate-${Date.now()}`;
+const adminMarker = `${marker}-admin`;
+const salesMarker = `${marker}-sales`;
+// The id comes from the module's sequence and the column has no default — that is the host's own
+// convention (`system_users.id` is the same), so a raw insert has to name it.
+// id 来自模块的序列、而该列没有默认值——那是宿主自己的惯例（`system_users.id` 亦然），故裸插入必须点名它。
+psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_seq'), '${adminMarker}', '1')`);
+psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_seq'), '${salesMarker}', '${secondId}')`);
 {
   const a = await chat(admin, '列出产品');
   check('admin 触发生成的工具', 'list_generated_products', (a.toolCalls || [])[0]);
   check('admin 的执行状态', 'executed', a.status);
-  check('admin 多看到自己那一行', beforeMine + 1, (a.data || []).filter((r) => r.name === 'gate-admin-row').length);
+  check('admin 看得到本次那一行', 1, (a.data || []).filter((r) => r.name === adminMarker).length);
 
   const s = await chat(second, '列出产品');
   check('第二个调用方触发同一个工具', 'list_generated_products', (s.toolCalls || [])[0]);
-  check('它看得到自己那一行', beforeTheirs + 1, (s.data || []).filter((r) => r.name === 'gate-sales-row').length);
-  check('它看不到 admin 那一行', 0, (s.data || []).filter((r) => r.name === 'gate-admin-row').length);
+  check('它看得到自己那一行', 1, (s.data || []).filter((r) => r.name === salesMarker).length);
+  check('它看不到 admin 那一行', 0, (s.data || []).filter((r) => r.name === adminMarker).length);
 }
 
 console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');

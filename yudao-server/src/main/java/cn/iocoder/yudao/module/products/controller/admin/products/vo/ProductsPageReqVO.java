@@ -13,22 +13,22 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @Data
 public class ProductsPageReqVO extends PageParam {
 
-    @Schema(description = "产品名称", example = "芋艿")
+    @Schema(description = "产品名称", example = "赵六")
     private String name;
 
-    @Schema(description = "价格", example = "24883")
+    @Schema(description = "价格", example = "32710")
     private Long price;
 
-    @Schema(description = "状态", example = "1")
+    @Schema(description = "状态", example = "2")
     private String status;
 
-    @Schema(description = "属主用户", example = "3510")
+    @Schema(description = "属主用户", example = "29080")
     private String ownerUserId;
 
-    @Schema(description = "所属组织", example = "3431")
+    @Schema(description = "所属组织", example = "2701")
     private Long orgId;
 
-    @Schema(description = "所属部门", example = "24361")
+    @Schema(description = "所属部门", example = "9334")
     private Long deptId;
 
     @Schema(description = "创建时间")

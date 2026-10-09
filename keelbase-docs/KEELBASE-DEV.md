@@ -57,10 +57,11 @@ can be pointed at a different stack without editing anything.
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | keeps the runtime's response envelope off this host's own controllers |
 | `--yudao.tenant.ignore-tables=…` | names the tables **KeelBase governs**, so the host's tenant interceptor does not narrow them too (one authority per row — see the line's decision index) |
 | `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | the host's own value is `SELECT 1 FROM DUAL`, which is MySQL — PostgreSQL has no `DUAL` |
+| `--spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource` | **the pool.** See below — with Druid, about half of all logins fail |
 
-## ⚠ A defect on this stack, unresolved
+## The pool had to be swapped, and why
 
-On PostgreSQL, **about half of all logins answer 500**:
+On PostgreSQL and **Druid**, about half of all logins answered 500:
 
 ```
 org.postgresql.util.PSQLException: 这个 statement 已经被关闭   (this statement has already been closed)
@@ -69,14 +70,17 @@ org.postgresql.util.PSQLException: 这个 statement 已经被关闭   (this stat
   …  MybatisMapperMethod → AdminUserMapper.selectWithCursor
 ```
 
-It is **not** the host's fault for having a bug and not ours for having caused it — it sits where **MyBatis-Plus 3.5.17, Druid and PostgreSQL** meet, and it reproduces on the plain login path. Two hypotheses were tested and **both are wrong**, which is recorded so nobody re-runs them:
+**On Hikari it does not happen at all** — twelve logins in a row, and the gate goes green. The one-line change is the `…master.type` parameter above, and it is a **command-line parameter**: no upstream file is edited for it.
 
-- **Druid's prepared-statement cache** — set to `false` on both property prefixes, and verified that the prefix binds (a deliberately invalid value on the same prefix fails startup). The failure is unchanged.
-- **Druid's `stat` filter** — disabled; unchanged.
+Getting there took a wrong turn worth keeping. The first attempt concluded "Druid's prepared-statement cache is ruled out" — and reported that as settled. **It was a false green**: what had been verified is that the *property binds*, not that the *pool changed*. Reading the pool's own state (Druid's stat servlet at `/druid/datasource.json`) showed `PoolPreparedStatements = true` the whole time. And then the more useful finding:
 
-What it means for this repository: **the gate is written and it is red for this reason.** `scripts/run-generated-module-scenarios.mjs` asserts the behaviours the spike observed, and it cannot get past login often enough to assert them. That is a defect in the stack, not in the gate, and it is the one thing standing between this line and a re-runnable gate.
+> **The Druid pool cannot be configured from outside this application.** `spring.datasource.dynamic.druid.pool-prepared-statements=false` — as a command-line argument, as an external config file at higher precedence — does not change it; neither does the sibling prefix `spring.datasource.druid.*`; **nor does editing `application-local.yaml` and rebuilding**, after which the jar was verified to contain `false` while the pool still reported `true`.
 
-`--spring.datasource.dynamic.druid.validation-query="SELECT 1"` above is kept because PostgreSQL genuinely has no `DUAL`; it is **not** a fix for the above, and does not claim to be.
+So the whole class of "tune Druid with a property" fixes is a dead end here, and the next thing to try was not another property. `prepareThreshold=0` on the JDBC URL was tried too and did not help.
+
+What the gate is for, the gate then did: on its first run against the fixed stack it found **two real dialect mismatches in the generated module** — a `boolean deleted` column that the host's logic-delete compares against `0` and `1` (its own schema writes `deleted int2 not null default 0`), and an `id` with no sequence behind it (the host's convention is `id int8 not null` plus a `<table>_seq`, and its generated DO carries `@KeySequence`). Both are fixed in the spec adapter, and both had been sitting in the module since the spike.
+
+`--spring.datasource.dynamic.druid.validation-query="SELECT 1"` above is kept because PostgreSQL genuinely has no `DUAL`; it is **not** part of this fix, and does not claim to be.
 
 **⚠ Two traps, both measured on this host** — see the spike record for the runs:
 
