@@ -125,6 +125,20 @@ html body .v-menu .el-menu .el-sub-menu__title {
   margin: 2px 0 !important;
 }
 
+// The line between the sidebar and the content. It is not a border on either of them: yudao draws it
+// as a `::after` on an absolutely positioned strip that spans the sidebar's full height, one pixel
+// wide, in the border colour. The product's own shell does not draw it at all — the sidebar and the
+// content share one ground, and the split is read from the layout rather than from a rule between
+// them. Same class is used elsewhere in yudao's layout variants for the same purpose, so this takes
+// all of them; there is only one on this page.
+// 侧边栏与内容之间的那条线。它不是任何一侧的 border：yudao 把它画在一条绝对定位、贯穿侧边栏全高的
+// 条带的 `::after` 上，1px 宽、用边框色。产品自己的壳根本不画它——侧边栏与内容共用同底色，分界靠布局
+// 读出来，而不是靠中间一条线。这个类在 yudao 的其他布局变体里也用于同一目的，故这里一并去掉；本页上
+// 它只出现一次。
+html body .layout-border__right::after {
+  display: none !important;
+}
+
 // The login page ends with a block of links into the vendor's own site — a reading list, a video
 // course, an interview collection and an outsourcing contact. It is static markup with no flag behind
 // it, so the layer is the only place that can take it out without editing upstream. It is identified
