@@ -113,7 +113,11 @@ public final class SpecCodegen {
     private static final List<String> HAND_WRITTEN = List.of(
             // YD-2: an upstream module whose schema upstream does not publish, so it was derived once.
             // YD-2：一个上游不发布其 schema 的上游模块，故它被推导了一次。
-            "sql/keelbase-crm.sql");
+            "sql/keelbase-crm.sql",
+            // ai1: enabled and compiled with no schema of its own, so its endpoints answered 500 until
+            // this file existed. Upstream publishes no DDL for it either.
+            // ai1：被启用、被编译，却没有自己的 schema，故在本文件存在之前它的端点一律答 500。上游同样不发布它的 DDL。
+            "sql/keelbase-ai1.sql");
 
     private SpecCodegen() {
     }
