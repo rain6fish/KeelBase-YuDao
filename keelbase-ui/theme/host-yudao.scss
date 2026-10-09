@@ -65,14 +65,12 @@ html body .el-menu .el-sub-menu .el-sub-menu__title:hover {
 
 // A group whose own page is open states that twice over: yudao tints its title with the same
 // variable it uses for the active item's text, which is white here. The product's own answer is a
-// tinted ground with primary text. `.el-sub-menu` in the chain is again weight, and `:has()` — which
-// contributes the weight of its argument — is what makes this reliably the heaviest.
+// tinted ground with primary text. `.el-sub-menu` in the chain is again weight — `.is-active` is
+// Element Plus's own mark on a group that contains the open item, which is what this host renders.
 // 含有已打开页面的分组，yudao 用「选中项文字色」那个变量给它的标题上色，而这里那个值是白色。产品自己
-// 的答案是浅底 + 主色文字。链上的 `.el-sub-menu` 同样是为了权重，而真正让它稳稳最重的是 `:has()`——
-// 它贡献的是其参数的权重。
-html body .v-menu .el-menu .el-sub-menu:has(> .el-menu-item.is-active) > .el-sub-menu__title,
+// 的答案是浅底 + 主色文字。链上的 `.el-sub-menu` 同样是为了权重——`.is-active` 是 Element Plus 自己给
+// 「含有已打开项的分组」打的标记，本宿主渲染的正是它。
 html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title,
-html body .el-menu .el-sub-menu:has(> .el-menu-item.is-active) > .el-sub-menu__title,
 html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
   background-color: var(--el-color-primary-light-9) !important;
   color: var(--el-color-primary) !important;

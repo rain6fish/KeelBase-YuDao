@@ -115,6 +115,17 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # Unconditional, not gated on node_modules existing: a checkout whose last install died partway
   # leaves a node_modules that looks present and is not usable, and the failure surfaces only later,
   # as a missing module during the build. pnpm makes a satisfied install a no-op.
+  # Upstream renders a doc-alert banner on most pages, pointing at its own documentation site. It is
+  # gated by a build-time flag, so it is turned off here rather than hidden with CSS: the element then
+  # never renders at all. It goes through the environment because Vite lets a variable that already
+  # exists win over the .env file — which is what keeps this a build-flag change and not an edit to an
+  # upstream file. Override with KEELBASE_YUDAO_UI_DOCALERT=true to get upstream's behaviour back.
+  # 上游在多数页面上渲染一条文档提示条，指向它自己的文档站。它由一个构建期开关控制，故在此**关掉**
+  # 而不是用 CSS 藏起来：元素因此根本不渲染。走环境变量，是因为 Vite 让已存在的变量优先于 `.env` 文件
+  # ——这正是让这件事停留在「改构建开关」而**不是**改上游文件的原因。用
+  # KEELBASE_YUDAO_UI_DOCALERT=true 可恢复上游行为。
+  export VITE_APP_DOCALERT_ENABLE="${KEELBASE_YUDAO_UI_DOCALERT:-false}"
+
   echo "installing the app's dependencies (this is upstream's own toolchain)…"
   ( cd "$UI_DIR" && "${PM[@]}" --registry="$REGISTRY" install )
   ( cd "$UI_DIR" && "${PM[@]}" run "$BUILD_SCRIPT" )

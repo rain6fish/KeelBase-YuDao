@@ -54,6 +54,13 @@ source; only the structure is restated. It is authored here, not synced.
 The checkout the app is built from is never modified. The trade is that the UI's own dev server
 renders upstream's look; only the built artefact carries the layer.
 
+**One thing the build also turns off.** Upstream renders a doc-alert banner on most pages, pointing at
+its own documentation site. It is gated by a build-time flag (`VITE_APP_DOCALERT_ENABLE`), so the
+build sets that flag through the environment instead of hiding the banner with CSS — the element then
+never renders at all. Vite lets an environment variable that already exists win over the `.env` file,
+which is what keeps this a build flag rather than an edit to an upstream file. Set
+`KEELBASE_YUDAO_UI_DOCALERT=true` to get upstream's behaviour back.
+
 ## Two facts that differ from the RuoYi host
 
 1. **The admin UI is not in this repository.** Upstream keeps `yudao-ui/yudao-ui-admin-vue3` as a
