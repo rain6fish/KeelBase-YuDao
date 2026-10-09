@@ -109,11 +109,13 @@
 <!--        </dependency>-->
 
         <!-- CRM 相关模块。默认注释，保证编译速度 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.boot</groupId>-->
-<!--            <artifactId>yudao-module-crm</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
+        <!-- YD-2 enables it: the first *existing* upstream business module KeelBase governs. /
+             YD-2 把它打开：KeelBase 治理的第一个**上游既有**业务模块。 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-crm</artifactId>
+            <version>${revision}</version>
+        </dependency>
 
         <!-- ERP 相关模块。默认注释，保证编译速度 -->
 <!--        <dependency>-->

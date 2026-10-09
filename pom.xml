@@ -16,12 +16,16 @@
         <module>yudao-module-system</module>
         <module>yudao-module-infra</module>
 <!--        <module>yudao-module-member</module>-->
-<!--        <module>yudao-module-bpm</module>-->
+        <!-- YD-2 enables it: `yudao-module-crm` depends on it, so it has to be in the reactor. /
+             YD-2 把它打开：`yudao-module-crm` 依赖它，故必须在 reactor 里。 -->
+        <module>yudao-module-bpm</module>
 <!--        <module>yudao-module-report</module>-->
 <!--        <module>yudao-module-mp</module>-->
 <!--        <module>yudao-module-pay</module>-->
 <!--        <module>yudao-module-mall</module>-->
-<!--        <module>yudao-module-crm</module>-->
+        <!-- YD-2 enables it: the first *existing* upstream business module KeelBase governs. /
+             YD-2 把它打开：KeelBase 治理的第一个**上游既有**业务模块。 -->
+        <module>yudao-module-crm</module>
 <!--        <module>yudao-module-erp</module>-->
 <!--        <module>yudao-module-iot</module>-->
 <!--        <module>yudao-module-mes</module>-->
