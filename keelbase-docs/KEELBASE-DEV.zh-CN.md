@@ -127,6 +127,14 @@ bash scripts/gen-from-spec.sh specs/products.json --check   # 比对，有漂移
 
 **`--check` 证明了什么、没证明什么。** 它证明盘上的文件**就是 spec 所说的那样**；它**不**证明它们**是对的**——它比的是**上一次运行写下的**，所以模板里的 bug 会**忠实地重新生成自己**、并且照报 `no drift`。第一版 DDL 模板漏了行尾逗号、还把 `comment` 粘到长约束上，产出了**无效 SQL** 而 `--check` 说它干净；逮住它的是**与 Spike 那份手工文件对账**。
 
+**边界在哪，以及它是被检查的。** 适配器拥有**模块级**面——表 · 工具面 · 行范围切点——而宿主级件由宿主线**手写一次**。在上面那两个命名空间之内，这一点现在是**被强制**的、不是被描述的：
+
+```bash
+bash scripts/gen-from-spec.sh --check-boundary
+```
+
+它**两个方向都报错**：生成的缺了 ⇒ Spec 不再是源；两边都不属于 ⇒ 出现了**第二个源**。这道检查值得有，因为命名空间**并不靠名字区分两者**——`sql/keelbase-products.sql` 是生成的、`sql/keelbase-crm.sql` 是手写的，并排放在一起。因此新增一个手写文件必须**在 `SpecCodegen.HAND_WRITTEN` 里声明**；那是要点，不是麻烦。
+
 ## 上游，以及怎么对着它比
 
 `upstream` 指向 `https://github.com/YunaiV/ruoyi-vue-pro.git`——**规范源**；项目的 Gitee 镜像这里**没配**。

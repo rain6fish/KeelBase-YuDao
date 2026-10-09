@@ -7,6 +7,7 @@
 #
 #   bash scripts/gen-from-spec.sh specs/products.json
 #   bash scripts/gen-from-spec.sh specs/products.json --check
+#   bash scripts/gen-from-spec.sh --check-boundary
 #
 # It resolves JDK 25 for the one command, runs from the repository root, and passes the arguments
 # through untouched.
@@ -16,6 +17,7 @@
 #
 #   bash scripts/gen-from-spec.sh specs/products.json
 #   bash scripts/gen-from-spec.sh specs/products.json --check
+#   bash scripts/gen-from-spec.sh --check-boundary
 #
 # 它为这一条命令解析 JDK 25、在仓库根运行、参数原样透传。
 set -euo pipefail

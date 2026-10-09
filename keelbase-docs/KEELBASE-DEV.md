@@ -144,6 +144,20 @@ regenerates itself faithfully and still reports `no drift`. The first version of
 dropped the trailing commas and glued `comment` onto long constraints, producing invalid SQL that
 `--check` called clean; what caught it was comparing against the spike's hand-made file.
 
+**Where the boundary is, and that it is checked.** The adapter owns the *module-level* surface — the
+table, the tool face, the row-scope pointcut — and a host line writes its *host-level* pieces by hand
+exactly once. Within the two namespaces above that is **enforced** rather than described:
+
+```bash
+bash scripts/gen-from-spec.sh --check-boundary
+```
+
+It fails in **both** directions: a generated file that is gone means the spec stopped being the source,
+and a file belonging to neither list means a second one appeared. The check earns its place because the
+namespaces do not tell the two apart by name — `sql/keelbase-products.sql` is generated and
+`sql/keelbase-crm.sql` is hand-written, sitting side by side. A new hand-written file therefore has to
+be **declared** in `SpecCodegen.HAND_WRITTEN`; that is the point, not a nuisance.
+
 ## Upstream, and how to compare against it
 
 `upstream` points at `https://github.com/YunaiV/ruoyi-vue-pro.git` — the canonical source; the

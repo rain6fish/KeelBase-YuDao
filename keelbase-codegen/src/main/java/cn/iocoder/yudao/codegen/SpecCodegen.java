@@ -90,24 +90,56 @@ public final class SpecCodegen {
      * artifact can find the thing that wrote it. / 生成物的出处行。它点名生成器，好让读产物的人找得到写它的东西。 */
     private static final String GENERATED_BY = "keelbase-codegen";
 
+    /**
+     * The seam files a host line writes <b>once</b>, which no Spec produces — declared so that the
+     * boundary is something the build can check rather than a claim in a document, and so that a file
+     * belonging to neither list fails instead of quietly becoming a second source.
+     *
+     * <p>This is the answer to the boundary question `RY-38` closed with: the adapter owns the
+     * <em>module-level</em> surface (the table, the tool face, the row-scope pointcut), and a host line
+     * writes its <em>host-level</em> pieces by hand exactly once. Within these two namespaces that is
+     * now enforced rather than described — and the enforcement is worth having because the namespaces
+     * do not distinguish the two by name: `sql/keelbase-products.sql` is generated and
+     * `sql/keelbase-crm.sql` is hand-written, side by side.
+     *
+     * 一条宿主线**只写一次**、而任何 Spec 都不产出的接缝文件——声明在此，好让这条边界成为**构建能检查**的东西，
+     * 而不是文档里的一句主张；也好让「两边都不属于」的文件**报错**，而不是悄悄变成第二个源。
+     *
+     * <p>这是 `RY-38` 收口时留下的那个边界问题的答案：适配器拥有**模块级**面（表 · 工具面 · 行范围切点），
+     * 宿主级件由宿主线**手写一次**。在这两个命名空间之内，这一点现在**是被强制**的、不是被描述的——而这条强制值得
+     * 有，因为命名空间**并不靠名字区分两者**：`sql/keelbase-products.sql` 是生成的、`sql/keelbase-crm.sql` 是手写的，
+     * 并排放在一起。
+     */
+    private static final List<String> HAND_WRITTEN = List.of(
+            // YD-2: an upstream module whose schema upstream does not publish, so it was derived once.
+            // YD-2：一个上游不发布其 schema 的上游模块，故它被推导了一次。
+            "sql/keelbase-crm.sql");
+
     private SpecCodegen() {
     }
 
     public static void main(String[] args) throws IOException {
         boolean check = false;
+        boolean boundary = false;
         String specArg = null;
         for (String arg : args) {
             if ("--check".equals(arg)) {
                 check = true;
+            } else if ("--check-boundary".equals(arg)) {
+                boundary = true;
             } else if (!arg.startsWith("--")) {
                 specArg = arg;
             }
         }
+        Path root = repoRoot();
+        if (boundary) {
+            checkBoundary(root);
+            return;
+        }
         if (specArg == null) {
-            System.err.println("usage: gen-from-spec.sh <spec.json> [--check]");
+            System.err.println("usage: gen-from-spec.sh <spec.json> [--check] | --check-boundary");
             System.exit(2);
         }
-        Path root = repoRoot();
         Spec spec = readSpec(Path.of(specArg));
 
         List<Output> outputs = List.of(
@@ -158,6 +190,75 @@ public final class SpecCodegen {
             System.exit(2);
         }
         return here;
+    }
+
+    /**
+     * Ask whether the boundary is where this file says it is: every file the adapter owns is either
+     * something a Spec produces, or something declared hand-written, and nothing else.
+     *
+     * <p>It fails in <b>both</b> directions. A generated file that is missing means the Spec stopped
+     * being the source; a file belonging to neither list means a second source appeared — which is the
+     * failure this whole check exists to make loud.
+     *
+     * 问这条边界是不是在它自己说的地方：适配器拥有的每个文件，要么是某个 Spec 产出的、要么是声明为手写的，
+     * **没有第三种**。它**两个方向都报错**：生成的缺了 ⇒ Spec 不再是源；两边都不属于 ⇒ 出现了**第二个源**——
+     * 那正是这道检查存在的理由。
+     */
+    private static void checkBoundary(Path root) throws IOException {
+        String genDir = String.join("/", GENERATED_DIR);
+        List<String> generated = new ArrayList<>();
+        try (var specs = Files.list(root.resolve("specs"))) {
+            for (Path spec : specs.filter(p -> p.getFileName().toString().endsWith(".json")).sorted().toList()) {
+                Spec s = readSpec(spec);
+                generated.add("sql/keelbase-" + s.module() + ".sql");
+                generated.add(genDir + "/" + s.entity() + "Tools.java");
+                generated.add(genDir + "/" + s.entity() + "Governance.java");
+            }
+        }
+        List<String> actual = new ArrayList<>();
+        try (var sql = Files.list(root.resolve("sql"))) {
+            sql.filter(p -> p.getFileName().toString().startsWith("keelbase-")
+                            && p.getFileName().toString().endsWith(".sql"))
+                    .sorted().forEach(p -> actual.add("sql/" + p.getFileName()));
+        }
+        try (var gen = Files.list(root.resolve(genDir))) {
+            gen.filter(p -> p.getFileName().toString().endsWith(".java"))
+                    .sorted().forEach(p -> actual.add(genDir + "/" + p.getFileName()));
+        }
+
+        int bad = 0;
+        for (String rel : actual) {
+            if (generated.contains(rel)) {
+                System.out.println("  generated     " + rel);
+            } else if (HAND_WRITTEN.contains(rel)) {
+                System.out.println("  hand-written  " + rel);
+            } else {
+                System.err.println("  UNDECLARED    " + rel
+                        + " - neither a Spec's output nor declared hand-written");
+                bad += 1;
+            }
+        }
+        for (String rel : generated) {
+            if (!actual.contains(rel)) {
+                System.err.println("  MISSING       " + rel);
+                bad += 1;
+            }
+        }
+        for (String rel : HAND_WRITTEN) {
+            if (!actual.contains(rel)) {
+                System.err.println("  MISSING       " + rel + " (declared hand-written)");
+                bad += 1;
+            }
+        }
+        System.out.println();
+        if (bad == 0) {
+            System.out.println("boundary holds: " + generated.size() + " generated, "
+                    + HAND_WRITTEN.size() + " hand-written, nothing else.");
+        } else {
+            System.err.println(bad + " file(s) outside the boundary - a Spec is not the source,"
+                    + " or a second one appeared.");
+            System.exit(1);
+        }
     }
 
     /** Compare as text with line endings normalised: this repository is checked out on Windows, so what
