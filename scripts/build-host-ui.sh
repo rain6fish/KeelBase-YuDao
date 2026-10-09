@@ -88,6 +88,64 @@ fi
 UI_SHA="$(git -C "$UI_DIR" rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 echo "admin UI checkout: $UI_DIR @ $UI_SHA"
 
+# --- 1b. our overlay and patches, laid over a reset tree -------------------------------------------
+# Until now the layer never touched the host's source. Two of the things asked of it cannot be done
+# from outside — the dashboard card's contents and the logo import are source, not styling — so this
+# repository now carries deltas and the build lays them on. The checkout is disposable and refetched,
+# so it is reset to upstream first: without that, a second run applies the patches twice and fails,
+# and the script could not be used to iterate.
+#
+# Both directions fail loudly on purpose. An overlay whose target no longer exists, and a patch that
+# no longer applies, both mean upstream moved and our delta has to be revisited — never that the
+# delta should be skipped, which would leave the artefact quietly half-ours.
+#
+# 在这之前，这一层从不碰宿主的源码。有两件被要求的事从外面做不到——首页卡片的内容与 logo 的引用是**源码**，
+# 不是样式——故本仓现在承载增量，由构建铺上去。检出是一次性的、每次重新取，故先复位到上游：没有这一步，
+# 第二次跑会把补丁应用两遍而失败，这个脚本也就没法用来反复迭代。
+#
+# 两个方向都**刻意**响亮地失败。覆盖目标已不存在、补丁已应用不上，都意味着上游动了、我们的增量需要重做
+# ——而不是「跳过它」，那会让产物悄悄变成半我们的。
+OVERLAY="$REPO_ROOT/keelbase-ui/host-overlay"
+PATCHES="$REPO_ROOT/keelbase-ui/host-patches"
+
+if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" ) ]]; then
+  if ! git -C "$UI_DIR" diff --quiet || ! git -C "$UI_DIR" diff --cached --quiet; then
+    echo "resetting the checkout to upstream before laying our delta on it…"
+    git -C "$UI_DIR" checkout -- .
+  fi
+
+  # The overlay adds files the checkout does not have; it does not replace upstream's. That is
+  # deliberate, and it is what makes the coupling loud: a file we add is referenced only from a patch,
+  # so if upstream moves the code that references it, the patch fails to apply and says so. A
+  # replacement would have no such tripwire — upstream renaming the file would leave our copy sitting
+  # there unused while the app went on using theirs, silently. If a replacement is ever needed, it
+  # belongs in this directory *together with* the patch that points at it.
+  # 覆盖目录**新增**检出里没有的文件，不替换上游的。这是刻意的，也正是让这层耦合响亮的原因：我们新增的文件
+  # 只被补丁引用，故上游一旦挪动引用它的那段代码，补丁就应用不上、并会明说。替换则没有这样的绊线——上游把
+  # 文件改名后，我们那份会静静躺在那里不被用，而应用继续用它的。真需要替换时，它应当与**指向它的那条补丁**
+  # 一同放进本目录。
+  if [[ -d "$OVERLAY" ]]; then
+    while IFS= read -r -d '' f; do
+      rel="${f#"$OVERLAY"/}"
+      cp "$f" "$UI_DIR/$rel"
+      echo "added $rel"
+    done < <(find "$OVERLAY" -type f -print0)
+  fi
+
+  if [[ -d "$PATCHES" ]]; then
+    for p in "$PATCHES"/*.patch; do
+      [[ -e "$p" ]] || continue
+      if ! git -C "$UI_DIR" apply --check "$p" 2>/dev/null; then
+        echo "patch does not apply cleanly: $(basename "$p")" >&2
+        echo "upstream changed the code it edits — the patch has to be rebased, not skipped" >&2
+        exit 1
+      fi
+      git -C "$UI_DIR" apply "$p"
+      echo "applied $(basename "$p")"
+    done
+  fi
+fi
+
 # --- 2. build the app, from an untouched tree ------------------------------------------------------
 if [[ "$SKIP_BUILD" == "0" ]]; then
   # The upstream tree ships a pnpm lockfile (v9) and no npm one, so pnpm is the faithful package
@@ -125,6 +183,13 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # ——这正是让这件事停留在「改构建开关」而**不是**改上游文件的原因。用
   # KEELBASE_YUDAO_UI_DOCALERT=true 可恢复上游行为。
   export VITE_APP_DOCALERT_ENABLE="${KEELBASE_YUDAO_UI_DOCALERT:-false}"
+
+  # The product's name, not the platform's. Same mechanism and same reason as the flag above: the app
+  # reads its title from this variable, so the build sets it rather than editing the .env file that
+  # carries upstream's. It lands in the page title and in every place the UI shows the system's name.
+  # 产品的名字，不是平台的名字。机制与理由同上：应用从这个变量取标题，故由构建设置它，而不是去改承载上游
+  # 值的那份 .env。它会落到页面标题，以及界面里每一处显示系统名的地方。
+  export VITE_APP_TITLE="${KEELBASE_YUDAO_UI_TITLE:-KB管理系统}"
 
   echo "installing the app's dependencies (this is upstream's own toolchain)…"
   ( cd "$UI_DIR" && "${PM[@]}" --registry="$REGISTRY" install )
@@ -185,6 +250,18 @@ echo "compiled $THEME_CSS_NAME ($want primary declarations pinned)"
 if [[ -f "$HOST_SCSS" ]]; then
   "$SASS" "$HOST_SCSS" "$DIST/$HOST_CSS_NAME"
   echo "compiled $HOST_CSS_NAME"
+fi
+
+# The avatar the stylesheet points at. It sits next to the stylesheet in the artefact, so the CSS can
+# name it relatively and stay correct whatever the build's base path is — a relative URL inside a
+# stylesheet resolves against the stylesheet, not against the page, which is what the page's own
+# relative links cannot do.
+# 样式表所指的那个头像。它与样式表并排落在产物里，故 CSS 可以用相对路径引用它，且不论构建的 base 是什么
+# 都成立——样式表里的相对 URL 是相对**样式表**解析的，而不是相对页面，这正是页面上那些相对链接做不到的事。
+AVATAR_SVG="$REPO_ROOT/keelbase-ui/assets/keelbase-avatar.svg"
+if [[ -f "$AVATAR_SVG" ]]; then
+  cp "$AVATAR_SVG" "$DIST/keelbase-avatar.svg"
+  echo "copied keelbase-avatar.svg"
 fi
 
 # --- 5. link them into the built page, last, idempotently --------------------------------------------

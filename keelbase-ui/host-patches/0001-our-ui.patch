@@ -1,0 +1,266 @@
+diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
+index c22c950..029a7e9 100644
+--- a/src/layout/components/Logo/src/Logo.vue
++++ b/src/layout/components/Logo/src/Logo.vue
+@@ -73,7 +73,7 @@ watch(
+     >
+       <img
+         class="h-[calc(var(--logo-height)-10px)] w-[calc(var(--logo-height)-10px)]"
+-        src="@/assets/imgs/logo.png"
++        src="@/assets/imgs/keelbase-logo.svg"
+       />
+       <div
+         v-if="show"
+diff --git a/src/locales/en.ts b/src/locales/en.ts
+index 9d14564..e1b64c8 100644
+--- a/src/locales/en.ts
++++ b/src/locales/en.ts
+@@ -208,8 +208,8 @@ export default {
+     happyDay: 'Wish you happy every day!',
+     toady: `It's sunny today`,
+     notice: 'Announcement',
+-    project: 'Project',
+-    access: 'Project access',
++    project: 'Modules',
++    access: 'Module access',
+     toDo: 'To do',
+     introduction: 'A serious introduction',
+     shortcutOperation: 'Quick entry',
+diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
+index 13065de..2951d81 100644
+--- a/src/locales/zh-CN.ts
++++ b/src/locales/zh-CN.ts
+@@ -210,8 +210,8 @@ export default {
+     happyDay: '祝你开心每一天!',
+     toady: '今日晴',
+     notice: '通知公告',
+-    project: '项目数',
+-    access: '项目访问',
++    project: '系统模块',
++    access: '模块访问',
+     toDo: '待办',
+     introduction: '一个正经的简介',
+     shortcutOperation: '快捷入口',
+diff --git a/src/store/modules/permission.ts b/src/store/modules/permission.ts
+index e9ca174..8d802c0 100644
+--- a/src/store/modules/permission.ts
++++ b/src/store/modules/permission.ts
+@@ -59,8 +59,16 @@ export const usePermissionStore = defineStore('permission', {
+             }
+           }
+         ])
++        // The platform vendor's own outbound entries are menus, not parts of this system, and the
++        // product's console does not show them. They are dropped here, where the menu tree is built,
++        // so the sidebar and everything else that reads the tree lose them together — they carry no
++        // anchor and no href, so no stylesheet can pick them out.
++        // 平台厂商自己的对外入口是菜单，不是本系统的组成部分，产品的控制台不显示它们。在这里——菜单树被
++        // 构建的地方——去掉，于是侧边栏与任何其他读这棵树的地方一起少掉它们；它们既没有 anchor 也没有
++        // href，任何样式表都挑不出它们。
++        const menuRouters = routerMap.filter((route) => !route.path.startsWith('/external-link'))
+         // 渲染菜单的所有路由
+-        this.routers = cloneDeep(remainingRouter).concat(routerMap)
++        this.routers = cloneDeep(remainingRouter).concat(menuRouters)
+         resolve()
+       })
+     },
+diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
+index 5326389..600c2a7 100644
+--- a/src/views/Home/Index.vue
++++ b/src/views/Home/Index.vue
+@@ -62,14 +62,6 @@
+         <template #header>
+           <div class="h-3 flex justify-between">
+             <span>{{ t('workplace.project') }}</span>
+-            <el-link
+-              type="primary"
+-              :underline="false"
+-              href="https://github.com/yudaocode"
+-              target="_blank"
+-            >
+-              {{ t('action.more') }}
+-            </el-link>
+           </div>
+         </template>
+         <el-skeleton :loading="loading" animated>
+@@ -103,17 +95,9 @@
+                 </div>
+                 <div
+                   class="mt-12px break-all line-clamp-2 text-12px text-gray-400"
+-                  :title="t(item.message)"
++                  :title="item.message"
+                 >
+-                  {{ t(item.message) }}
+-                </div>
+-                <div
+-                  class="mt-auto flex items-center justify-between gap-8px pt-12px text-12px text-gray-400"
+-                >
+-                  <span class="min-w-0 truncate" :title="item.personal">{{ item.personal }}</span>
+-                  <span class="shrink-0 whitespace-nowrap">
+-                    {{ formatTime(item.time, 'yyyy-MM-dd') }}
+-                  </span>
++                  {{ item.message }}
+                 </div>
+               </el-card>
+             </el-col>
+@@ -199,6 +183,7 @@ import { EChartsOption } from 'echarts'
+ import { formatTime } from '@/utils'
+ 
+ import { useUserStore } from '@/store/modules/user'
++import { usePermissionStore } from '@/store/modules/permission'
+ // import { useWatermark } from '@/hooks/web/useWatermark'
+ import type { WorkplaceTotal, Project, Notice, Shortcut } from './types'
+ import { pieOptions, barOptions } from './echarts-data'
+@@ -209,6 +194,7 @@ defineOptions({ name: 'Index' })
+ const { t } = useI18n()
+ const router = useRouter()
+ const userStore = useUserStore()
++const permissionStore = usePermissionStore()
+ // const { setWatermark } = useWatermark()
+ const loading = ref(true)
+ const avatar = userStore.getUser.avatar
+@@ -230,60 +216,24 @@ const getCount = async () => {
+   totalSate = Object.assign(totalSate, data)
+ }
+ 
+-// 获取项目数
++// The system's own modules. Read from the routes the backend handed this user rather than listed by
++// hand: a hand-written list drifts the moment a module is added or switched off, and the count above
++// would go on reporting the old one. 系统自身的模块。取自后端发给该用户的路由，而不是手写一份：手写的
++// 那份在模块增减的那一刻就漂了，上面的计数还会照着旧的报。
+ let projects = reactive<Project[]>([])
+ const getProject = async () => {
+-  const data = [
+-    {
+-      name: 'ruoyi-vue-pro',
+-      icon: 'simple-icons:springboot',
+-      message: 'github.com/YunaiV/ruoyi-vue-pro',
+-      personal: 'Spring Boot 单体架构',
+-      time: new Date('2025-01-02'),
+-      color: '#6DB33F'
+-    },
+-    {
+-      name: 'yudao-ui-admin-vue3',
+-      icon: 'ep:element-plus',
+-      message: 'github.com/yudaocode/yudao-ui-admin-vue3',
+-      personal: 'Vue3 + element-plus 管理后台',
+-      time: new Date('2025-02-03'),
+-      color: '#409EFF'
+-    },
+-    {
+-      name: 'yudao-mall-uniapp',
+-      icon: 'icon-park-outline:mall-bag',
+-      message: 'github.com/yudaocode/yudao-mall-uniapp',
+-      personal: 'Vue3 + uniapp 商城手机端',
+-      time: new Date('2025-03-04'),
+-      color: '#ff4d4f'
+-    },
+-    {
+-      name: 'yudao-cloud',
+-      icon: 'material-symbols:cloud-outline',
+-      message: 'github.com/YunaiV/yudao-cloud',
+-      personal: 'Spring Cloud 微服务架构',
+-      time: new Date('2025-04-05'),
+-      color: '#1890ff'
+-    },
+-    {
+-      name: 'yudao-ui-admin-vben',
+-      icon: 'devicon:antdesign',
+-      message: 'github.com/yudaocode/yudao-ui-admin-vben',
+-      personal: 'Vue3 + vben5(antd) 管理后台',
+-      time: new Date('2025-05-06'),
+-      color: '#e18525'
+-    },
+-    {
+-      name: 'yudao-ui-admin-uniapp',
+-      icon: 'ant-design:mobile',
+-      message: 'github.com/yudaocode/yudao-ui-admin-uniapp',
+-      personal: 'Vue3 + uniapp 管理手机端',
+-      time: new Date('2025-06-01'),
+-      color: '#2979ff'
+-    }
+-  ]
++  const data = permissionStore.getRouters
++    .filter((route) => route.meta && route.meta.title && route.meta.hidden !== true)
++    .map((route) => ({
++      name: route.meta!.title as string,
++      icon: (route.meta!.icon as string) || 'ep:menu',
++      message: route.path,
++      personal: '',
++      time: 0,
++      color: 'var(--el-color-primary)'
++    }))
+   projects = Object.assign(projects, data)
++  totalSate.project = data.length
+ }
+ 
+ // 获取通知公告
+@@ -424,7 +374,11 @@ const getAllApi = async () => {
+ }
+ 
+ const handleProjectClick = (message: string) => {
+-  window.open(`https://${message}`, '_blank')
++  if (/^https?:\/\//.test(message)) {
++    window.open(message, '_blank')
++  } else {
++    router.push(message)
++  }
+ }
+ 
+ const handleShortcutClick = (url: string) => {
+diff --git a/src/views/Login/Login.vue b/src/views/Login/Login.vue
+index 122bdd1..53b1a64 100644
+--- a/src/views/Login/Login.vue
++++ b/src/views/Login/Login.vue
+@@ -9,7 +9,7 @@
+       >
+         <!-- 左上角的 logo + 系统标题 -->
+         <div class="relative flex items-center text-white">
+-          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
++          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
+           <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+         </div>
+         <!-- 左边的背景图 + 欢迎语 -->
+@@ -36,7 +36,7 @@
+           style="color: var(--el-text-color-primary)"
+         >
+           <div class="flex items-center at-2xl:hidden at-xl:hidden">
+-            <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
++            <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
+             <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+           </div>
+           <div class="flex items-center justify-end space-x-10px h-48px">
+diff --git a/src/views/Login/SocialLogin.vue b/src/views/Login/SocialLogin.vue
+index 241cea1..0e8361f 100644
+--- a/src/views/Login/SocialLogin.vue
++++ b/src/views/Login/SocialLogin.vue
+@@ -9,7 +9,7 @@
+       >
+         <!-- 左上角的 logo + 系统标题 -->
+         <div class="relative flex items-center text-white">
+-          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
++          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
+           <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+         </div>
+         <!-- 左边的背景图 + 欢迎语 -->
+@@ -35,7 +35,7 @@
+           class="flex items-center justify-between text-white at-2xl:justify-end at-xl:justify-end"
+         >
+           <div class="flex items-center at-2xl:hidden at-xl:hidden">
+-            <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
++            <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
+             <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+           </div>
+           <div class="flex items-center justify-end space-x-10px h-48px">
+diff --git a/src/views/Login/components/QrCodeForm.vue b/src/views/Login/components/QrCodeForm.vue
+index d5e05ec..a440844 100644
+--- a/src/views/Login/components/QrCodeForm.vue
++++ b/src/views/Login/components/QrCodeForm.vue
+@@ -17,7 +17,7 @@
+   </el-row>
+ </template>
+ <script lang="ts" setup>
+-import logoImg from '@/assets/imgs/logo.png'
++import logoImg from '@/assets/imgs/keelbase-logo.svg'
+ 
+ import LoginFormTitle from './LoginFormTitle.vue'
+ import { LoginStateEnum, useLoginState } from './useLogin'

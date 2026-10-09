@@ -51,67 +51,49 @@
   --top-header-text-color: var(--el-text-color-primary) !important;
   --top-header-hover-color: var(--el-color-primary-light-9) !important;
   --top-tool-border-color: transparent !important;
+
+  // The band the menu draws for hover and for the open item, inside the two floor values below.
+  // Kept as variables so the two states cannot drift apart.
+  // 菜单为悬停与已选项画的那条色带的上下内缩；存成变量，免得两个状态各写一份而漂开。
+  --keel-menu-band-inset: 5px;
 }
 
-// Two states the variables cannot carry, because yudao ties hover text and active text to the same
-// variable and hover background to the same value as the sidebar itself. On the dark default you
-// cannot tell; on a light sidebar white hover text on a light ground is unreadable. Restated here.
-//
-// The `.v-menu` ancestor is there for weight, not for meaning: yudao's sidebar rule is scoped, which
-// makes it `.v-menu[data-v-…] .el-menu .el-menu-item:hover` — five class-level terms against the four
-// of a plain `html body .el-menu .el-menu-item:not(.is-active):hover`. Both are `!important`, so the
-// higher weight wins and the unreadable state comes back. `:not()` contributes only the weight of its
-// argument, which is the trap. The `.v-menu`-less rules are for the collapsed-menu popper, which is
-// teleported out of `.v-menu` and whose own rule carries no scope attribute, so is lighter.
-// 有两个状态光靠变量带不出来：yudao 把「悬停文字色」与「选中文字色」挂在同一个变量上，又把悬停底色
-// 取成侧边栏自身那个值。深色默认下看不出差别；浅色侧边栏里则是白字压浅底，读不了。在此明写。
-//
-// 那个 `.v-menu` 祖先是为了**权重**，不是为了语义：yudao 那条侧边栏规则带作用域，形如
-// `.v-menu[data-v-…] .el-menu .el-menu-item:hover`——五级类权重，对上 `html body .el-menu
-// .el-menu-item:not(.is-active):hover` 的四级。两者都是 `!important`，权重高者胜，于是那个读不了的
-// 状态又回来了。`:not()` 只贡献其**参数**的权重，这正是坑所在。不带 `.v-menu` 的那几条是给折叠态弹出
-// 菜单的：它被传送出 `.v-menu` 之外，且它自己的规则没有作用域属性，权重更轻。
-html body .v-menu .el-menu .el-menu-item:not(.is-active):hover {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-text-color-primary) !important;
+// ── the lines yudao draws between regions ───────────────────────────────────────────────────────────
+// None of them is a border. Each is a pseudo-element on a strip, one pixel wide, in the border colour:
+// `__right` closes the sidebar, `__left` opens a region, `__top` underlines one. The product's own
+// shell draws none of them — regions share one ground and the split is read from the layout.
+// 这些线都不是 border。每一条都是某个条带上 1px 宽的伪元素，用边框色：`__right` 收侧边栏、`__left`
+// 起一个区、`__top` 给某区加下划线。产品自己的壳一条都不画——各区共用同底色，分界靠布局读出来。
+html body .layout-border__right::after {
+  display: none !important;
 }
-html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-text-color-primary) !important;
+html body .layout-border__left::before {
+  display: none !important;
 }
-html body .el-menu .el-menu-item:not(.is-active):hover {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-text-color-primary) !important;
-}
-html body .el-menu .el-sub-menu .el-sub-menu__title:hover {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-text-color-primary) !important;
+html body .layout-border__top::before {
+  display: none !important;
 }
 
-// A group whose own page is open states that twice over: yudao tints its title with the same
-// variable it uses for the active item's text, which is white here. The product's own answer is a
-// tinted ground with primary text. `.is-active` is Element Plus's own mark on a group that contains
-// the open item, which is what this host renders.
-// 含有已打开页面的分组，yudao 用「选中项文字色」那个变量给它的标题上色，而这里那个值是白色。产品自己
-// 的答案是浅底 + 主色文字。`.is-active` 是 Element Plus 自己给「含有已打开项的分组」打的标记，本宿主
-// 渲染的正是它。
-html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-color-primary) !important;
-}
-html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-color-primary) !important;
-}
+// The sidebar's outbound entries to the platform vendor are **not** hidden here. They carry neither
+// an anchor nor an href — yudao renders any off-site menu as a plain `<li>` with a click handler — so
+// no selector can pick them out, and a rule written against their destination matches nothing while
+// looking correct. They are dropped where the menu tree is built instead; see
+// `keelbase-ui/host-patches/`.
+// 侧边栏通向平台厂商的那几个出口**不在这里隐藏**。它们既没有 anchor 也没有 href——yudao 把任何站外菜单
+// 渲染成一个带点击处理的普通 `<li>`——故没有选择器挑得出它们，而一条照着它们的目标网址写的规则会**什么都
+// 匹配不到**、看上去却是对的。它们改在**菜单树被构建的地方**去掉；见 `keelbase-ui/host-patches/`。
 
-// The sidebar's rows, and the room its scrollbar needs. Element Plus defaults a row to 56px; the
-// product's own menu runs 42px for a group and 38px for a child, which is what makes the sidebar read
-// as a list instead of a column of blocks. The right padding is the other half: the scrollbar here is
-// an overlay rather than a reserved strip, so the rows — and the active item's rounded end in
-// particular — would run underneath it.
-// 侧边栏的行高，以及它的滚动条需要的余地。Element Plus 默认一行 56px；产品自己的菜单一级 42px、二级
-// 38px——正是这组数字让侧边栏读起来像一份列表，而不是一列方块。右侧留白是另一半：这里的滚动条是**浮**
-// 在内容上的，而不是占一条留白，故菜单项——尤其是激活项那个收圆的右端——会跑到它下面去。
+// ── the rows, and the band that marks them ──────────────────────────────────────────────────────────
+// Element Plus defaults a row to 56px; the product's own menu runs 42px for a group and 38px for a
+// child, which is what makes the sidebar read as a list instead of a column of blocks. The band that
+// marks hover and the open item is drawn inset from that, so it sits inside the row rather than
+// filling it, and it is rounded off on the right so it reads as a floating element on one ground.
+// The right padding keeps the rows clear of the scrollbar, which here is an overlay rather than a
+// reserved strip.
+// Element Plus 默认一行 56px；产品自己的菜单一级 42px、二级 38px——正是这组数字让侧边栏读起来像一份
+// 列表，而不是一列方块。标记悬停与已选项的那条色带**内缩**绘制，故它落在行内、而不是把整行填满；右侧
+// 收成半圆，于是它读起来像同一底色上的一枚悬浮元素。右侧留白让菜单项避开滚动条——这里的滚动条是**浮**在
+// 内容上的，不占一条留白。
 html body .v-menu .el-menu {
   --el-menu-item-height: 42px;
   --el-menu-sub-item-height: 38px;
@@ -125,59 +107,166 @@ html body .v-menu .el-menu .el-sub-menu__title {
   margin: 2px 0 !important;
 }
 
-// The line between the sidebar and the content. It is not a border on either of them: yudao draws it
-// as a `::after` on an absolutely positioned strip that spans the sidebar's full height, one pixel
-// wide, in the border colour. The product's own shell does not draw it at all — the sidebar and the
-// content share one ground, and the split is read from the layout rather than from a rule between
-// them. Same class is used elsewhere in yudao's layout variants for the same purpose, so this takes
-// all of them; there is only one on this page.
-// 侧边栏与内容之间的那条线。它不是任何一侧的 border：yudao 把它画在一条绝对定位、贯穿侧边栏全高的
-// 条带的 `::after` 上，1px 宽、用边框色。产品自己的壳根本不画它——侧边栏与内容共用同底色，分界靠布局
-// 读出来，而不是靠中间一条线。这个类在 yudao 的其他布局变体里也用于同一目的，故这里一并去掉；本页上
-// 它只出现一次。
-html body .layout-border__right::after {
-  display: none !important;
+// Hover, on a row that is not the open one. Deeper than the tint the product uses for the open group,
+// so the two do not read as the same thing, and the same band geometry as the open item.
+// 悬停，发生在并非已打开的那一行上。比产品给「已打开分组」用的浅色更深一档，使两者不会被读成同一件事；
+// 色带几何与已选项完全相同。
+html body .v-menu .el-menu .el-menu-item:not(.is-active):hover {
+  background-color: transparent !important;
+  color: var(--el-text-color-primary) !important;
+}
+html body .v-menu .el-menu .el-menu-item:not(.is-active):hover::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background-color: var(--el-color-primary-light-8);
+}
+html body .el-menu .el-menu-item:not(.is-active):hover {
+  background-color: transparent !important;
+  color: var(--el-text-color-primary) !important;
+}
+html body .el-menu .el-menu-item:not(.is-active):hover::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background-color: var(--el-color-primary-light-8);
 }
 
-// The login page ends with a block of links into the vendor's own site — a reading list, a video
-// course, an interview collection and an outsourcing contact. It is static markup with no flag behind
-// it, so the layer is the only place that can take it out without editing upstream. It is identified
-// by where its links point rather than by position, so upstream adding a row after it cannot hide the
-// wrong thing. The divider that introduces it goes too: the block is what is being removed.
-// 登录页末尾是一组指向**厂商自己站点**的链接——书单、视频课、面试题、外包咨询。它是写死的标记、背后
-// 没有开关，故在不改上游的前提下只有本层能拿掉它。识别它靠的是**链接指向哪里**，不是它排在第几位，
-// 于是上游往后再加一行也不会藏错东西。引出它的那条分隔线一并去掉：要拿掉的是**整块**。
+html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover {
+  background-color: transparent !important;
+  color: var(--el-text-color-primary) !important;
+}
+html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background-color: var(--el-color-primary-light-8);
+}
+
+// The item that is open, and the group that contains it — both in the same band, the group in the
+// lighter tint so it reads as a container rather than as the current page.
+// 已打开的那一项，以及含有它的那个分组——同一条色带，分组用更浅的一档，使它读起来像容器而不是当前页。
+html body .v-menu .el-menu .el-menu-item.is-active {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+html body .v-menu .el-menu .el-menu-item.is-active::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+html body .v-menu .el-menu .el-menu-item.is-active:hover {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+html body .v-menu .el-menu .el-menu-item.is-active:hover::before {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+}
+html body .el-menu .el-menu-item.is-active {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+html body .el-menu .el-menu-item.is-active::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+}
+html body .el-menu .el-menu-item.is-active:hover {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+html body .el-menu .el-menu-item.is-active:hover::before {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+}
+
+html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: transparent !important;
+  color: var(--el-color-primary) !important;
+}
+html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background-color: var(--el-color-primary-light-9);
+}
+html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title:hover {
+  background-color: transparent !important;
+  color: var(--el-color-primary) !important;
+}
+html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: transparent !important;
+  color: var(--el-color-primary) !important;
+}
+html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background-color: var(--el-color-primary-light-9);
+}
+
+// ── avatars ─────────────────────────────────────────────────────────────────────────────────────────
+// Every avatar in this console is either the vendor's mascot or an image the backend hands out, and
+// neither is ours. The src cannot be reached from here, so the image is hidden and the ground beneath
+// it carries ours instead. That covers every avatar in one place, including the ones inside tables
+// and the profile page, which a component-by-component change would have to visit one at a time.
+// 这个控制台里的头像，要么是厂商的吉祥物、要么是后端发下来的图，都不是我们的。`src` 从这里够不到，
+// 故把图藏起来、由它下面那层承载我们的。这样一处覆盖到全部头像，含表格里与个人页里的那些——逐组件改
+// 就得一处一处去。
+html body .el-avatar {
+  background-image: url(keelbase-avatar.svg) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+html body .el-avatar > img {
+  visibility: hidden !important;
+}
+html body .el-avatar > .el-icon {
+  visibility: hidden !important;
+}
+
+// ── the login page ──────────────────────────────────────────────────────────────────────────────────
+// It ends with a block of links into the vendor's own site — a reading list, a video course, an
+// interview collection and an outsourcing contact. Static markup with no flag behind it, identified
+// by where its links point rather than by position, so a row added after it cannot hide the wrong
+// thing. The divider that introduces it goes too: the block is what is being removed.
+// 它末尾是一组指向**厂商自己站点**的链接——书单、视频课、面试题、外包咨询。写死的标记、背后没有开关，
+// 靠**链接指向哪里**识别而不是排在第几位，于是往后再加一行也不会藏错东西。引出它的那条分隔线一并去掉：
+// 要拿掉的是**整块**。
 html body .login-form .el-row > .el-col:has(a[href*="iocoder.cn"]) {
   display: none !important;
 }
 html body .login-form .el-row > .el-divider:has(+ .el-col a[href*="iocoder.cn"]) {
   display: none !important;
-}
-
-// The active item keeps the product's signature: flush to the left edge, right side rounded off,
-// ground running from a light tint into the primary. 激活项保留产品自身的签名：左侧贴边、右侧收成
-// 半圆、底色由浅色渐变到主色。
-html body .v-menu .el-menu .el-menu-item.is-active {
-  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
-  color: #fff !important;
-  border-radius: 0 999px 999px 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
-}
-html body .v-menu .el-menu .el-menu-item.is-active:hover {
-  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
-  color: #fff !important;
-  border-radius: 0 999px 999px 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
-}
-html body .el-menu .el-menu-item.is-active {
-  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
-  color: #fff !important;
-  border-radius: 0 999px 999px 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
-}
-html body .el-menu .el-menu-item.is-active:hover {
-  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
-  color: #fff !important;
-  border-radius: 0 999px 999px 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
 }
