@@ -32,19 +32,6 @@ index 14b447c..4877590 100644
        </div>
        <Icon icon="tdesign:qrcode" :size="20" />
      </div>
-diff --git a/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue b/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
-index b91a418..0f798e3 100644
---- a/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
-+++ b/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
-@@ -644,7 +644,7 @@ const previewProcessJson = () => {
-   })
- }
- 
--/* ------------------------------------------------ 芋道源码 methods ------------------------------------------------------ */
-+/* ------------------------------------------------ 上游平台 methods ------------------------------------------------------ */
- onMounted(() => {
-   initBpmnModeler()
-   createNewDiagram(props.value)
 diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
 index c22c950..029a7e9 100644
 --- a/src/layout/components/Logo/src/Logo.vue
@@ -110,17 +97,6 @@ index e9ca174..8d802c0 100644
          resolve()
        })
      },
-diff --git a/src/utils/constants.ts b/src/utils/constants.ts
-index 5736a49..0b76ece 100644
---- a/src/utils/constants.ts
-+++ b/src/utils/constants.ts
-@@ -1,5 +1,5 @@
- /**
-- * Created by 芋道源码
-+ * Created by 上游平台
-  *
-  * 枚举类
-  */
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
 index 5326389..f7e835d 100644
 --- a/src/views/Home/Index.vue
@@ -422,19 +398,39 @@ index 5326389..f7e835d 100644
  
  getAllApi()
 diff --git a/src/views/Login/Login.vue b/src/views/Login/Login.vue
-index 122bdd1..53b1a64 100644
+index 122bdd1..a273b11 100644
 --- a/src/views/Login/Login.vue
 +++ b/src/views/Login/Login.vue
-@@ -9,7 +9,7 @@
+@@ -7,24 +7,10 @@
+       <div
+         :class="`${prefixCls}__left flex-1 bg-gray-500 bg-opacity-20 relative p-30px lt-xl:hidden overflow-x-hidden overflow-y-auto`"
        >
-         <!-- 左上角的 logo + 系统标题 -->
-         <div class="relative flex items-center text-white">
+-        <!-- 左上角的 logo + 系统标题 -->
+-        <div class="relative flex items-center text-white">
 -          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
-+          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
-           <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+-          <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+-        </div>
+-        <!-- 左边的背景图 + 欢迎语 -->
+-        <div class="h-[calc(100%-60px)] flex items-center justify-center">
+-          <TransitionGroup
+-            appear
+-            enter-active-class="animate__animated animate__bounceInLeft"
+-            tag="div"
+-          >
+-            <img key="1" alt="" class="w-350px" src="@/assets/svgs/login-box-bg.svg" />
+-            <div key="2" class="text-3xl text-white">{{ t('login.welcome') }}</div>
+-            <div key="3" class="mt-5 text-14px font-normal text-white">
+-              {{ t('login.message') }}
+-            </div>
+-          </TransitionGroup>
++        <!-- The product's own panel, in place of the illustration and the welcome text that stood
++             here. The mark and the name are inside it, so no header is repeated above it. -->
++        <div class="h-full flex items-center justify-center">
++          <img alt="" class="w-full max-w-[468px]" src="@/assets/imgs/keelbase-login-panel.png" />
          </div>
-         <!-- 左边的背景图 + 欢迎语 -->
-@@ -36,7 +36,7 @@
+       </div>
+       <div
+@@ -36,7 +22,7 @@
            style="color: var(--el-text-color-primary)"
          >
            <div class="flex items-center at-2xl:hidden at-xl:hidden">
@@ -444,19 +440,39 @@ index 122bdd1..53b1a64 100644
            </div>
            <div class="flex items-center justify-end space-x-10px h-48px">
 diff --git a/src/views/Login/SocialLogin.vue b/src/views/Login/SocialLogin.vue
-index 241cea1..fcf05dc 100644
+index 241cea1..a37a60a 100644
 --- a/src/views/Login/SocialLogin.vue
 +++ b/src/views/Login/SocialLogin.vue
-@@ -9,7 +9,7 @@
+@@ -7,24 +7,10 @@
+       <div
+         :class="`${prefixCls}__left flex-1 bg-gray-500 bg-opacity-20 relative p-30px lt-xl:hidden overflow-x-hidden overflow-y-auto`"
        >
-         <!-- 左上角的 logo + 系统标题 -->
-         <div class="relative flex items-center text-white">
+-        <!-- 左上角的 logo + 系统标题 -->
+-        <div class="relative flex items-center text-white">
 -          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
-+          <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/keelbase-logo.svg" />
-           <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+-          <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
+-        </div>
+-        <!-- 左边的背景图 + 欢迎语 -->
+-        <div class="h-[calc(100%-60px)] flex items-center justify-center">
+-          <TransitionGroup
+-            appear
+-            enter-active-class="animate__animated animate__bounceInLeft"
+-            tag="div"
+-          >
+-            <img key="1" alt="" class="w-350px" src="@/assets/svgs/login-box-bg.svg" />
+-            <div key="2" class="text-3xl text-white">{{ t('login.welcome') }}</div>
+-            <div key="3" class="mt-5 text-14px font-normal text-white">
+-              {{ t('login.message') }}
+-            </div>
+-          </TransitionGroup>
++        <!-- The product's own panel, in place of the illustration and the welcome text that stood
++             here. The mark and the name are inside it, so no header is repeated above it. -->
++        <div class="h-full flex items-center justify-center">
++          <img alt="" class="w-full max-w-[468px]" src="@/assets/imgs/keelbase-login-panel.png" />
          </div>
-         <!-- 左边的背景图 + 欢迎语 -->
-@@ -35,7 +35,7 @@
+       </div>
+       <div
+@@ -35,7 +21,7 @@
            class="flex items-center justify-between text-white at-2xl:justify-end at-xl:justify-end"
          >
            <div class="flex items-center at-2xl:hidden at-xl:hidden">
@@ -465,7 +481,7 @@ index 241cea1..fcf05dc 100644
              <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
            </div>
            <div class="flex items-center justify-end space-x-10px h-48px">
-@@ -200,7 +200,7 @@ const loginData = reactive({
+@@ -200,7 +186,7 @@ const loginData = reactive({
    captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
    tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE !== 'false',
    loginForm: {
@@ -513,28 +529,6 @@ index 11f7f68..41996ef 100644
        <div class="flex flex-row flex-wrap items-center justify-center w-460px mt-20px">
          <div
            class="flex justify-center w-180px leading-50px border border-solid border-[#e4e4e4] rounded-10px m-10px cursor-pointer hover:bg-[rgba(243,243,243,0.73)]"
-diff --git a/src/views/ai/utils/constants.ts b/src/views/ai/utils/constants.ts
-index 6f4e839..fefa05b 100644
---- a/src/views/ai/utils/constants.ts
-+++ b/src/views/ai/utils/constants.ts
-@@ -1,5 +1,5 @@
- /**
-- * Created by 芋道源码
-+ * Created by 上游平台
-  *
-  * AI 枚举类
-  *
-diff --git a/src/views/ai/utils/utils.ts b/src/views/ai/utils/utils.ts
-index ab45ae1..71acef7 100644
---- a/src/views/ai/utils/utils.ts
-+++ b/src/views/ai/utils/utils.ts
-@@ -1,5 +1,5 @@
- /**
-- * Created by 芋道源码
-+ * Created by 上游平台
-  *
-  * AI 枚举类
-  *
 diff --git a/src/views/im/home/index.vue b/src/views/im/home/index.vue
 index 42ee268..0105dda 100644
 --- a/src/views/im/home/index.vue
@@ -548,94 +542,3 @@ index 42ee268..0105dda 100644
   *
   * 路由切换时 router.afterEach 会调 useTitle 重置 title；用 nextTick 排在它之后再覆盖
   * 一并监听 route.fullPath，IM 子路由切换（消息 / 通讯录）也能重新加上前缀
-diff --git a/src/views/mp/components/wx-material-select/main.vue b/src/views/mp/components/wx-material-select/main.vue
-index 752b1e5..343753e 100644
---- a/src/views/mp/components/wx-material-select/main.vue
-+++ b/src/views/mp/components/wx-material-select/main.vue
-@@ -1,7 +1,7 @@
- <!--
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
--  芋道源码：
-+  上游平台：
-   ① 移除 avue 组件，使用 ElementUI 原生组件
- -->
- <template>
-diff --git a/src/views/mp/components/wx-msg/main.vue b/src/views/mp/components/wx-msg/main.vue
-index 5223113..f7fb429 100644
---- a/src/views/mp/components/wx-msg/main.vue
-+++ b/src/views/mp/components/wx-msg/main.vue
-@@ -1,7 +1,7 @@
- <!--
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
--  芋道源码：
-+  上游平台：
-   ① 移除暂时用不到的 websocket
-   ② 代码优化，补充注释，提升阅读性
- -->
-diff --git a/src/views/mp/components/wx-news/main.vue b/src/views/mp/components/wx-news/main.vue
-index b8dac0f..99e44a4 100644
---- a/src/views/mp/components/wx-news/main.vue
-+++ b/src/views/mp/components/wx-news/main.vue
-@@ -2,7 +2,7 @@
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
-   【微信消息 - 图文】
--  芋道源码：
-+  上游平台：
-   ① 代码优化，补充注释，提升阅读性
- -->
- <template>
-diff --git a/src/views/mp/components/wx-reply/main.vue b/src/views/mp/components/wx-reply/main.vue
-index 89ffe47..3d54c98 100644
---- a/src/views/mp/components/wx-reply/main.vue
-+++ b/src/views/mp/components/wx-reply/main.vue
-@@ -1,7 +1,7 @@
- <!--
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
--  芋道源码：
-+  上游平台：
-   ① 移除多余的 rep 为前缀的变量，让 message 消息更简单
-   ② 代码优化，补充注释，提升阅读性
-   ③ 优化消息的临时缓存策略，发送消息时，只清理被发送消息的 tab，不会强制切回到 text 输入
-diff --git a/src/views/mp/components/wx-video-play/main.vue b/src/views/mp/components/wx-video-play/main.vue
-index d544bbe..b641acd 100644
---- a/src/views/mp/components/wx-video-play/main.vue
-+++ b/src/views/mp/components/wx-video-play/main.vue
-@@ -2,7 +2,7 @@
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
-   【微信消息 - 视频】
--  芋道源码：
-+  上游平台：
-   ① bug 修复：
-     1）joolun 的做法：使用 mediaId 从微信公众号，下载对应的 mp4 素材，从而播放内容；
-       存在的问题：mediaId 有效期是 3 天，超过时间后无法播放
-diff --git a/src/views/mp/components/wx-voice-play/main.vue b/src/views/mp/components/wx-voice-play/main.vue
-index fe7f0ca..2a59e71 100644
---- a/src/views/mp/components/wx-voice-play/main.vue
-+++ b/src/views/mp/components/wx-voice-play/main.vue
-@@ -2,7 +2,7 @@
-   - Copyright (C) 2018-2019
-   - All rights reserved, Designed By www.joolun.com
-   【微信消息 - 语音】
--   芋道源码：
-+   上游平台：
-   ① bug 修复：
-     1）joolun 的做法：使用 mediaId 从微信公众号，下载对应的 mp4 素材，从而播放内容；
-       存在的问题：mediaId 有效期是 3 天，超过时间后无法播放
-diff --git a/src/views/mp/material/components/ImageTable.vue b/src/views/mp/material/components/ImageTable.vue
-index 52c608f..7d2b539 100644
---- a/src/views/mp/material/components/ImageTable.vue
-+++ b/src/views/mp/material/components/ImageTable.vue
-@@ -63,7 +63,7 @@ const emit = defineEmits<{
-   column-count: 5;
-   margin-top: 10px;
- 
--  /* 芋道源码：增加 10px，避免顶着上面 */
-+  /* 上游平台：增加 10px，避免顶着上面 */
- }
- 
- .waterfall-item {

@@ -189,7 +189,7 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # carries upstream's. It lands in the page title and in every place the UI shows the system's name.
   # 产品的名字，不是平台的名字。机制与理由同上：应用从这个变量取标题，故由构建设置它，而不是去改承载上游
   # 值的那份 .env。它会落到页面标题，以及界面里每一处显示系统名的地方。
-  export VITE_APP_TITLE="${KEELBASE_YUDAO_UI_TITLE:-KB管理系统}"
+  export VITE_APP_TITLE="${KEELBASE_YUDAO_UI_TITLE:-KeelBase}"
 
   # The tenant the login form pre-fills. It is not a label: it is the name the login looks the tenant
   # up by, so it has to be the name the database actually carries — which is why it moves together
