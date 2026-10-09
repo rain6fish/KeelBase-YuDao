@@ -32,6 +32,19 @@ index 14b447c..4877590 100644
        </div>
        <Icon icon="tdesign:qrcode" :size="20" />
      </div>
+diff --git a/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue b/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
+index b91a418..0f798e3 100644
+--- a/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
++++ b/src/components/bpmnProcessDesigner/package/designer/ProcessDesigner.vue
+@@ -644,7 +644,7 @@ const previewProcessJson = () => {
+   })
+ }
+ 
+-/* ------------------------------------------------ 芋道源码 methods ------------------------------------------------------ */
++/* ------------------------------------------------ 上游平台 methods ------------------------------------------------------ */
+ onMounted(() => {
+   initBpmnModeler()
+   createNewDiagram(props.value)
 diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
 index c22c950..029a7e9 100644
 --- a/src/layout/components/Logo/src/Logo.vue
@@ -97,6 +110,17 @@ index e9ca174..8d802c0 100644
          resolve()
        })
      },
+diff --git a/src/utils/constants.ts b/src/utils/constants.ts
+index 5736a49..0b76ece 100644
+--- a/src/utils/constants.ts
++++ b/src/utils/constants.ts
+@@ -1,5 +1,5 @@
+ /**
+- * Created by 芋道源码
++ * Created by 上游平台
+  *
+  * 枚举类
+  */
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
 index 5326389..f7e835d 100644
 --- a/src/views/Home/Index.vue
@@ -489,3 +513,129 @@ index 11f7f68..41996ef 100644
        <div class="flex flex-row flex-wrap items-center justify-center w-460px mt-20px">
          <div
            class="flex justify-center w-180px leading-50px border border-solid border-[#e4e4e4] rounded-10px m-10px cursor-pointer hover:bg-[rgba(243,243,243,0.73)]"
+diff --git a/src/views/ai/utils/constants.ts b/src/views/ai/utils/constants.ts
+index 6f4e839..fefa05b 100644
+--- a/src/views/ai/utils/constants.ts
++++ b/src/views/ai/utils/constants.ts
+@@ -1,5 +1,5 @@
+ /**
+- * Created by 芋道源码
++ * Created by 上游平台
+  *
+  * AI 枚举类
+  *
+diff --git a/src/views/ai/utils/utils.ts b/src/views/ai/utils/utils.ts
+index ab45ae1..71acef7 100644
+--- a/src/views/ai/utils/utils.ts
++++ b/src/views/ai/utils/utils.ts
+@@ -1,5 +1,5 @@
+ /**
+- * Created by 芋道源码
++ * Created by 上游平台
+  *
+  * AI 枚举类
+  *
+diff --git a/src/views/im/home/index.vue b/src/views/im/home/index.vue
+index 42ee268..0105dda 100644
+--- a/src/views/im/home/index.vue
++++ b/src/views/im/home/index.vue
+@@ -275,7 +275,7 @@ watch(
+ )
+ 
+ /**
+- * 浏览器标签 title 拼上未读数前缀；例：(63条未读)芋道源码
++ * 浏览器标签 title 拼上未读数前缀；例：(63条未读)系统名
+  *
+  * 路由切换时 router.afterEach 会调 useTitle 重置 title；用 nextTick 排在它之后再覆盖
+  * 一并监听 route.fullPath，IM 子路由切换（消息 / 通讯录）也能重新加上前缀
+diff --git a/src/views/mp/components/wx-material-select/main.vue b/src/views/mp/components/wx-material-select/main.vue
+index 752b1e5..343753e 100644
+--- a/src/views/mp/components/wx-material-select/main.vue
++++ b/src/views/mp/components/wx-material-select/main.vue
+@@ -1,7 +1,7 @@
+ <!--
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+-  芋道源码：
++  上游平台：
+   ① 移除 avue 组件，使用 ElementUI 原生组件
+ -->
+ <template>
+diff --git a/src/views/mp/components/wx-msg/main.vue b/src/views/mp/components/wx-msg/main.vue
+index 5223113..f7fb429 100644
+--- a/src/views/mp/components/wx-msg/main.vue
++++ b/src/views/mp/components/wx-msg/main.vue
+@@ -1,7 +1,7 @@
+ <!--
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+-  芋道源码：
++  上游平台：
+   ① 移除暂时用不到的 websocket
+   ② 代码优化，补充注释，提升阅读性
+ -->
+diff --git a/src/views/mp/components/wx-news/main.vue b/src/views/mp/components/wx-news/main.vue
+index b8dac0f..99e44a4 100644
+--- a/src/views/mp/components/wx-news/main.vue
++++ b/src/views/mp/components/wx-news/main.vue
+@@ -2,7 +2,7 @@
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+   【微信消息 - 图文】
+-  芋道源码：
++  上游平台：
+   ① 代码优化，补充注释，提升阅读性
+ -->
+ <template>
+diff --git a/src/views/mp/components/wx-reply/main.vue b/src/views/mp/components/wx-reply/main.vue
+index 89ffe47..3d54c98 100644
+--- a/src/views/mp/components/wx-reply/main.vue
++++ b/src/views/mp/components/wx-reply/main.vue
+@@ -1,7 +1,7 @@
+ <!--
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+-  芋道源码：
++  上游平台：
+   ① 移除多余的 rep 为前缀的变量，让 message 消息更简单
+   ② 代码优化，补充注释，提升阅读性
+   ③ 优化消息的临时缓存策略，发送消息时，只清理被发送消息的 tab，不会强制切回到 text 输入
+diff --git a/src/views/mp/components/wx-video-play/main.vue b/src/views/mp/components/wx-video-play/main.vue
+index d544bbe..b641acd 100644
+--- a/src/views/mp/components/wx-video-play/main.vue
++++ b/src/views/mp/components/wx-video-play/main.vue
+@@ -2,7 +2,7 @@
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+   【微信消息 - 视频】
+-  芋道源码：
++  上游平台：
+   ① bug 修复：
+     1）joolun 的做法：使用 mediaId 从微信公众号，下载对应的 mp4 素材，从而播放内容；
+       存在的问题：mediaId 有效期是 3 天，超过时间后无法播放
+diff --git a/src/views/mp/components/wx-voice-play/main.vue b/src/views/mp/components/wx-voice-play/main.vue
+index fe7f0ca..2a59e71 100644
+--- a/src/views/mp/components/wx-voice-play/main.vue
++++ b/src/views/mp/components/wx-voice-play/main.vue
+@@ -2,7 +2,7 @@
+   - Copyright (C) 2018-2019
+   - All rights reserved, Designed By www.joolun.com
+   【微信消息 - 语音】
+-   芋道源码：
++   上游平台：
+   ① bug 修复：
+     1）joolun 的做法：使用 mediaId 从微信公众号，下载对应的 mp4 素材，从而播放内容；
+       存在的问题：mediaId 有效期是 3 天，超过时间后无法播放
+diff --git a/src/views/mp/material/components/ImageTable.vue b/src/views/mp/material/components/ImageTable.vue
+index 52c608f..7d2b539 100644
+--- a/src/views/mp/material/components/ImageTable.vue
++++ b/src/views/mp/material/components/ImageTable.vue
+@@ -63,7 +63,7 @@ const emit = defineEmits<{
+   column-count: 5;
+   margin-top: 10px;
+ 
+-  /* 芋道源码：增加 10px，避免顶着上面 */
++  /* 上游平台：增加 10px，避免顶着上面 */
+ }
+ 
+ .waterfall-item {
