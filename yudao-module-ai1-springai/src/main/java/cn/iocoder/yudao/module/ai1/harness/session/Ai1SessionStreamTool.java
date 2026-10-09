@@ -11,6 +11,8 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.security.core.LoginUser;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.agent.Ai1AgentDO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.session.Ai1SessionMessageDO;
@@ -37,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.redisson.api.RStream;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -147,6 +151,17 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     private static final String FIELD_AGENT_ID = "agentId";
     private static final String FIELD_SESSION_ID = "sessionId";
     private static final String FIELD_CONTENT = "content";
+    /**
+     * Carried the same way the tenant is, and for the same reason: the caller is known where the task
+     * is submitted (the request thread) and needed where it runs (a worker thread), and the two are
+     * not the same thread. Everything KeelBase governs below this point asks who is acting; without
+     * this field it asks a question nothing on that thread can answer.
+     *
+     * 与租户**同一条路**带过来，理由也相同：调用方在**投递处**（请求线程）是知道的、而在**运行处**（worker 线程）
+     * 是需要的，而两者不是同一个线程。KeelBase 在这以下治理的一切都要问「谁在行动」；没有这个字段，它问的是一个
+     * 那个线程上没人能回答的问题。
+     */
+    private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_TYPE = "type";
     private static final String FIELD_DATA = "data";
@@ -301,6 +316,11 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         if (tenantId != null) {
             fields.put(FIELD_TENANT_ID, String.valueOf(tenantId));
         }
+        // 调用方同样可选：投递线程上有登录用户就带上，供 worker 侧还原（与租户同一条路）
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        if (userId != null) {
+            fields.put(FIELD_USER_ID, String.valueOf(userId));
+        }
         // 1.2 生成所需的业务字段
         fields.put(FIELD_MESSAGE_ID, String.valueOf(messageId));
         fields.put(FIELD_AGENT_ID, String.valueOf(agentId));
@@ -433,7 +453,9 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         long workerThreadId = Thread.currentThread().threadId();
         try {
             Long tenantId = Convert.toLong(fields.get(FIELD_TENANT_ID));
-            TenantUtils.execute(tenantId, () -> executeTask(recordId, fields, messageId, lock, workerThreadId, reclaimed));
+            Long userId = Convert.toLong(fields.get(FIELD_USER_ID));
+            TenantUtils.execute(tenantId, () -> withCaller(userId,
+                    () -> executeTask(recordId, fields, messageId, lock, workerThreadId, reclaimed)));
         } catch (Exception e) {
             // Redis 或回填失败时保留 pending，后续接管不会重新生成
             log.error("[handleTask][助手消息({}) 处理失败]", messageId, e);
@@ -446,6 +468,35 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             } catch (Exception e) {
                 log.warn("[handleTask][助手消息({}) 执行锁释放失败]", messageId, e);
             }
+        }
+    }
+
+    /**
+     * Runs the body with the submitting caller in the security context, so that anything below this
+     * point asking "who is acting" gets the answer the request thread would have given.
+     *
+     * <p>The context is a thread local and this is a pool thread: it is set for the body and cleared
+     * afterwards, so one caller cannot leak into the next task this thread picks up.
+     *
+     * 让 body 在**投递它的那个调用方**的安全上下文里运行，好让这以下任何问「谁在行动」的东西，得到**请求线程上**
+     * 会给的那个答案。
+     *
+     * <p>上下文是线程局部的、而这是一条**池线程**：它在 body 期间被设置、之后被清掉，故一个调用方**不会**漏进这条线程
+     * 接下来领到的任务里。
+     */
+    private static void withCaller(Long userId, Runnable body) {
+        if (userId == null) {
+            body.run();
+            return;
+        }
+        LoginUser caller = new LoginUser();
+        caller.setId(userId);
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(caller, null, List.of()));
+        try {
+            body.run();
+        } finally {
+            SecurityContextHolder.clearContext();
         }
     }
 
