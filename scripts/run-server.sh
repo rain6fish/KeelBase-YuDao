@@ -43,6 +43,8 @@ exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar
   --spring.datasource.dynamic.datasource.slave.username="$PG_USER" \
   --spring.datasource.dynamic.datasource.slave.password="$PG_PASSWORD" \
   --spring.data.redis.host="$REDIS_HOST" --spring.data.redis.port="$REDIS_PORT" \
+  --spring.datasource.dynamic.druid.validation-query="SELECT 1" \
+  --spring.datasource.druid.validation-query="SELECT 1" \
   --keelbase.audit.hmac-key="$AUDIT_KEY" \
   --keelbase.wire.exclude-packages=cn.iocoder.yudao \
   --keelbase.memory.max-per-owner="${MEMORY_CAP:-200}" \

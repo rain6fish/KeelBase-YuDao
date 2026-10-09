@@ -56,6 +56,27 @@ can be pointed at a different stack without editing anything.
 | `--keelbase.audit.hmac-key=…` | the runtime's audit chain; with no `application.yml` of its own when embedded, this fails startup without it |
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | keeps the runtime's response envelope off this host's own controllers |
 | `--yudao.tenant.ignore-tables=…` | names the tables **KeelBase governs**, so the host's tenant interceptor does not narrow them too (one authority per row — see the line's decision index) |
+| `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | the host's own value is `SELECT 1 FROM DUAL`, which is MySQL — PostgreSQL has no `DUAL` |
+
+## ⚠ A defect on this stack, unresolved
+
+On PostgreSQL, **about half of all logins answer 500**:
+
+```
+org.postgresql.util.PSQLException: 这个 statement 已经被关闭   (this statement has already been closed)
+  at org.postgresql.jdbc.PgStatement.checkClosed
+  …  DruidPooledPreparedStatement.getMaxRows
+  …  MybatisMapperMethod → AdminUserMapper.selectWithCursor
+```
+
+It is **not** the host's fault for having a bug and not ours for having caused it — it sits where **MyBatis-Plus 3.5.17, Druid and PostgreSQL** meet, and it reproduces on the plain login path. Two hypotheses were tested and **both are wrong**, which is recorded so nobody re-runs them:
+
+- **Druid's prepared-statement cache** — set to `false` on both property prefixes, and verified that the prefix binds (a deliberately invalid value on the same prefix fails startup). The failure is unchanged.
+- **Druid's `stat` filter** — disabled; unchanged.
+
+What it means for this repository: **the gate is written and it is red for this reason.** `scripts/run-generated-module-scenarios.mjs` asserts the behaviours the spike observed, and it cannot get past login often enough to assert them. That is a defect in the stack, not in the gate, and it is the one thing standing between this line and a re-runnable gate.
+
+`--spring.datasource.dynamic.druid.validation-query="SELECT 1"` above is kept because PostgreSQL genuinely has no `DUAL`; it is **not** a fix for the above, and does not claim to be.
 
 **⚠ Two traps, both measured on this host** — see the spike record for the runs:
 

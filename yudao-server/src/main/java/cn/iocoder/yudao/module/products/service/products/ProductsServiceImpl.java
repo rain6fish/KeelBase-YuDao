@@ -21,9 +21,9 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 import static cn.iocoder.yudao.module.products.enums.ErrorCodeConstants.*;
 
 /**
- * äº§å“ï¼ˆç”Ÿæˆï¼‰ Service 实现类
+ * 产品（生成） Service 实现类
  *
- * @author spike
+ * @author 芋道源码
  */
 @Service
 @Validated

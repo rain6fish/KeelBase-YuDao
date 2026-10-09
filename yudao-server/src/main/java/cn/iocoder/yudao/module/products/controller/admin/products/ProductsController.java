@@ -29,7 +29,7 @@ import cn.iocoder.yudao.module.products.controller.admin.products.vo.*;
 import cn.iocoder.yudao.module.products.dal.dataobject.products.ProductsDO;
 import cn.iocoder.yudao.module.products.service.products.ProductsService;
 
-@Tag(name = "管理后台 - äº§å“ï¼ˆç”Ÿæˆï¼‰")
+@Tag(name = "管理后台 - 产品（生成）")
 @RestController
 @RequestMapping("/products/products")
 @Validated
@@ -39,14 +39,14 @@ public class ProductsController {
     private ProductsService productsService;
 
     @PostMapping("/create")
-    @Operation(summary = "创建äº§å“ï¼ˆç”Ÿæˆï¼‰")
+    @Operation(summary = "创建产品（生成）")
     @PreAuthorize("@ss.hasPermission('products:products:create')")
     public CommonResult<Long> createProducts(@Valid @RequestBody ProductsSaveReqVO createReqVO) {
         return success(productsService.createProducts(createReqVO));
     }
 
     @PutMapping("/update")
-    @Operation(summary = "更新äº§å“ï¼ˆç”Ÿæˆï¼‰")
+    @Operation(summary = "更新产品（生成）")
     @PreAuthorize("@ss.hasPermission('products:products:update')")
     public CommonResult<Boolean> updateProducts(@Valid @RequestBody ProductsSaveReqVO updateReqVO) {
         productsService.updateProducts(updateReqVO);
@@ -54,7 +54,7 @@ public class ProductsController {
     }
 
     @DeleteMapping("/delete")
-    @Operation(summary = "删除äº§å“ï¼ˆç”Ÿæˆï¼‰")
+    @Operation(summary = "删除产品（生成）")
     @Parameter(name = "id", description = "编号", required = true)
     @PreAuthorize("@ss.hasPermission('products:products:delete')")
     public CommonResult<Boolean> deleteProducts(@RequestParam("id") Long id) {
@@ -64,7 +64,7 @@ public class ProductsController {
 
     @DeleteMapping("/delete-list")
     @Parameter(name = "ids", description = "编号", required = true)
-    @Operation(summary = "批量删除äº§å“ï¼ˆç”Ÿæˆï¼‰")
+    @Operation(summary = "批量删除产品（生成）")
                 @PreAuthorize("@ss.hasPermission('products:products:delete')")
     public CommonResult<Boolean> deleteProductsList(@RequestParam("ids") List<Long> ids) {
         productsService.deleteProductsListByIds(ids);
@@ -72,7 +72,7 @@ public class ProductsController {
     }
 
     @GetMapping("/get")
-    @Operation(summary = "获得äº§å“ï¼ˆç”Ÿæˆï¼‰")
+    @Operation(summary = "获得产品（生成）")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('products:products:query')")
     public CommonResult<ProductsRespVO> getProducts(@RequestParam("id") Long id) {
@@ -81,7 +81,7 @@ public class ProductsController {
     }
 
     @GetMapping("/page")
-    @Operation(summary = "获得äº§å“ï¼ˆç”Ÿæˆï¼‰分页")
+    @Operation(summary = "获得产品（生成）分页")
     @PreAuthorize("@ss.hasPermission('products:products:query')")
     public CommonResult<PageResult<ProductsRespVO>> getProductsPage(@Valid ProductsPageReqVO pageReqVO) {
         PageResult<ProductsDO> pageResult = productsService.getProductsPage(pageReqVO);
@@ -89,7 +89,7 @@ public class ProductsController {
     }
 
     @GetMapping("/export-excel")
-    @Operation(summary = "导出äº§å“ï¼ˆç”Ÿæˆï¼‰ Excel")
+    @Operation(summary = "导出产品（生成） Excel")
     @PreAuthorize("@ss.hasPermission('products:products:export')")
     @ApiAccessLog(operateType = EXPORT)
     public void exportProductsExcel(@Valid ProductsPageReqVO pageReqVO,
@@ -97,7 +97,7 @@ public class ProductsController {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         List<ProductsDO> list = productsService.getProductsPage(pageReqVO).getList();
         // 导出 Excel
-        ExcelUtils.write(response, "äº§å“ï¼ˆç”Ÿæˆï¼‰.xls", "数据", ProductsRespVO.class,
+        ExcelUtils.write(response, "产品（生成）.xls", "数据", ProductsRespVO.class,
                         BeanUtils.toBean(list, ProductsRespVO.class));
     }
 

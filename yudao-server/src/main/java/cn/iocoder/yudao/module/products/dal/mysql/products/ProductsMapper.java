@@ -10,9 +10,9 @@ import org.apache.ibatis.annotations.Mapper;
 import cn.iocoder.yudao.module.products.controller.admin.products.vo.*;
 
 /**
- * äº§å“ï¼ˆç”Ÿæˆï¼‰ Mapper
+ * 产品（生成） Mapper
  *
- * @author spike
+ * @author 芋道源码
  */
 @Mapper
 public interface ProductsMapper extends BaseMapperX<ProductsDO> {

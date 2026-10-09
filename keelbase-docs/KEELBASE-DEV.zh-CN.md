@@ -52,6 +52,27 @@ bash scripts/run-server.sh
 | `--keelbase.audit.hmac-key=…` | 运行时的审计链；嵌入时它没有自己的 `application.yml`，缺这项**起不来** |
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | 让运行时的响应信封**不套在**本宿主自己的控制器上 |
 | `--yudao.tenant.ignore-tables=…` | 点名**由 KeelBase 治理**的表，好让宿主的租户拦截器**不再**去收束它们（一行的权威只有一个——见本线的决定索引） |
+| `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | 宿主自己的值是 `SELECT 1 FROM DUAL`，那是 **MySQL**——PostgreSQL 没有 `DUAL` |
+
+## ⚠ 这套栈上的一个缺陷，**未解**
+
+在 PostgreSQL 上，**约一半的登录返回 500**：
+
+```
+org.postgresql.util.PSQLException: 这个 statement 已经被关闭
+  at org.postgresql.jdbc.PgStatement.checkClosed
+  …  DruidPooledPreparedStatement.getMaxRows
+  …  MybatisMapperMethod → AdminUserMapper.selectWithCursor
+```
+
+它**不是**宿主有 bug、也**不是**我们弄坏的——它坐在 **MyBatis-Plus 3.5.17、Druid 与 PostgreSQL** 三者相遇的地方，且就在**最普通的登录路径**上复现。两条假设都试过、**两条都错**，写下来是为了**别再重跑**：
+
+- **Druid 的预备语句缓存** —— 两个属性前缀都设成 `false`，并**验证过前缀确实绑定**（在同一个前缀上放一个刻意非法的值会让启动失败）。故障**不变**。
+- **Druid 的 `stat` 过滤器** —— 关掉，**不变**。
+
+对本仓意味着什么：**门禁已写好，而它因为这个原因是红的**。`scripts/run-generated-module-scenarios.mjs` 断言 Spike 观测到的那些行为，而它**过不了登录那一关**、进不到断言。那是**栈**的缺陷、不是门禁的缺陷，也是**本线距离「可重跑门禁」之间唯一挡着的那样东西**。
+
+上面那条 `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` **保留**，因为 PostgreSQL 确实没有 `DUAL`；它**不是**上面那个缺陷的修法，也**没有**声称是。
 
 **⚠ 两个坑，都是在本宿主上量出来的**——跑的过程见 Spike 记录：
 
