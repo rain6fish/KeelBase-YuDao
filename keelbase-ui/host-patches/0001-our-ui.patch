@@ -398,7 +398,7 @@ index 5326389..f7e835d 100644
  
  getAllApi()
 diff --git a/src/views/Login/Login.vue b/src/views/Login/Login.vue
-index 122bdd1..a273b11 100644
+index 122bdd1..e5952da 100644
 --- a/src/views/Login/Login.vue
 +++ b/src/views/Login/Login.vue
 @@ -7,24 +7,10 @@
@@ -426,7 +426,7 @@ index 122bdd1..a273b11 100644
 +        <!-- The product's own panel, in place of the illustration and the welcome text that stood
 +             here. The mark and the name are inside it, so no header is repeated above it. -->
 +        <div class="h-full flex items-center justify-center">
-+          <img alt="" class="w-full max-w-[468px]" src="@/assets/imgs/keelbase-login-panel.png" />
++          <img alt="" class="w-full" src="@/assets/imgs/keelbase-login-panel.png" />
          </div>
        </div>
        <div
@@ -440,7 +440,7 @@ index 122bdd1..a273b11 100644
            </div>
            <div class="flex items-center justify-end space-x-10px h-48px">
 diff --git a/src/views/Login/SocialLogin.vue b/src/views/Login/SocialLogin.vue
-index 241cea1..a37a60a 100644
+index 241cea1..3401051 100644
 --- a/src/views/Login/SocialLogin.vue
 +++ b/src/views/Login/SocialLogin.vue
 @@ -7,24 +7,10 @@
@@ -468,7 +468,7 @@ index 241cea1..a37a60a 100644
 +        <!-- The product's own panel, in place of the illustration and the welcome text that stood
 +             here. The mark and the name are inside it, so no header is repeated above it. -->
 +        <div class="h-full flex items-center justify-center">
-+          <img alt="" class="w-full max-w-[468px]" src="@/assets/imgs/keelbase-login-panel.png" />
++          <img alt="" class="w-full" src="@/assets/imgs/keelbase-login-panel.png" />
          </div>
        </div>
        <div
