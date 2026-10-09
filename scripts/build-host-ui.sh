@@ -200,16 +200,27 @@ BASE_PREFIX="$(sed -n 's/.*\(href\|src\)="\([^"]*\)assets\/.*/\2/p' "$INDEX" | h
 if [[ -z "$BASE_PREFIX" ]]; then BASE_PREFIX="/"; fi
 echo "base prefix read from $INDEX: $BASE_PREFIX"
 
+# The href carries a content hash. Vite hashes its own assets; these two files keep their names, so
+# without a version a browser that has cached one will keep serving it after the layer changes — which
+# shows up as "the edit did nothing" and wastes exactly the time it takes to suspect the CSS.
+# href 带内容哈希。Vite 给自己的产物做了哈希；这两个文件名字是固定的，故不带上版本号时，浏览器缓存过
+# 的那份在视觉层改了之后还会继续被用——表现出来就是「改了跟没改一样」，白白耗掉本该花在内容上的排查。
+THEME_HASH="$(md5sum "$DIST/$THEME_CSS_NAME" | cut -c1-8)"
+HOST_HASH=""
+if [[ -n "$HOST_CSS_NAME" ]]; then HOST_HASH="$(md5sum "$DIST/$HOST_CSS_NAME" | cut -c1-8)"; fi
+
 tmp="$(mktemp)"
-awk -v theme_css="$THEME_CSS_NAME" -v host_css="$HOST_CSS_NAME" -v prefix="$BASE_PREFIX" -v m_theme="$MARKER" -v m_host="$HOST_MARKER" '
+awk -v theme_css="$THEME_CSS_NAME" -v host_css="$HOST_CSS_NAME" -v prefix="$BASE_PREFIX" \
+    -v theme_hash="$THEME_HASH" -v host_hash="$HOST_HASH" \
+    -v m_theme="$MARKER" -v m_host="$HOST_MARKER" '
   index($0, m_theme) || index($0, m_host) { getline; next }   # drop a marker and the line under it
   {
     if (!done && $0 ~ /<\/head>/) {
       print "    " m_theme
-      print "    <link rel=\"stylesheet\" href=\"" prefix theme_css "\" />"
+      print "    <link rel=\"stylesheet\" href=\"" prefix theme_css "?v=" theme_hash "\" />"
       if (host_css != "") {
         print "    " m_host
-        print "    <link rel=\"stylesheet\" href=\"" prefix host_css "\" />"
+        print "    <link rel=\"stylesheet\" href=\"" prefix host_css "?v=" host_hash "\" />"
       }
       done = 1
     }

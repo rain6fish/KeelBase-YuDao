@@ -54,6 +54,14 @@ source; only the structure is restated. It is authored here, not synced.
 The checkout the app is built from is never modified. The trade is that the UI's own dev server
 renders upstream's look; only the built artefact carries the layer.
 
+The injected links carry a content hash (`keelbase-host.css?v=…`). Vite hashes its own assets; these
+two files keep their names, so without a version a browser that has cached one keeps serving it after
+the layer changes — which presents as "the edit did nothing".
+
+The sidebar is also where the product's own row rhythm lands: 42px for a group, 38px for a child, and
+a right padding so the rows do not run under the scrollbar, which here is an overlay rather than a
+reserved strip.
+
 **One thing the build also turns off.** Upstream renders a doc-alert banner on most pages, pointing at
 its own documentation site. It is gated by a build-time flag (`VITE_APP_DOCALERT_ENABLE`), so the
 build sets that flag through the environment instead of hiding the banner with CSS — the element then
@@ -91,3 +99,9 @@ the weight of its argument, and both sides are `!important`, so yudao's wins and
 comes back on a light ground. The adapter carries a `.v-menu` ancestor in those selectors for the
 weight. This is worth knowing before editing it: dropping what looks like a redundant class silently
 loses the state again.
+
+**A selector list is unforgiving.** One selector the browser cannot parse invalidates its entire rule,
+silently — the other selectors in that list stop applying too and nothing reports it. Sass compiles a
+nested `:has()` without complaint, and nesting `:has()` is not allowed, so a rule that paired one with
+a perfectly good selector lost both. The adapter therefore keeps **one selector per rule**, so every
+rule stands or falls on its own. The repetition is the point.

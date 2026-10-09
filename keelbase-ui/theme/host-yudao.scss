@@ -10,6 +10,13 @@
 // vendored byte-for-byte. What crosses over unaltered is every *value* — they are all `var(--el-*)`
 // references into the vendored tokens, so the palette still has one source.
 //
+// One selector per rule, deliberately. A stylesheet's selector list is unforgiving: one selector the
+// browser cannot parse invalidates the whole rule it belongs to, silently — the other selectors in
+// that list stop applying too, and nothing reports it. `:has(:has(…))` is exactly such a selector
+// (nesting `:has()` is not allowed), so a rule that paired it with a perfectly good selector lost
+// both. Keeping lists to one selector makes every rule independently checkable, at the cost of some
+// repetition.
+//
 // 宿主适配层：把 yudao 自己的布局命名空间，改用 KeelBase 的视觉语言来陈述。
 //
 // 与本文件相邻的那些令牌文件覆盖的是 Element Plus 那一面。侧边栏 / 顶栏 / 标签条不在其中——
@@ -19,6 +26,12 @@
 // 它是**翻译**而不是**拷贝**，这是刻意的：Web-Admin-Vue 把这同一套样子陈述在它自己的类名上
 // （`.admin-aside` · `.el-menu-nav`），那些类名在这里并不存在，故那些规则无法逐字节入库。原样过来的
 // 是每一个**取值**——它们全是对已入库令牌的 `var(--el-*)` 引用，于是配色仍然只有一个源。
+//
+// **一条规则只写一个选择器**，这是刻意的。样式表的选择器列表是「不容情」的：浏览器解析不了其中
+// **一个**选择器，它所属的**整条规则**就作废，而且**悄无声息**——同一条列表里其余本来正确的选择器也
+// 一并失效，没有任何东西会报出来。`:has(:has(…))` 正是这样一个选择器（`:has()` 不允许嵌套），于是
+// 一条把它与一个完全正确的选择器并列的规则，两个都丢了。把列表收到只剩一个选择器，让每条规则都能被
+// 独立核对，代价是一些重复。
 
 :root {
   // sidebar: same ground as the content area, so the whole page reads as one surface and the active
@@ -48,16 +61,28 @@
 // makes it `.v-menu[data-v-…] .el-menu .el-menu-item:hover` — five class-level terms against the four
 // of a plain `html body .el-menu .el-menu-item:not(.is-active):hover`. Both are `!important`, so the
 // higher weight wins and the unreadable state comes back. `:not()` contributes only the weight of its
-// argument, which is the trap. The unscoped variant stays for the collapsed-menu popper, whose own
-// rule carries no scope attribute and is therefore lighter.
-// 那个 `.v-menu` 祖先是为了**权重**，不是为了语义：yudao 那条侧边栏规则带作用域，于是形如
+// argument, which is the trap. The `.v-menu`-less rules are for the collapsed-menu popper, which is
+// teleported out of `.v-menu` and whose own rule carries no scope attribute, so is lighter.
+// 有两个状态光靠变量带不出来：yudao 把「悬停文字色」与「选中文字色」挂在同一个变量上，又把悬停底色
+// 取成侧边栏自身那个值。深色默认下看不出差别；浅色侧边栏里则是白字压浅底，读不了。在此明写。
+//
+// 那个 `.v-menu` 祖先是为了**权重**，不是为了语义：yudao 那条侧边栏规则带作用域，形如
 // `.v-menu[data-v-…] .el-menu .el-menu-item:hover`——五级类权重，对上 `html body .el-menu
 // .el-menu-item:not(.is-active):hover` 的四级。两者都是 `!important`，权重高者胜，于是那个读不了的
-// 状态又回来了。`:not()` 只贡献其**参数**的权重，这正是坑所在。不带作用域的那条留给折叠态弹出菜单：
-// 它自己的规则没有作用域属性，权重更轻。
-html body .v-menu .el-menu .el-menu-item:not(.is-active):hover,
-html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover,
-html body .el-menu .el-menu-item:not(.is-active):hover,
+// 状态又回来了。`:not()` 只贡献其**参数**的权重，这正是坑所在。不带 `.v-menu` 的那几条是给折叠态弹出
+// 菜单的：它被传送出 `.v-menu` 之外，且它自己的规则没有作用域属性，权重更轻。
+html body .v-menu .el-menu .el-menu-item:not(.is-active):hover {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-text-color-primary) !important;
+}
+html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-text-color-primary) !important;
+}
+html body .el-menu .el-menu-item:not(.is-active):hover {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-text-color-primary) !important;
+}
 html body .el-menu .el-sub-menu .el-sub-menu__title:hover {
   background-color: var(--el-color-primary-light-9) !important;
   color: var(--el-text-color-primary) !important;
@@ -65,29 +90,79 @@ html body .el-menu .el-sub-menu .el-sub-menu__title:hover {
 
 // A group whose own page is open states that twice over: yudao tints its title with the same
 // variable it uses for the active item's text, which is white here. The product's own answer is a
-// tinted ground with primary text. `.el-sub-menu` in the chain is again weight — `.is-active` is
-// Element Plus's own mark on a group that contains the open item, which is what this host renders.
+// tinted ground with primary text. `.is-active` is Element Plus's own mark on a group that contains
+// the open item, which is what this host renders.
 // 含有已打开页面的分组，yudao 用「选中项文字色」那个变量给它的标题上色，而这里那个值是白色。产品自己
-// 的答案是浅底 + 主色文字。链上的 `.el-sub-menu` 同样是为了权重——`.is-active` 是 Element Plus 自己给
-// 「含有已打开项的分组」打的标记，本宿主渲染的正是它。
-html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title,
+// 的答案是浅底 + 主色文字。`.is-active` 是 Element Plus 自己给「含有已打开项的分组」打的标记，本宿主
+// 渲染的正是它。
+html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-color-primary) !important;
+}
 html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
   background-color: var(--el-color-primary-light-9) !important;
   color: var(--el-color-primary) !important;
 }
 
+// The sidebar's rows, and the room its scrollbar needs. Element Plus defaults a row to 56px; the
+// product's own menu runs 42px for a group and 38px for a child, which is what makes the sidebar read
+// as a list instead of a column of blocks. The right padding is the other half: the scrollbar here is
+// an overlay rather than a reserved strip, so the rows — and the active item's rounded end in
+// particular — would run underneath it.
+// 侧边栏的行高，以及它的滚动条需要的余地。Element Plus 默认一行 56px；产品自己的菜单一级 42px、二级
+// 38px——正是这组数字让侧边栏读起来像一份列表，而不是一列方块。右侧留白是另一半：这里的滚动条是**浮**
+// 在内容上的，而不是占一条留白，故菜单项——尤其是激活项那个收圆的右端——会跑到它下面去。
+html body .v-menu .el-menu {
+  --el-menu-item-height: 42px;
+  --el-menu-sub-item-height: 38px;
+  --el-menu-base-level-padding: 16px;
+  padding-right: 12px !important;
+}
+html body .v-menu .el-menu .el-menu-item {
+  margin: 2px 0 !important;
+}
+html body .v-menu .el-menu .el-sub-menu__title {
+  margin: 2px 0 !important;
+}
+
+// The login page ends with a block of links into the vendor's own site — a reading list, a video
+// course, an interview collection and an outsourcing contact. It is static markup with no flag behind
+// it, so the layer is the only place that can take it out without editing upstream. It is identified
+// by where its links point rather than by position, so upstream adding a row after it cannot hide the
+// wrong thing. The divider that introduces it goes too: the block is what is being removed.
+// 登录页末尾是一组指向**厂商自己站点**的链接——书单、视频课、面试题、外包咨询。它是写死的标记、背后
+// 没有开关，故在不改上游的前提下只有本层能拿掉它。识别它靠的是**链接指向哪里**，不是它排在第几位，
+// 于是上游往后再加一行也不会藏错东西。引出它的那条分隔线一并去掉：要拿掉的是**整块**。
+html body .login-form .el-row > .el-col:has(a[href*="iocoder.cn"]) {
+  display: none !important;
+}
+html body .login-form .el-row > .el-divider:has(+ .el-col a[href*="iocoder.cn"]) {
+  display: none !important;
+}
+
 // The active item keeps the product's signature: flush to the left edge, right side rounded off,
 // ground running from a light tint into the primary. 激活项保留产品自身的签名：左侧贴边、右侧收成
 // 半圆、底色由浅色渐变到主色。
-html body .v-menu .el-menu .el-menu-item.is-active,
-html body .v-menu .el-menu .el-menu-item.is-active:hover,
-html body .el-menu .el-menu-item.is-active,
+html body .v-menu .el-menu .el-menu-item.is-active {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
+  color: #fff !important;
+  border-radius: 0 999px 999px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+html body .v-menu .el-menu .el-menu-item.is-active:hover {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
+  color: #fff !important;
+  border-radius: 0 999px 999px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+html body .el-menu .el-menu-item.is-active {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
+  color: #fff !important;
+  border-radius: 0 999px 999px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
 html body .el-menu .el-menu-item.is-active:hover {
-  background: linear-gradient(
-    90deg,
-    var(--el-color-primary-light-3) 0%,
-    var(--el-color-primary) 100%
-  ) !important;
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%) !important;
   color: #fff !important;
   border-radius: 0 999px 999px 0 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
