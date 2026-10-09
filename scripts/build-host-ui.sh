@@ -191,6 +191,13 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # 值的那份 .env。它会落到页面标题，以及界面里每一处显示系统名的地方。
   export VITE_APP_TITLE="${KEELBASE_YUDAO_UI_TITLE:-KB管理系统}"
 
+  # The tenant the login form pre-fills. It is not a label: it is the name the login looks the tenant
+  # up by, so it has to be the name the database actually carries — which is why it moves together
+  # with `sql/keelbase-brand-names.sql` and not on its own.
+  # 登录表单预填的租户名。它不是标签：它是登录**按名字查租户**时用的那个名字，故必须与库里实际的名字一致——
+  # 这正是它要与 `sql/keelbase-brand-names.sql` **一起**改、而不能单独改的原因。
+  export VITE_APP_DEFAULT_LOGIN_TENANT="${KEELBASE_YUDAO_UI_TENANT:-KeelBase}"
+
   echo "installing the app's dependencies (this is upstream's own toolchain)…"
   ( cd "$UI_DIR" && "${PM[@]}" --registry="$REGISTRY" install )
   ( cd "$UI_DIR" && "${PM[@]}" run "$BUILD_SCRIPT" )

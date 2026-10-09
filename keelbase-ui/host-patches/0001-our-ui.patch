@@ -1,3 +1,37 @@
+diff --git a/index.html b/index.html
+index 8cfcbef..3cde30c 100644
+--- a/index.html
++++ b/index.html
+@@ -5,14 +5,8 @@
+     <link rel="icon" href="/favicon.ico" />
+     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-    <meta
+-      name="keywords"
+-      content="芋道管理系统 基于 vue3 + CompositionAPI + typescript + vite3 + element plus 的后台开源免费管理系统！"
+-    />
+-    <meta
+-      name="description"
+-      content="芋道管理系统 基于 vue3 + CompositionAPI + typescript + vite3 + element plus 的后台开源免费管理系统！"
+-    />
++    <meta name="keywords" content="KeelBase 企业应用基座" />
++    <meta name="description" content="KeelBase 企业应用基座" />
+     <title>%VITE_APP_TITLE%</title>
+   </head>
+   <body>
+diff --git a/src/components/DiyEditor/components/mobile/UserCard/index.vue b/src/components/DiyEditor/components/mobile/UserCard/index.vue
+index 14b447c..4877590 100644
+--- a/src/components/DiyEditor/components/mobile/UserCard/index.vue
++++ b/src/components/DiyEditor/components/mobile/UserCard/index.vue
+@@ -5,7 +5,7 @@
+         <el-avatar :size="60">
+           <Icon icon="ep:avatar" :size="60" />
+         </el-avatar>
+-        <span class="text-18px font-bold">芋道源码</span>
++        <span class="text-18px font-bold">KeelBase</span>
+       </div>
+       <Icon icon="tdesign:qrcode" :size="20" />
+     </div>
 diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
 index c22c950..029a7e9 100644
 --- a/src/layout/components/Logo/src/Logo.vue
@@ -386,7 +420,7 @@ index 122bdd1..53b1a64 100644
            </div>
            <div class="flex items-center justify-end space-x-10px h-48px">
 diff --git a/src/views/Login/SocialLogin.vue b/src/views/Login/SocialLogin.vue
-index 241cea1..0e8361f 100644
+index 241cea1..fcf05dc 100644
 --- a/src/views/Login/SocialLogin.vue
 +++ b/src/views/Login/SocialLogin.vue
 @@ -9,7 +9,7 @@
@@ -407,6 +441,28 @@ index 241cea1..0e8361f 100644
              <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
            </div>
            <div class="flex items-center justify-end space-x-10px h-48px">
+@@ -200,7 +200,7 @@ const loginData = reactive({
+   captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
+   tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE !== 'false',
+   loginForm: {
+-    tenantName: '芋道源码',
++    tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || 'KeelBase',
+     username: 'admin',
+     password: 'admin123',
+     captchaVerification: '',
+diff --git a/src/views/Login/components/MobileForm.vue b/src/views/Login/components/MobileForm.vue
+index e27ef86..597a2e3 100644
+--- a/src/views/Login/components/MobileForm.vue
++++ b/src/views/Login/components/MobileForm.vue
+@@ -126,7 +126,7 @@ const loginData = reactive({
+   },
+   loginForm: {
+     uuid: '',
+-    tenantName: '芋道源码',
++    tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || 'KeelBase',
+     mobileNumber: '',
+     code: ''
+   }
 diff --git a/src/views/Login/components/QrCodeForm.vue b/src/views/Login/components/QrCodeForm.vue
 index d5e05ec..a440844 100644
 --- a/src/views/Login/components/QrCodeForm.vue
@@ -420,3 +476,16 @@ index d5e05ec..a440844 100644
  
  import LoginFormTitle from './LoginFormTitle.vue'
  import { LoginStateEnum, useLoginState } from './useLogin'
+diff --git a/src/views/ai/chat/index/components/message/MessageListEmpty.vue b/src/views/ai/chat/index/components/message/MessageListEmpty.vue
+index 11f7f68..41996ef 100644
+--- a/src/views/ai/chat/index/components/message/MessageListEmpty.vue
++++ b/src/views/ai/chat/index/components/message/MessageListEmpty.vue
+@@ -3,7 +3,7 @@
+   <div class="relative flex flex-row justify-center w-full h-full">
+     <!-- title -->
+     <div class="flex flex-col justify-center">
+-      <div class="text-28px font-bold text-center">芋道 AI</div>
++      <div class="text-28px font-bold text-center">KeelBase AI</div>
+       <div class="flex flex-row flex-wrap items-center justify-center w-460px mt-20px">
+         <div
+           class="flex justify-center w-180px leading-50px border border-solid border-[#e4e4e4] rounded-10px m-10px cursor-pointer hover:bg-[rgba(243,243,243,0.73)]"

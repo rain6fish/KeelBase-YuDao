@@ -117,6 +117,21 @@ itself is not reachable from here, so it cannot be swapped.
 `host-overlay/src/assets/imgs/keelbase-logo.svg` is the product's brand mark, with the same path and
 colour as Web-Admin-Vue's own logo component and favicon, so the mark keeps one source.
 
+## The names the deployment shows
+
+The system's name comes from the build's environment (`VITE_APP_TITLE`), so it lands in the page
+title and everywhere the UI prints it without any source being edited.
+
+Two other names are **not** labels and cannot be changed here. The **tenant name** is what the login
+looks the tenant up by, and the seeded administrator's **nickname** is what the top bar and the
+greeting show. Both live in the database, and the login pre-fill has to agree with the tenant record
+or sign-in stops working. They move together, through `sql/keelbase-brand-names.sql` — run it against
+an existing database after upstream's seed; a fresh install runs upstream's seed and then it.
+
+Upstream's seed file is left untouched: it is upstream's, it is several thousand lines, and it is
+duplicated across dialects, so a rename belongs in a file that says what it changes rather than as
+edits scattered through theirs.
+
 ## Two traps the build had to learn
 
 **The href has to be absolute.** A relative `href` resolves against the *current route*, not the
