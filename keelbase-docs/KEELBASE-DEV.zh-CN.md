@@ -83,6 +83,25 @@ RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
 **⚠ 未覆盖：** pgvector 在位，是运行时知识层走**语义路径**的前提；但那条路还要一个嵌入模型，而这里没配
 ——故**语义路径本身没有跑过**，只验了扩展在位。
 
+## 从 Spec 生成一个受治理的模块
+
+```bash
+node scripts/keelbase-gen-from-spec.mjs specs/products.json           # 写
+node scripts/keelbase-gen-from-spec.mjs specs/products.json --check   # 比对，有漂移即非零
+```
+
+给一份 Business Spec，它产出三个文件，**都是本项目自己的**、不是宿主生成器的：
+
+| 产出 | 是什么 |
+|---|---|
+| `sql/keelbase-<module>.sql` | 建表的 DDL，带治理列与宿主的基列。**MySQL**，中文标签骑在 `COMMENT` 里——这个宿主自己的生成器在导入时读它，于是命名那一趟就并进了 DDL |
+| `…/keelbase/generated/<Entity>Tools.java` | 模块的 AI 工具面：一读一写，各配路由 |
+| `…/keelbase/generated/<Entity>Governance.java` | 模块的行范围，作为**切在模块自己 service 上的切点** |
+
+**它不做**的是生成模块自己的 CRUD。那是这个宿主的代码生成器、经它的 API 驱动——**另一趟**，因为它需要一套跑着的栈；也正是因此，这一半是**确定性的、离线的**。
+
+**`--check` 证明了什么、没证明什么。** 它证明盘上的文件**就是 spec 所说的那样**；它**不**证明它们**是对的**——它比的是**上一次运行写下的**，所以模板里的 bug 会**忠实地重新生成自己**、并且照报 `no drift`。第一版 DDL 模板漏了行尾逗号、还把 `comment` 粘到长约束上，产出了**无效 SQL** 而 `--check` 说它干净；逮住它的是**与 Spike 那份手工文件对账**。
+
 ## 上游，以及怎么对着它比
 
 `upstream` 指向 `https://github.com/YunaiV/ruoyi-vue-pro.git`——**规范源**；项目的 Gitee 镜像这里**没配**。

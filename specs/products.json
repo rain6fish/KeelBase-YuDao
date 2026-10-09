@@ -1,0 +1,22 @@
+{
+  "feature": "products",
+  "goal": "让销售维护一份产品目录，每个产品有自己的属主；只有属主能改自己的产品。",
+  "actors": ["sales"],
+  "objects": [
+    {
+      "name": "product",
+      "label": "产品",
+      "module": "products",
+      "searchable": true,
+      "fields": [
+        { "name": "name", "type": "string", "label": "产品名称", "required": true },
+        { "name": "price", "type": "int", "label": "价格" },
+        { "name": "status", "type": "enum", "enum": ["on_sale", "off_shelf"], "label": "状态" }
+      ]
+    }
+  ],
+  "aiCapabilities": [
+    { "object": "product", "kind": "read" },
+    { "object": "product", "kind": "write", "riskLevel": "R3", "requiresConfirmation": true }
+  ]
+}

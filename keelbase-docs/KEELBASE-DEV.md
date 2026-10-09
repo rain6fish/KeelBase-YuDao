@@ -93,6 +93,32 @@ line.
 path, but that path also needs an embedding model, and none is configured here — so the **semantic path
 itself has not been exercised**, only the extension's presence.
 
+## Generating a governed module from a spec
+
+```bash
+node scripts/keelbase-gen-from-spec.mjs specs/products.json           # write
+node scripts/keelbase-gen-from-spec.mjs specs/products.json --check   # compare, non-zero on drift
+```
+
+From a Business Spec it produces three files, all of them this project's rather than the host
+generator's:
+
+| Output | What it is |
+|---|---|
+| `sql/keelbase-<module>.sql` | the DDL that creates the table, with the governance columns and the host's base columns. **MySQL**, and the Chinese labels ride in `COMMENT` — this host's own generator reads them at import, so the naming pass disappears into the DDL |
+| `…/keelbase/generated/<Entity>Tools.java` | the module's AI tool face: a read and a write, with their routes |
+| `…/keelbase/generated/<Entity>Governance.java` | the module's row scope, as pointcuts over the module's own service |
+
+**What it does not do** is generate the module's own CRUD. That is this host's code generator, driven
+over its API — a separate step, because it needs a running stack, and it is why this half is
+deterministic and offline.
+
+**What `--check` proves, and what it does not.** It proves the files on disk are what the spec says.
+It does **not** prove they are right — it compares against what the last run wrote, so a template bug
+regenerates itself faithfully and still reports `no drift`. The first version of the DDL template
+dropped the trailing commas and glued `comment` onto long constraints, producing invalid SQL that
+`--check` called clean; what caught it was comparing against the spike's hand-made file.
+
 ## Upstream, and how to compare against it
 
 `upstream` points at `https://github.com/YunaiV/ruoyi-vue-pro.git` — the canonical source; the
