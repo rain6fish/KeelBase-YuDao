@@ -64,10 +64,16 @@ index e9ca174..8d802c0 100644
        })
      },
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
-index 5326389..600c2a7 100644
+index 5326389..f7e835d 100644
 --- a/src/views/Home/Index.vue
 +++ b/src/views/Home/Index.vue
-@@ -62,14 +62,6 @@
+@@ -57,19 +57,11 @@
+   </div>
+ 
+   <el-row class="mt-8px" :gutter="8" justify="space-between">
+-    <el-col :xl="16" :lg="16" :md="24" :sm="24" :xs="24" class="mb-8px">
++    <el-col :xl="24" :lg="24" :md="24" :sm="24" :xs="24" class="mb-8px">
+       <el-card shadow="never">
          <template #header>
            <div class="h-3 flex justify-between">
              <span>{{ t('workplace.project') }}</span>
@@ -102,15 +108,75 @@ index 5326389..600c2a7 100644
                  </div>
                </el-card>
              </el-col>
-@@ -199,6 +183,7 @@ import { EChartsOption } from 'echarts'
- import { formatTime } from '@/utils'
- 
+@@ -142,65 +126,15 @@
+         </el-skeleton>
+       </el-card>
+     </el-col>
+-    <el-col :xl="8" :lg="8" :md="24" :sm="24" :xs="24" class="mb-8px">
+-      <el-card shadow="never">
+-        <template #header>
+-          <div class="h-3 flex justify-between">
+-            <span>{{ t('workplace.shortcutOperation') }}</span>
+-          </div>
+-        </template>
+-        <el-skeleton :loading="loading" animated>
+-          <el-row>
+-            <el-col v-for="item in shortcut" :key="`team-${item.name}`" :span="8" class="mb-8px">
+-              <div class="flex items-center">
+-                <Icon :icon="item.icon" class="mr-8px" :style="{ color: item.color }" />
+-                <el-link type="default" :underline="false" @click="handleShortcutClick(item.url)">
+-                  {{ item.name }}
+-                </el-link>
+-              </div>
+-            </el-col>
+-          </el-row>
+-        </el-skeleton>
+-      </el-card>
+-      <el-card shadow="never" class="mt-8px">
+-        <template #header>
+-          <div class="h-3 flex justify-between">
+-            <span>{{ t('workplace.notice') }}</span>
+-            <el-link type="primary" :underline="false">{{ t('action.more') }}</el-link>
+-          </div>
+-        </template>
+-        <el-skeleton :loading="loading" animated>
+-          <div v-for="(item, index) in notice" :key="`dynamics-${index}`">
+-            <div class="flex items-center">
+-              <el-avatar :src="avatar" :size="35" class="mr-16px">
+-                <img src="@/assets/imgs/avatar.gif" alt="" />
+-              </el-avatar>
+-              <div>
+-                <div class="text-14px">
+-                  <Highlight :keys="item.keys.map((v) => t(v))">
+-                    {{ item.type }} : {{ item.title }}
+-                  </Highlight>
+-                </div>
+-                <div class="mt-16px text-12px text-gray-400">
+-                  {{ formatTime(item.date, 'yyyy-MM-dd') }}
+-                </div>
+-              </div>
+-            </div>
+-            <el-divider />
+-          </div>
+-        </el-skeleton>
+-      </el-card>
+-    </el-col>
+   </el-row>
+ </template>
+ <script lang="ts" setup>
+ import { set } from 'lodash-es'
+ import { EChartsOption } from 'echarts'
+-import { formatTime } from '@/utils'
+-
  import { useUserStore } from '@/store/modules/user'
 +import { usePermissionStore } from '@/store/modules/permission'
  // import { useWatermark } from '@/hooks/web/useWatermark'
- import type { WorkplaceTotal, Project, Notice, Shortcut } from './types'
+-import type { WorkplaceTotal, Project, Notice, Shortcut } from './types'
++import type { WorkplaceTotal, Project } from './types'
  import { pieOptions, barOptions } from './echarts-data'
-@@ -209,6 +194,7 @@ defineOptions({ name: 'Index' })
+ import { useRouter } from 'vue-router'
+ 
+@@ -209,6 +143,7 @@ defineOptions({ name: 'Index' })
  const { t } = useI18n()
  const router = useRouter()
  const userStore = useUserStore()
@@ -118,7 +184,7 @@ index 5326389..600c2a7 100644
  // const { setWatermark } = useWatermark()
  const loading = ref(true)
  const avatar = userStore.getUser.avatar
-@@ -230,60 +216,24 @@ const getCount = async () => {
+@@ -230,137 +165,24 @@ const getCount = async () => {
    totalSate = Object.assign(totalSate, data)
  }
  
@@ -190,15 +256,105 @@ index 5326389..600c2a7 100644
 +      color: 'var(--el-color-primary)'
 +    }))
    projects = Object.assign(projects, data)
+-}
+-
+-// 获取通知公告
+-let notice = reactive<Notice[]>([])
+-const getNotice = async () => {
+-  const data = [
+-    {
+-      title: '系统支持 JDK 8/17/21，Vue 2/3',
+-      type: '技术兼容性',
+-      keys: ['JDK', 'Vue'],
+-      date: new Date()
+-    },
+-    {
+-      title: '后端提供 Spring Boot 2.7/3.2 + Cloud 双架构',
+-      type: '架构灵活性',
+-      keys: ['Boot', 'Cloud'],
+-      date: new Date()
+-    },
+-    {
+-      title: '全部开源，个人与企业可 100% 直接使用，无需授权',
+-      type: '开源免授权',
+-      keys: ['无需授权'],
+-      date: new Date()
+-    },
+-    {
+-      title: '国内使用最广泛的快速开发平台，远超 10w+ 企业使用',
+-      type: '广泛企业认可',
+-      keys: ['最广泛', '10w+'],
+-      date: new Date()
+-    }
+-  ]
+-  notice = Object.assign(notice, data)
+-}
+-
+-// 获取快捷入口
+-let shortcut = reactive<Shortcut[]>([])
+-
+-const getShortcut = async () => {
+-  const data = [
+-    {
+-      name: '首页',
+-      icon: 'ion:home-outline',
+-      url: '/',
+-      color: '#1fdaca'
+-    },
+-    {
+-      name: '商城中心',
+-      icon: 'ep:shop',
+-      url: '/mall/home',
+-      color: '#ff6b6b'
+-    },
+-    {
+-      name: 'AI 大模型',
+-      icon: 'tabler:ai',
+-      url: '/ai/chat',
+-      color: '#7c3aed'
+-    },
+-    {
+-      name: 'ERP 系统',
+-      icon: 'simple-icons:erpnext',
+-      url: '/erp/home',
+-      color: '#3fb27f'
+-    },
+-    {
+-      name: 'CRM 系统',
+-      icon: 'simple-icons:civicrm',
+-      url: '/crm/backlog',
+-      color: '#4daf1bc9'
+-    },
+-    {
+-      name: 'IoT 物联网',
+-      icon: 'fa-solid:hdd',
+-      url: '/iot/home',
+-      color: '#1a73e8'
+-    }
+-  ]
+-  shortcut = Object.assign(shortcut, data)
 +  totalSate.project = data.length
  }
  
- // 获取通知公告
-@@ -424,7 +374,11 @@ const getAllApi = async () => {
+ // 用户来源
+@@ -415,8 +237,6 @@ const getAllApi = async () => {
+   await Promise.all([
+     getCount(),
+     getProject(),
+-    getNotice(),
+-    getShortcut(),
+     getUserAccessSource(),
+     getWeeklyUserActivity()
+   ])
+@@ -424,11 +244,11 @@ const getAllApi = async () => {
  }
  
  const handleProjectClick = (message: string) => {
 -  window.open(`https://${message}`, '_blank')
+-}
+-
+-const handleShortcutClick = (url: string) => {
+-  router.push(url)
 +  if (/^https?:\/\//.test(message)) {
 +    window.open(message, '_blank')
 +  } else {
@@ -206,7 +362,7 @@ index 5326389..600c2a7 100644
 +  }
  }
  
- const handleShortcutClick = (url: string) => {
+ getAllApi()
 diff --git a/src/views/Login/Login.vue b/src/views/Login/Login.vue
 index 122bdd1..53b1a64 100644
 --- a/src/views/Login/Login.vue

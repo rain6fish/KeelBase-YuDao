@@ -158,7 +158,15 @@ html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover::before {
 // The item that is open, and the group that contains it — both in the same band, the group in the
 // lighter tint so it reads as a container rather than as the current page.
 // 已打开的那一项，以及含有它的那个分组——同一条色带，分组用更浅的一档，使它读起来像容器而不是当前页。
-html body .v-menu .el-menu .el-menu-item.is-active {
+// `.el-menu--vertical` is here for weight, the same reason `.v-menu` is for hover: yudao's rule for
+// the open item is scoped, so it carries one more class-level term than `… .el-menu .el-menu-item
+// .is-active` does. Losing that comparison leaves the item's own flat rectangle painted under the
+// band — same hue, square right end — and the rounded end stops showing. It looks like a styling
+// choice rather than a cascade loss.
+// `.el-menu--vertical` 在这里是为了**权重**，与悬停那条用 `.v-menu` 同理：yudao 给已打开项写的那条规则
+// 带作用域，比 `… .el-menu .el-menu-item.is-active` 多一级类权重。这一级输掉，菜单项自己那层**平色矩形**
+// 就留在色带之下——同色系、方角——收圆的那一端于是看不见了。它看起来像一种样式选择，而不是权重输了。
+html body .v-menu .el-menu.el-menu--vertical .el-menu-item.is-active {
   background-color: transparent !important;
   color: #fff !important;
 }
@@ -180,7 +188,7 @@ html body .v-menu .el-menu .el-menu-item.is-active:hover {
 html body .v-menu .el-menu .el-menu-item.is-active:hover::before {
   background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
 }
-html body .el-menu .el-menu-item.is-active {
+html body .el-menu.el-menu--vertical .el-menu-item.is-active {
   background-color: transparent !important;
   color: #fff !important;
 }
