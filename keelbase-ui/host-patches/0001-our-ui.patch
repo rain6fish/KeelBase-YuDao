@@ -46,35 +46,39 @@ index c22c950..029a7e9 100644
        <div
          v-if="show"
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 9d14564..570735b 100644
+index 9d14564..2540eb8 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -208,8 +208,8 @@ export default {
+@@ -208,9 +208,11 @@ export default {
      happyDay: 'Wish you happy every day!',
      toady: `It's sunny today`,
      notice: 'Announcement',
 -    project: 'Project',
--    access: 'Project access',
 +    project: 'Modules',
-+    access: 'Unread',
+     access: 'Project access',
      toDo: 'To do',
++    apiAccess: 'API calls',
++    apiError: 'API errors',
      introduction: 'A serious introduction',
      shortcutOperation: 'Quick entry',
+     operation: 'Operation',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 13065de..230ca5c 100644
+index 13065de..cca60e7 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -210,8 +210,8 @@ export default {
+@@ -210,9 +210,11 @@ export default {
      happyDay: '祝你开心每一天!',
      toady: '今日晴',
      notice: '通知公告',
 -    project: '项目数',
--    access: '项目访问',
 +    project: '系统模块',
-+    access: '未读消息',
+     access: '项目访问',
      toDo: '待办',
++    apiAccess: '接口访问',
++    apiError: '接口异常',
      introduction: '一个正经的简介',
      shortcutOperation: '快捷入口',
+     operation: '操作',
 diff --git a/src/store/modules/permission.ts b/src/store/modules/permission.ts
 index e9ca174..8d802c0 100644
 --- a/src/store/modules/permission.ts
@@ -98,9 +102,42 @@ index e9ca174..8d802c0 100644
        })
      },
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
-index 5326389..8cba6fc 100644
+index 5326389..6812a90 100644
 --- a/src/views/Home/Index.vue
 +++ b/src/views/Home/Index.vue
+@@ -25,27 +25,27 @@
+                 <CountTo
+                   class="text-20px"
+                   :start-val="0"
+-                  :end-val="totalSate.project"
++                  :end-val="totalSate.modules"
+                   :duration="2600"
+                 />
+               </div>
+               <el-divider direction="vertical" />
+               <div class="px-8px text-right">
+-                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.toDo') }}</div>
++                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiAccess') }}</div>
+                 <CountTo
+                   class="text-20px"
+                   :start-val="0"
+-                  :end-val="totalSate.todo"
++                  :end-val="totalSate.access"
+                   :duration="2600"
+                 />
+               </div>
+               <el-divider direction="vertical" border-style="dashed" />
+               <div class="px-8px text-right">
+-                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.access') }}</div>
++                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiError') }}</div>
+                 <CountTo
+                   class="text-20px"
+                   :start-val="0"
+-                  :end-val="totalSate.access"
++                  :end-val="totalSate.errors"
+                   :duration="2600"
+                 />
+               </div>
 @@ -57,19 +57,11 @@
    </div>
  
@@ -204,8 +241,8 @@ index 5326389..8cba6fc 100644
 -
  import { useUserStore } from '@/store/modules/user'
 +import { usePermissionStore } from '@/store/modules/permission'
-+import { getTaskTodoPage } from '@/api/bpm/task'
-+import { getUnreadNotifyMessageCount } from '@/api/system/notify/message'
++import { getApiAccessLogPage } from '@/api/infra/apiAccessLog'
++import { getApiErrorLogPage } from '@/api/infra/apiErrorLog'
  // import { useWatermark } from '@/hooks/web/useWatermark'
 -import type { WorkplaceTotal, Project, Notice, Shortcut } from './types'
 +import type { WorkplaceTotal, Project } from './types'
@@ -220,7 +257,15 @@ index 5326389..8cba6fc 100644
  // const { setWatermark } = useWatermark()
  const loading = ref(true)
  const avatar = userStore.getUser.avatar
-@@ -222,145 +159,43 @@ let totalSate = reactive<WorkplaceTotal>({
+@@ -216,151 +153,48 @@ const username = userStore.getUser.nickname
+ const pieOptionsData = reactive<EChartsOption>(pieOptions) as EChartsOption
+ // 获取统计数
+ let totalSate = reactive<WorkplaceTotal>({
+-  project: 0,
++  modules: 0,
+   access: 0,
+-  todo: 0
++  errors: 0
  })
  
  const getCount = async () => {
@@ -230,23 +275,22 @@ index 5326389..8cba6fc 100644
 -    todo: 10
 -  }
 -  totalSate = Object.assign(totalSate, data)
-+  // Real figures, each read from the module that owns it. Upstream put three constants here; two of
-+  // them are now measured, and the third — which measured nothing at all — carries a label matching
-+  // what it does measure. Each falls back to zero on its own: a rejected call would otherwise take
-+  // the whole `Promise.all` down and leave the dashboard on its skeletons forever.
-+  // 真数，各取自拥有它的那个模块。上游在这里放了三个常量；其中两个现在是真的量出来的，而第三个——它原本
-+  // 什么都没量——换了个与所量之物相符的标签。两者各自回落到 0：否则一个调用被拒会把整个 `Promise.all`
-+  // 带下去，面板就永远停在骨架屏上。
-+  const [todo, unread] = await Promise.all([
-+    getTaskTodoPage({ pageNo: 1, pageSize: 1 })
++  // The two figures beside the module count are the interface's own: how many calls it has answered
++  // and how many of them failed, read from the logs the infrastructure module keeps. Each falls back
++  // to zero on its own — a rejected call would otherwise take the whole `Promise.all` down and leave
++  // the dashboard on its skeletons forever.
++  // 模块数旁边那两个数是接口自己的：它答过多少次调用、其中多少次失败——取自基础设施模块所记的日志。
++  // 两者各自回落到 0——否则一个调用被拒会把整个 `Promise.all` 带下去，面板就永远停在骨架屏上。
++  const [access, errors] = await Promise.all([
++    getApiAccessLogPage({ pageNo: 1, pageSize: 1 })
 +      .then((res) => res?.total ?? 0)
 +      .catch(() => 0),
-+    getUnreadNotifyMessageCount()
-+      .then((count) => Number(count) || 0)
++    getApiErrorLogPage({ pageNo: 1, pageSize: 1 })
++      .then((res) => res?.total ?? 0)
 +      .catch(() => 0)
 +  ])
-+  totalSate.todo = todo
-+  totalSate.access = unread
++  totalSate.access = access
++  totalSate.errors = errors
  }
  
 -// 获取项目数
@@ -394,11 +438,11 @@ index 5326389..8cba6fc 100644
 -    }
 -  ]
 -  shortcut = Object.assign(shortcut, data)
-+  totalSate.project = data.length
++  totalSate.modules = data.length
  }
  
  // 用户来源
-@@ -415,8 +250,6 @@ const getAllApi = async () => {
+@@ -415,8 +249,6 @@ const getAllApi = async () => {
    await Promise.all([
      getCount(),
      getProject(),
@@ -407,7 +451,7 @@ index 5326389..8cba6fc 100644
      getUserAccessSource(),
      getWeeklyUserActivity()
    ])
-@@ -424,11 +257,11 @@ const getAllApi = async () => {
+@@ -424,11 +256,11 @@ const getAllApi = async () => {
  }
  
  const handleProjectClick = (message: string) => {
@@ -424,6 +468,20 @@ index 5326389..8cba6fc 100644
  }
  
  getAllApi()
+diff --git a/src/views/Home/types.ts b/src/views/Home/types.ts
+index 956636a..28abea8 100644
+--- a/src/views/Home/types.ts
++++ b/src/views/Home/types.ts
+@@ -1,7 +1,7 @@
+ export type WorkplaceTotal = {
+-  project: number
++  modules: number
+   access: number
+-  todo: number
++  errors: number
+ }
+ 
+ export type Project = {
 diff --git a/src/views/Login/Login.vue b/src/views/Login/Login.vue
 index 122bdd1..e5952da 100644
 --- a/src/views/Login/Login.vue
