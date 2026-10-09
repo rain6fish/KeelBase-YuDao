@@ -111,8 +111,8 @@ RESET=1 bash scripts/bootstrap-datastore.sh  # 删库重灌
 ## 从 Spec 生成一个受治理的模块
 
 ```bash
-node scripts/keelbase-gen-from-spec.mjs specs/products.json           # 写
-node scripts/keelbase-gen-from-spec.mjs specs/products.json --check   # 比对，有漂移即非零
+bash scripts/gen-from-spec.sh specs/products.json           # 写
+bash scripts/gen-from-spec.sh specs/products.json --check   # 比对，有漂移即非零
 ```
 
 给一份 Business Spec，它产出三个文件，**都是本项目自己的**、不是宿主生成器的：

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>cn.iocoder.boot</groupId>
+        <artifactId>yudao</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>keelbase-codegen</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+    <description>
+        Turns a Business Spec into what this host needs for a governed module: the DDL that creates its
+        table, and the two of our files that give it an AI tool face and a row-scope pointcut.
+        把一份 Business Spec 变成这个宿主需要的两样东西：建表的 DDL，以及我们自己的两个文件——AI 工具面与行范围切点。
+    </description>
+
+    <dependencies>
+        <!-- Only for reading the Spec. The generator emits text; it depends on nothing else. -->
+        <!-- 只为读 Spec。生成器产出的是文本，不依赖别的。 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- The generator is not a dependency of anything: it is run, not linked. `exec:java` keeps
+                 it that way — no jar to install, no classpath to assemble, and the compile step is the
+                 same one the rest of the build uses.
+                 生成器不是谁的依赖：它是**被运行**的，不是被链接的。`exec:java` 保持这一点——没有要安装的 jar、
+                 没有要拼的 classpath，而编译那一步与整个构建用的是同一步。 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>cn.iocoder.yudao.codegen.SpecCodegen</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

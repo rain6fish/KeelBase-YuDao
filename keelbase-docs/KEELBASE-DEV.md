@@ -121,8 +121,8 @@ itself has not been exercised**, only the extension's presence.
 ## Generating a governed module from a spec
 
 ```bash
-node scripts/keelbase-gen-from-spec.mjs specs/products.json           # write
-node scripts/keelbase-gen-from-spec.mjs specs/products.json --check   # compare, non-zero on drift
+bash scripts/gen-from-spec.sh specs/products.json           # write
+bash scripts/gen-from-spec.sh specs/products.json --check   # compare, non-zero on drift
 ```
 
 From a Business Spec it produces three files, all of them this project's rather than the host

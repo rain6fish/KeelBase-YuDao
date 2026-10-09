@@ -38,6 +38,11 @@
 <!-- 请参考 https://doc.iocoder.cn/ai/build/ 文档，完成 AI 模块的启动！！！ -->
 <!--        <module>yudao-module-ai</module>-->
         <module>yudao-module-ai1-springai</module>
+        <!-- Ours, not upstream's: the Spec→(DDL + seam files) generator. It is a module so that it
+             compiles with the build and needs no jar installed; nothing depends on it.
+             我们自己的、非上游的：Spec→（DDL + 接缝文件）生成器。做成模块是为了随构建一起编译、无需安装 jar；
+             没有任何东西依赖它。 -->
+        <module>keelbase-codegen</module>
     </modules>
 
     <name>${project.artifactId}</name>

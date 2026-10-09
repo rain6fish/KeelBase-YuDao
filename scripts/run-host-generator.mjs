@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Drive this host's own code generator over its API: take a table that
-// `keelbase-gen-from-spec.mjs` created and produce the module's CRUD from it.
+// `scripts/gen-from-spec.sh` created and produce the module's CRUD from it.
 //
 //   node scripts/run-host-generator.mjs --module products
 //
@@ -20,7 +20,7 @@
 //   5. GET  /codegen/table/list + /codegen/preview — read every file the generator produced
 //   6. write the Java and mapper XML into the app tree; archive the rest
 //
-// 把这台宿主**自己的**代码生成器经它的 API 驱动起来：拿 `keelbase-gen-from-spec.mjs` 建好的表，产出模块的 CRUD。
+// 把这台宿主**自己的**代码生成器经它的 API 驱动起来：拿 `scripts/gen-from-spec.sh` 建好的表，产出模块的 CRUD。
 //
 //   node scripts/run-host-generator.mjs --module products
 //
@@ -78,7 +78,7 @@ async function api(path, { method = 'GET', token, body } = {}) {
 
 console.log(`== 1) 建表：sql/keelbase-${MODULE}.sql ==`);
 const ddl = join(REPO, 'sql', `keelbase-${MODULE}.sql`);
-if (!existsSync(ddl)) throw new Error(`missing ${ddl} — run keelbase-gen-from-spec.mjs first`);
+if (!existsSync(ddl)) throw new Error(`missing ${ddl} — run scripts/gen-from-spec.sh first`);
 execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-v', 'ON_ERROR_STOP=1'], {
   input: readFileSync(ddl),
   stdio: ['pipe', 'inherit', 'inherit']
