@@ -25,9 +25,15 @@
 //
 // 不是本线运行时的一部分：没有东西启动它，也没有东西依赖它。
 import http from 'node:http';
+import { appendFileSync } from 'node:fs';
 
 const PORT = Number(process.env.MCP_PORT || 8799);
 const TOOL = process.env.MCP_TOOL || 'probe_echo';
+const NOTE_TOOL = process.env.MCP_NOTE_TOOL || 'probe_note';
+// Where the one tool with a side effect writes. A multi-step run proves itself by this file having the
+// line in it — a call that was refused would leave it untouched.
+// 那个**有副作用**的工具写在哪里。一次多步运行靠这个文件里有没有那一行来证明自己——被拒的调用不会动它。
+const NOTE_FILE = process.env.MCP_NOTE_FILE || '/tmp/probe-notes.txt';
 const SESSION = 'keelbase-probe-session';
 
 const send = (res, status, payload) => {
@@ -75,15 +81,27 @@ const server = http.createServer((req, res) => {
         return;
       case 'tools/list':
         reply({
-          tools: [{
-            name: TOOL,
-            description: 'Echo a string back. The probe exists to be called, not to be useful.',
-            inputSchema: {
-              type: 'object',
-              properties: { text: { type: 'string', description: '任何字符串' } },
-              required: ['text']
+          tools: [
+            {
+              name: TOOL,
+              description: 'Echo a string back. Read-only; the probe exists to be called, not to be useful.',
+              inputSchema: {
+                type: 'object',
+                properties: { text: { type: 'string', description: '任何字符串' } },
+                required: ['text']
+              }
+            },
+            {
+              name: NOTE_TOOL,
+              description: 'Append a line to the probe\'s note file. This one has a side effect, so a'
+                + ' run that reaches it leaves a mark that can be checked afterwards.',
+              inputSchema: {
+                type: 'object',
+                properties: { text: { type: 'string', description: '要记下的一行' } },
+                required: ['text']
+              }
             }
-          }]
+          ]
         });
         return;
       case 'tools/call': {
@@ -92,6 +110,11 @@ const server = http.createServer((req, res) => {
         // The observable: a run that reaches here has really issued the tool call.
         // 可观测处：跑到这里的运行，是真的发出了这次工具调用。
         console.log(`[probe-mcp] tools/call name=${name} args=${JSON.stringify(args)}`);
+        if (name === NOTE_TOOL) {
+          appendFileSync(NOTE_FILE, `${args.text ?? ''}\n`);
+          reply({ content: [{ type: 'text', text: `noted: ${args.text ?? ''}` }], isError: false });
+          return;
+        }
         reply({ content: [{ type: 'text', text: `echo: ${args.text ?? ''}` }], isError: false });
         return;
       }
