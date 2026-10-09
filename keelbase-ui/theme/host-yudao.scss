@@ -1,0 +1,96 @@
+// Host adapter: yudao's own layout namespaces, restated in the KeelBase visual language.
+//
+// The token files vendored next to this one cover the Element Plus surface. They do not cover the
+// sidebar, the top bar or the tab strip, because yudao drives all three through a namespace of its
+// own — `--left-menu-*`, `--top-header-*`, `--logo-*` — and defaults them to a dark navy that the
+// product's own look does not use. This file is the translation.
+//
+// It is a translation and not a copy on purpose: Web-Admin-Vue states the same look against its own
+// class names (`.admin-aside`, `.el-menu-nav`), which do not exist here, so those rules cannot be
+// vendored byte-for-byte. What crosses over unaltered is every *value* — they are all `var(--el-*)`
+// references into the vendored tokens, so the palette still has one source.
+//
+// 宿主适配层：把 yudao 自己的布局命名空间，改用 KeelBase 的视觉语言来陈述。
+//
+// 与本文件相邻的那些令牌文件覆盖的是 Element Plus 那一面。侧边栏 / 顶栏 / 标签条不在其中——
+// yudao 用一套自己的命名空间驱动这三者（`--left-menu-*` · `--top-header-*` · `--logo-*`），默认成
+// 产品自身不使用的深藏青。本文件就是这层翻译。
+//
+// 它是**翻译**而不是**拷贝**，这是刻意的：Web-Admin-Vue 把这同一套样子陈述在它自己的类名上
+// （`.admin-aside` · `.el-menu-nav`），那些类名在这里并不存在，故那些规则无法逐字节入库。原样过来的
+// 是每一个**取值**——它们全是对已入库令牌的 `var(--el-*)` 引用，于是配色仍然只有一个源。
+
+:root {
+  // sidebar: same ground as the content area, so the whole page reads as one surface and the active
+  // item is what floats. 侧边栏与内容区同底色，整页一体；悬浮感由激活项提供。
+  --left-menu-bg-color: var(--el-bg-color-page) !important;
+  --left-menu-bg-light-color: transparent !important;
+  --left-menu-bg-active-color: var(--el-color-primary) !important;
+  --left-menu-collapse-bg-active-color: var(--el-color-primary) !important;
+  --left-menu-text-color: var(--el-text-color-regular) !important;
+  --left-menu-text-active-color: #fff !important;
+  --left-menu-border-color: transparent !important;
+
+  --logo-title-text-color: var(--el-text-color-primary) !important;
+  --logo-border-color: transparent !important;
+
+  --top-header-bg-color: var(--el-bg-color-page) !important;
+  --top-header-text-color: var(--el-text-color-primary) !important;
+  --top-header-hover-color: var(--el-color-primary-light-9) !important;
+  --top-tool-border-color: transparent !important;
+}
+
+// Two states the variables cannot carry, because yudao ties hover text and active text to the same
+// variable and hover background to the same value as the sidebar itself. On the dark default you
+// cannot tell; on a light sidebar white hover text on a light ground is unreadable. Restated here.
+//
+// The `.v-menu` ancestor is there for weight, not for meaning: yudao's sidebar rule is scoped, which
+// makes it `.v-menu[data-v-…] .el-menu .el-menu-item:hover` — five class-level terms against the four
+// of a plain `html body .el-menu .el-menu-item:not(.is-active):hover`. Both are `!important`, so the
+// higher weight wins and the unreadable state comes back. `:not()` contributes only the weight of its
+// argument, which is the trap. The unscoped variant stays for the collapsed-menu popper, whose own
+// rule carries no scope attribute and is therefore lighter.
+// 那个 `.v-menu` 祖先是为了**权重**，不是为了语义：yudao 那条侧边栏规则带作用域，于是形如
+// `.v-menu[data-v-…] .el-menu .el-menu-item:hover`——五级类权重，对上 `html body .el-menu
+// .el-menu-item:not(.is-active):hover` 的四级。两者都是 `!important`，权重高者胜，于是那个读不了的
+// 状态又回来了。`:not()` 只贡献其**参数**的权重，这正是坑所在。不带作用域的那条留给折叠态弹出菜单：
+// 它自己的规则没有作用域属性，权重更轻。
+html body .v-menu .el-menu .el-menu-item:not(.is-active):hover,
+html body .v-menu .el-menu .el-sub-menu .el-sub-menu__title:hover,
+html body .el-menu .el-menu-item:not(.is-active):hover,
+html body .el-menu .el-sub-menu .el-sub-menu__title:hover {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-text-color-primary) !important;
+}
+
+// A group whose own page is open states that twice over: yudao tints its title with the same
+// variable it uses for the active item's text, which is white here. The product's own answer is a
+// tinted ground with primary text. `.el-sub-menu` in the chain is again weight, and `:has()` — which
+// contributes the weight of its argument — is what makes this reliably the heaviest.
+// 含有已打开页面的分组，yudao 用「选中项文字色」那个变量给它的标题上色，而这里那个值是白色。产品自己
+// 的答案是浅底 + 主色文字。链上的 `.el-sub-menu` 同样是为了权重，而真正让它稳稳最重的是 `:has()`——
+// 它贡献的是其参数的权重。
+html body .v-menu .el-menu .el-sub-menu:has(> .el-menu-item.is-active) > .el-sub-menu__title,
+html body .v-menu .el-menu .el-sub-menu.is-active > .el-sub-menu__title,
+html body .el-menu .el-sub-menu:has(> .el-menu-item.is-active) > .el-sub-menu__title,
+html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-color-primary) !important;
+}
+
+// The active item keeps the product's signature: flush to the left edge, right side rounded off,
+// ground running from a light tint into the primary. 激活项保留产品自身的签名：左侧贴边、右侧收成
+// 半圆、底色由浅色渐变到主色。
+html body .v-menu .el-menu .el-menu-item.is-active,
+html body .v-menu .el-menu .el-menu-item.is-active:hover,
+html body .el-menu .el-menu-item.is-active,
+html body .el-menu .el-menu-item.is-active:hover {
+  background: linear-gradient(
+    90deg,
+    var(--el-color-primary-light-3) 0%,
+    var(--el-color-primary) 100%
+  ) !important;
+  color: #fff !important;
+  border-radius: 0 999px 999px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}

@@ -55,8 +55,12 @@ PNPM_VERSION="${KEELBASE_YUDAO_UI_PNPM:-9.15.9}"
 REGISTRY="${KEELBASE_YUDAO_UI_REGISTRY:-https://registry.npmmirror.com}"
 
 THEME_SCSS="$REPO_ROOT/keelbase-ui/theme/element-theme.scss"
+HOST_SCSS="$REPO_ROOT/keelbase-ui/theme/host-yudao.scss"
 THEME_CSS_NAME="keelbase-theme.css"
+HOST_CSS_NAME="keelbase-host.css"
 MARKER="<!-- keelbase-theme -->"
+HOST_MARKER="<!-- keelbase-host -->"
+if [[ ! -f "$HOST_SCSS" ]]; then HOST_CSS_NAME=""; fi
 
 SKIP_BUILD=0
 if [[ "${1:-}" == "--skip-build" ]]; then SKIP_BUILD=1; fi
@@ -161,15 +165,41 @@ if [[ "$got" != "$want" ]]; then
 fi
 echo "compiled $THEME_CSS_NAME ($want primary declarations pinned)"
 
-# --- 5. link it into the built page, last, idempotently ---------------------------------------------
-# Any block we wrote before is dropped first, so re-running does not stack links.
+# --- 4b. compile the host adapter -------------------------------------------------------------------
+# yudao drives the sidebar, the top bar and the tab strip through a namespace of its own, which the
+# Element Plus tokens do not reach; this file restates those in the product's language. It carries
+# its own `!important` where it needs one, so it is copied through untransformed.
+# yudao 用一套自己的命名空间驱动侧边栏 / 顶栏 / 标签条，Element Plus 令牌够不到那几个；这个文件把它们
+# 改用产品自己的语言陈述。它自带该有的 `!important`，故此处原样编译、不做转换。
+if [[ -f "$HOST_SCSS" ]]; then
+  "$SASS" "$HOST_SCSS" "$DIST/$HOST_CSS_NAME"
+  echo "compiled $HOST_CSS_NAME"
+fi
+
+# --- 5. link them into the built page, last, idempotently --------------------------------------------
+# The href must be absolute, and it must carry the app's own base path. A relative href resolves
+# against the *current route*, not the document root: the app uses history routing, so the moment a
+# user reaches a deep route the relative link points at a path that does not exist and the whole
+# layer disappears silently — no error, just upstream's look back. The prefix is read off an asset
+# link Vite already emitted, so it follows whatever base the build was configured with.
+# href 必须是绝对路径，且要带上应用自己的 base。相对 href 是相对**当前路由**解析的，而不是文档根：
+# 应用走 history 路由，用户一到深层路由，相对链接就指向一个不存在的路径，**整层静默消失**——不报错，
+# 只是上游的样子又回来了。前缀从 Vite 已经产出的资源链接上读，于是它跟着构建配置的 base 走。
+BASE_PREFIX="$(sed -n 's/.*\(href\|src\)="\([^"]*\)assets\/.*/\2/p' "$INDEX" | head -1)"
+if [[ -z "$BASE_PREFIX" ]]; then BASE_PREFIX="/"; fi
+echo "base prefix read from $INDEX: $BASE_PREFIX"
+
 tmp="$(mktemp)"
-awk -v css="$THEME_CSS_NAME" -v marker="$MARKER" '
-  $0 ~ marker { getline; next }                       # drop the marker and the line we put under it
+awk -v theme_css="$THEME_CSS_NAME" -v host_css="$HOST_CSS_NAME" -v prefix="$BASE_PREFIX" -v m_theme="$MARKER" -v m_host="$HOST_MARKER" '
+  index($0, m_theme) || index($0, m_host) { getline; next }   # drop a marker and the line under it
   {
     if (!done && $0 ~ /<\/head>/) {
-      print "    " marker
-      print "    <link rel=\"stylesheet\" href=\"" css "\" />"
+      print "    " m_theme
+      print "    <link rel=\"stylesheet\" href=\"" prefix theme_css "\" />"
+      if (host_css != "") {
+        print "    " m_host
+        print "    <link rel=\"stylesheet\" href=\"" prefix host_css "\" />"
+      }
       done = 1
     }
     print
@@ -178,15 +208,20 @@ awk -v css="$THEME_CSS_NAME" -v marker="$MARKER" '
 mv "$tmp" "$INDEX"
 
 # --- 6. assert, rather than report ------------------------------------------------------------------
-count="$(grep -c -- "$MARKER" "$INDEX" || true)"
-if [[ "$count" != "1" ]]; then
-  echo "expected exactly one theme link in $INDEX, found $count" >&2
-  exit 1
-fi
-if ! grep -q -- "$THEME_CSS_NAME" "$INDEX"; then
-  echo "theme link missing from $INDEX" >&2
-  exit 1
-fi
+assert_one() {
+  local marker="$1" href="$2" count
+  count="$(grep -c -F -- "$marker" "$INDEX" || true)"
+  if [[ "$count" != "1" ]]; then
+    echo "expected exactly one '$marker' in $INDEX, found $count" >&2
+    exit 1
+  fi
+  if ! grep -q -F -- "$href" "$INDEX"; then
+    echo "link missing from $INDEX: $href" >&2
+    exit 1
+  fi
+}
+assert_one "$MARKER" "$BASE_PREFIX$THEME_CSS_NAME"
+if [[ -n "$HOST_CSS_NAME" ]]; then assert_one "$HOST_MARKER" "$BASE_PREFIX$HOST_CSS_NAME"; fi
 
-echo "linked $THEME_CSS_NAME into $INDEX"
+echo "linked $BASE_PREFIX$THEME_CSS_NAME${HOST_CSS_NAME:+ and $BASE_PREFIX$HOST_CSS_NAME} into $INDEX"
 echo "note: the layer is in the artefact only — the UI's own dev server renders upstream's look."

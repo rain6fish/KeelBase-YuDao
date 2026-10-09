@@ -30,6 +30,20 @@ In this host only the **default (deep indigo) theme** is live: the app has no `d
 so the `teal` and `graphite` blocks never match. They travel with the copy anyway, so the three
 themes stay one authored thing rather than a fork.
 
+## Two stylesheets, two jobs
+
+| file | covers |
+|---|---|
+| `theme/element-theme.scss` → `keelbase-theme.css` | the **Element Plus token surface** — colours, radii, typography, card and button treatment |
+| `theme/host-yudao.scss` → `keelbase-host.css` | **yudao's own layout namespaces** — `--left-menu-*`, `--top-header-*`, `--logo-*` |
+
+The second one exists because the first cannot reach the sidebar, the top bar or the tab strip: yudao
+drives all three through a namespace of its own and defaults it to a dark navy the product does not
+use. It is a **translation, not a copy** — `Web-Admin-Vue` states the same look against class names
+(`.admin-aside`, `.el-menu-nav`) that do not exist here, so those rules cannot be vendored. Every
+*value* in it is a `var(--el-*)` reference into the vendored tokens, so the palette still has one
+source; only the structure is restated. It is authored here, not synced.
+
 ## How the layer is applied
 
 **Build-time injection** — the layer lives in the artefact, never in the source.
@@ -53,3 +67,20 @@ renders upstream's look; only the built artefact carries the layer.
    layer stays overridable at runtime, and the host's own theme picker keeps working for everything
    else. The side effect is that the host's primary-colour picker no longer visibly changes the page:
    this layer pins it on purpose.
+
+## Two traps the build had to learn
+
+**The href has to be absolute.** A relative `href` resolves against the *current route*, not the
+document root. The app uses history routing, so at the root route it works — which is the first thing
+anyone checks — and the moment a user reaches a deep route the link points at a path that does not
+exist and the whole
+layer vanishes **silently**: no error, no 404 the user sees, just upstream's look back. The build now
+reads the base prefix off an asset link Vite already emitted and writes an absolute href.
+
+**`!important` alone is not enough against yudao's own menu rules.** Those are scoped, which makes
+them e.g. `.v-menu[data-v-…] .el-menu .el-menu-item:hover` — five class-level terms. A plain
+`html body .el-menu .el-menu-item:not(.is-active):hover` has four, because `:not()` contributes only
+the weight of its argument, and both sides are `!important`, so yudao's wins and its white hover text
+comes back on a light ground. The adapter carries a `.v-menu` ancestor in those selectors for the
+weight. This is worth knowing before editing it: dropping what looks like a redundant class silently
+loses the state again.
