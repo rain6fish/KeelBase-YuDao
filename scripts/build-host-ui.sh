@@ -107,11 +107,47 @@ echo "admin UI checkout: $UI_DIR @ $UI_SHA"
 # ——而不是「跳过它」，那会让产物悄悄变成半我们的。
 OVERLAY="$REPO_ROOT/keelbase-ui/host-overlay"
 PATCHES="$REPO_ROOT/keelbase-ui/host-patches"
+REMOVALS="$REPO_ROOT/keelbase-ui/host-removals.txt"
 
-if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" ) ]]; then
+if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" || -f "$REMOVALS" ) ]]; then
   if ! git -C "$UI_DIR" diff --quiet || ! git -C "$UI_DIR" diff --cached --quiet; then
     echo "resetting the checkout to upstream before laying our delta on it…"
     git -C "$UI_DIR" checkout -- .
+  fi
+
+  # --- 1b. the paths this host does not ship --------------------------------------------------------
+  # Third direction of the same delta, and the same rule as the other two: it must fail loudly if
+  # upstream moved. A path that is no longer there means this list has to be revisited — skipping the
+  # entry would leave the artefact quietly carrying a module the product does not ship.
+  #
+  # It runs after the reset and before the patch, so the patch is applied to a tree that already lacks
+  # these paths and therefore must not reference them. The reset is what makes it idempotent: the files
+  # are upstream's, so they come back on every refetch and are removed again on every build.
+  #
+  # 同一份增量的第三个方向，规矩与前两个相同：上游挪动了就必须**响亮地失败**。路径不在了，意味着这份
+  # 清单需要重做——跳过那一条，会让产物悄悄带着一个产品不发出去的模块。
+  #
+  # 它跑在复位之后、补丁之前，于是补丁应用到的树上这些路径已经不在、补丁也就不该引用它们。**复位**正是它
+  # 幂等的原因：这些文件是上游的，每重新取一次就回来一次，每次构建再删一次。
+  if [[ -f "$REMOVALS" ]]; then
+    while IFS= read -r rel || [[ -n "$rel" ]]; do
+      rel="${rel#"${rel%%[![:space:]]*}"}"   # trim leading whitespace
+      rel="${rel%"${rel##*[![:space:]]}"}"   # trim trailing whitespace
+      [[ -z "$rel" || "$rel" == \#* ]] && continue
+      case "$rel" in
+        /* | *..*)
+          echo "removal list entry is not a plain repo-relative path: $rel" >&2
+          exit 1
+          ;;
+      esac
+      if [[ ! -e "$UI_DIR/$rel" ]]; then
+        echo "removal list names a path upstream no longer has: $rel" >&2
+        echo "upstream moved it — the removal list has to be revisited, not skipped" >&2
+        exit 1
+      fi
+      rm -rf "${UI_DIR:?}/$rel"
+      echo "removed $rel"
+    done < "$REMOVALS"
   fi
 
   # The overlay adds files the checkout does not have; it does not replace upstream's. That is

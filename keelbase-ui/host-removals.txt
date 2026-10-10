@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Paths the product does not ship. The build resets the checkout to upstream and then removes each one,
+# and it fails if a path is not there — a path that has disappeared upstream means this list has to be
+# revisited, not that the entry should be skipped. Without the reset the list would not be idempotent:
+# the files come back every time upstream is refetched.
+#
+# Every entry is a plain repo-relative path: no leading slash, no `..`. Blank lines and lines starting
+# with `#` are ignored.
+#
+# 本产品不发的路径。构建先把检出复位到上游、再把每一条删掉，且**路径不在就失败**——上游那边消失了，
+# 意味着这份清单需要重做，而不是把这一条跳过。没有那道复位，清单就不幂等：上游每重新取一次，文件就回来。
+#
+# 每条都是**普通的仓内相对路径**：不以 `/` 开头、不含 `..`。空行与 `#` 开头的行忽略。
+#
+# src/views/im + src/api/im — the IM module. The host does not load it (the dependency in
+#   yudao-server/pom.xml is commented out), so its pages are unreachable, and the menu records are
+#   already filtered out in store/modules/permission.ts. The static /im route in
+#   router/modules/remaining.ts goes with them, which is a patch rather than an entry here — it imports
+#   these files directly, so leaving it would fail the build instead of quietly shipping dead code.
+# src/views/im + src/api/im —— IM 模块。宿主不加载它（yudao-server/pom.xml 里那条依赖是注释状态），
+#   故它的页面够不到；菜单记录也已在 store/modules/permission.ts 里滤掉。router/modules/remaining.ts
+#   里那条静态 /im 路由随它们一起去——那条走补丁、不走这份清单：它直接 import 这些文件，留着会让构建
+#   失败，而不是安静地发出去一份死代码。
+src/views/im
+src/api/im

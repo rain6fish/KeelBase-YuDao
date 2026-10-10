@@ -761,9 +761,16 @@ index 23ecc3a..9c8ca00 100644
 +  '/keelbase-avatar-graphite.svg',
 +  '/keelbase-avatar-warm.svg'
 +]
++// The API validates the avatar as a URL, and these paths are site-relative — so the *path* stays
++// relative (it has to be, to survive being served from another origin) and only what is sent is made
++// absolute. Sending the path as-is is answered with 「头像地址格式不正确」.
++// 接口把头像按 URL 校验，而这几条是站点相对路径——所以**路径**保持相对（必须如此，换个源服务它才活得
++// 下去），只把**发出去的那个**变成绝对。原样发路径会被答「头像地址格式不正确」。
++const absolute = (p: string) => new URL(p, window.location.origin).href
 +const choosePreset = async (preset: string) => {
-+  await updateUserProfile({ avatar: preset })
-+  await userStore.setUserAvatarAction(preset)
++  const url = absolute(preset)
++  await updateUserProfile({ avatar: url })
++  await userStore.setUserAvatarAction(url)
 +}
 +
  const handelUpload = async ({ data }) => {
@@ -812,16 +819,43 @@ index 11f7f68..41996ef 100644
        <div class="flex flex-row flex-wrap items-center justify-center w-460px mt-20px">
          <div
            class="flex justify-center w-180px leading-50px border border-solid border-[#e4e4e4] rounded-10px m-10px cursor-pointer hover:bg-[rgba(243,243,243,0.73)]"
-diff --git a/src/views/im/home/index.vue b/src/views/im/home/index.vue
-index 42ee268..0105dda 100644
---- a/src/views/im/home/index.vue
-+++ b/src/views/im/home/index.vue
-@@ -275,7 +275,7 @@ watch(
- )
+diff --git a/src/router/modules/remaining.ts b/src/router/modules/remaining.ts
+index 76e7a16..8112fca 100644
+--- a/src/router/modules/remaining.ts
++++ b/src/router/modules/remaining.ts
+@@ -1182,35 +1182,6 @@ const remainingRouter: AppRouteRecordRaw[] = [
+         }
+       }
+     ]
+-  },
+-  {
+-    path: '/im',
+-    name: 'Im',
+-    redirect: '/im/home/conversation',
+-    meta: { hidden: true, title: 'IM 即时通讯' },
+-    children: [
+-      {
+-        path: 'home',
+-        component: () => import('@/views/im/home/index.vue'),
+-        name: 'ImHome',
+-        redirect: '/im/home/conversation',
+-        meta: { hidden: true, title: '聊天' },
+-        children: [
+-          {
+-            path: 'conversation',
+-            component: () => import('@/views/im/home/pages/conversation/index.vue'),
+-            name: 'ImHomeConversation',
+-            meta: { hidden: true, title: '消息' }
+-          },
+-          {
+-            path: 'contact',
+-            component: () => import('@/views/im/home/pages/contact/index.vue'),
+-            name: 'ImHomeContact',
+-            meta: { hidden: true, title: '通讯录' }
+-          }
+-        ]
+-      }
+-    ]
+   }
+ ]
  
- /**
-- * 浏览器标签 title 拼上未读数前缀；例：(63条未读)芋道源码
-+ * 浏览器标签 title 拼上未读数前缀；例：(63条未读)系统名
-  *
-  * 路由切换时 router.afterEach 会调 useTitle 重置 title；用 nextTick 排在它之后再覆盖
-  * 一并监听 route.fullPath，IM 子路由切换（消息 / 通讯录）也能重新加上前缀

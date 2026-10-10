@@ -101,25 +101,33 @@ is reported as a failure (`502`) — so the next symptom is never a silently emp
    else. The side effect is that the host's primary-colour picker no longer visibly changes the page:
    this layer pins it on purpose.
 
-## Two deltas the layer cannot express
+## Three deltas the layer cannot express
 
 A stylesheet can restyle what the host renders. It cannot change what the host renders from its own
-source — and two of the things this product needs are exactly that: the dashboard card's contents are
-a static array in a component, and the logo is a source import. Both are therefore carried as deltas
-and laid over the checkout before it is built.
+source — and three of the things this product needs are exactly that: the dashboard card's contents are
+a static array in a component, the logo is a source import, and the IM module is not shipped at all.
+They are therefore carried as deltas and laid over the checkout before it is built.
 
-    keelbase-ui/host-overlay/     files we add to the checkout
-    keelbase-ui/host-patches/     a patch applied to the checkout
+    keelbase-ui/host-overlay/      files we add to the checkout
+    keelbase-ui/host-patches/      a patch applied to the checkout
+    keelbase-ui/host-removals.txt  paths we take out of the checkout
 
 The checkout is disposable and refetched, so the build resets it to upstream first and then lays the
-delta on. Both directions fail loudly on purpose: an overlay whose file was moved upstream, and a
-patch that no longer applies, both mean our delta needs revisiting — never that it should be skipped,
-which would leave the artefact quietly half-ours.
+delta on. All three fail loudly on purpose: an overlay whose file was moved upstream, a patch that no
+longer applies, and a removal whose path is no longer there, all mean our delta needs revisiting —
+never that it should be skipped, which would leave the artefact quietly half-ours.
 
 **The overlay adds, it does not replace.** That is what keeps the coupling loud: a file we add is
 referenced only from a patch, so upstream moving the code that references it makes the patch fail and
 say so. A replacement would have no such tripwire — upstream renaming the file would leave our copy
 sitting there unused while the app went on using theirs, silently.
+
+**Taking a route out and taking the files out are two different jobs, and both are needed.** The route
+is the patch's job: it imports the removed files by literal path, so leaving it behind fails the build.
+The files are the removal list's job, and the route is not what puts them in the bundle — that is
+`utils/routerHelper.ts`, which pulls every view in through `import.meta.glob('../views/**/*.{vue,tsx}')`
+so backend menu records can name one by path. Delete the route alone and the IM module would still be
+built and deployed; it is unreachable either way, which is why the cost was only ever the bytes.
 
 ## The avatar and the brand mark
 
