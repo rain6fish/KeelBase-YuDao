@@ -59,6 +59,16 @@ services:
       - --keelbase.knowledge.chunk-overlap=120
       - --yudao.tenant.ignore-tables=products
       - --yudao.access-log.enable=true
+      # The model loop. Off unless `AI_ENABLED` is true AND a key is present, mirroring how
+      # `scripts/run-server.sh` treats the key: with the client disabled the runtime keeps answering
+      # from its deterministic planner, and the gates that assert *which* tool ran stay meaningful.
+      # 模型回路。除非 `AI_ENABLED` 为真**且**给了 key，否则是关的——与 `scripts/run-server.sh` 对
+      # key 的处理一致：客户端关着时运行时继续由确定性 planner 作答，那些断言「哪个工具跑了」的门禁才
+      # 仍然有意义。
+      - "--spring.ai.chat.client.enabled=${AI_ENABLED:-false}"
+      - "--spring.ai.openai.api-key=${MODEL_API_KEY:-none}"
+      - "--spring.ai.openai.base-url=${MODEL_BASE_URL:-https://api.deepseek.com}"
+      - "--spring.ai.openai.chat.options.model=${MODEL_NAME:-deepseek-v4-flash}"
     volumes:
       - ./yudao-server.jar:/app/yudao-server.jar:ro
     networks:

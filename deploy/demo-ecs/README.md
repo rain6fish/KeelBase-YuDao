@@ -66,6 +66,25 @@ curl -s -o /dev/null -w '%{http_code}\n' https://demo2.keelbase.com.cn/
 curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ <title>KeelBase</title>
 ```
 
+## The AI model loop, and where to reach it
+
+KeelBase's own surface sits at the server **root**, not under `/admin-api` — that is where the AI
+loop answers. The admin nginx forwards three prefixes there (`/app`, `/ai`, `/audit`); with
+`AI_ENABLED=true` and a `MODEL_API_KEY` in `.env`, a real model drives them:
+
+```
+POST https://demo2.keelbase.com.cn/ai/chat    →  { "provider": "spring-ai", "toolCalls": [...] }
+POST https://demo2.keelbase.com.cn/ai/task    →  steps ≥ 2, and the step that writes comes back held
+                                                 for confirmation, with its token
+GET  https://demo2.keelbase.com.cn/app/capabilities
+```
+
+The provider defaults to DeepSeek — `MODEL_BASE_URL=https://api.deepseek.com`,
+`MODEL_NAME=deepseek-v4-flash` — and `MODEL_BASE_URL` can point at any OpenAI-compatible endpoint.
+The two `POST`s take the host's own access token (the runtime resolves it to a host user), so there
+is one identity rather than two. The runtime also registers `/auth`, `/customers` and `/follow_ups`
+at the root; those are deliberately **not** forwarded — see `admin-nginx.conf`.
+
 ## Things worth knowing before changing this
 
 - **Secrets are not here.** `docker-compose.yml` reads `PG_PASSWORD` and `AUDIT_KEY` from `.env`,
@@ -78,6 +97,10 @@ curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ 
 - **Memory is the binding constraint on the demo host**, not disk. The server runs with
   `-Xmx384m` and still takes ~600 MB resident; the host has 1.6 GB in total, so it swaps. If this
   instance is to be relied on, raise the host's memory rather than tuning the heap down further.
-- **The AI model loop is off** (no key is passed), so `/ai/*` answers from the deterministic path.
+- **The AI model loop** is switched by `AI_ENABLED` plus `MODEL_API_KEY` in `.env`. With both set,
+  KeelBase's `/ai/chat` and `/ai/task` are driven by a real model; the base URL and model name default
+  to DeepSeek's (`https://api.deepseek.com`, `deepseek-v4-flash`) and can be pointed at any
+  OpenAI-compatible provider. With `AI_ENABLED` unset they answer from the deterministic planner and
+  `/ai/chat` reports `provider: deterministic`.
 - The `--spring.datasource.dynamic.datasource.master.type=...HikariDataSource` argument is not
   cosmetic: on PostgreSQL, upstream's default pool fails roughly half of all logins.

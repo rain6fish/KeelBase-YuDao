@@ -62,6 +62,23 @@ curl -s -o /dev/null -w '%{http_code}\n' https://demo2.keelbase.com.cn/
 curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ <title>KeelBase</title>
 ```
 
+## AI 模型回路，以及去哪儿用它
+
+KeelBase 自己的面挂在服务**根路径**上、不在 `/admin-api` 之下——AI 回路就在那儿应答。后台 nginx 把
+三个前缀转过去（`/app`、`/ai`、`/audit`）；当 `.env` 里 `AI_ENABLED=true` 且有 `MODEL_API_KEY` 时，
+由**真模型**驱动它们：
+
+```
+POST https://demo2.keelbase.com.cn/ai/chat    →  { "provider": "spring-ai", "toolCalls": [...] }
+POST https://demo2.keelbase.com.cn/ai/task    →  步数 ≥ 2，且**要写**的那一步回来时被扣下等人、带着 token
+GET  https://demo2.keelbase.com.cn/app/capabilities
+```
+
+提供方默认是 DeepSeek——`MODEL_BASE_URL=https://api.deepseek.com`、`MODEL_NAME=deepseek-v4-flash`——
+而 `MODEL_BASE_URL` 可指向任何兼容 OpenAI 协议的端点。两个 `POST` 都用宿主自己的访问令牌（运行时把它
+解析成一个宿主用户），所以只有**一套身份**、不是两套。运行时还在根路径注册了 `/auth`、`/customers`、
+`/follow_ups`；这三个**有意不转发**——见 `admin-nginx.conf`。
+
 ## 改这套东西之前值得知道的
 
 - **密钥不在这里。** `docker-compose.yml` 从 `.env` 读 `PG_PASSWORD` 与 `AUDIT_KEY`，而 `.env` 已被 git
@@ -71,6 +88,9 @@ curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ 
   用的是**第 1 号数据库**以免与其缓存相撞。这里**不为二者建任何容器**。
 - **在 demo 机器上，卡住的是内存而不是磁盘。** 服务以 `-Xmx384m` 跑，常驻仍约 600 MB；机器总共 1.6 GB，
   所以它在换页。若这个实例要靠得住，应当**给机器加内存**，而不是继续把堆调小。
-- **AI 模型回路是关的**（没传 key）⇒ `/ai/*` 由确定性路径应答。
+- **AI 模型回路**由 `.env` 里的 `AI_ENABLED` 加 `MODEL_API_KEY` 控制。两者都给上，KeelBase 的
+  `/ai/chat` 与 `/ai/task` 就由**真模型**驱动；base URL 与模型名默认是 DeepSeek 的
+  （`https://api.deepseek.com`、`deepseek-v4-flash`），可指向任何兼容 OpenAI 协议的提供方。
+  `AI_ENABLED` 不设时它们由确定性 planner 作答，`/ai/chat` 报 `provider: deterministic`。
 - `--spring.datasource.dynamic.datasource.master.type=...HikariDataSource` 那个参数不是可有可无：
   在 PostgreSQL 上，上游默认的连接池会让**约一半的登录**失败。
