@@ -168,6 +168,26 @@ namespaces do not tell the two apart by name — `sql/keelbase-products.sql` is 
 `sql/keelbase-crm.sql` is hand-written, sitting side by side. A new hand-written file therefore has to
 be **declared** in `SpecCodegen.HAND_WRITTEN`; that is the point, not a nuisance.
 
+## The other check that reads the prose
+
+```bash
+node scripts/check-path-refs.mjs
+```
+
+`--check` and `--check-boundary` both read files the generator owns. Neither reads a **citation** — a
+path written in a comment or a doc, pointing at a file that was renamed or never existed here. A
+wrong path and a right one render identically, so the reference rots silently. This is the check that
+reads it, over our own files only: upstream's trees are not scanned (they cite their own files), a
+`../` path is out of scope (it names a sibling checkout), and a pattern such as
+`sql/keelbase-<module>.sql` is a shape rather than a path.
+
+Like `--check-boundary` it fails in **both** directions: a cited path that is absent, and an entry in
+its `ELSEWHERE` list that nothing cites any more. The second one exists so that a declared exception
+cannot quietly become a hole.
+
+**It is not wired into anything yet** — no CI job runs it and no hook does either. It is here, and
+documented, so that it can be run; that is not the same as being enforced.
+
 ## Upstream, and how to compare against it
 
 `upstream` points at `https://github.com/YunaiV/ruoyi-vue-pro.git` — the canonical source; the
