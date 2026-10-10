@@ -55,8 +55,22 @@ const backend = new URL(BACKEND)
 // 哪些路径转给接口，与 deploy/demo-ecs/admin-nginx.conf 保持一致：两条字面前缀，加上 KeelBase 挂在根
 // 路径上的面（`/app`、`/ai`、`/audit`）用正则匹配。
 const API_PREFIXES = ['/admin-api/', '/app-api/']
-const API_ROOT_RE = /^\/(app|ai|audit)\//
-const isApiPath = (p) => API_PREFIXES.some((prefix) => p.startsWith(prefix)) || API_ROOT_RE.test(p)
+// `/app/` and `/audit/` have no page in this app, so a prefix is enough for them. `/ai/` is not so
+// simple: the AI module's own pages live at `/ai/chat`, `/ai/image`, `/ai/console/…` as well, so a
+// bare `/ai/` prefix answers those with the backend's JSON and the page looks broken rather than
+// mis-routed. Only the runtime's own paths are listed; `/ai/chat` is both a page (GET) and the
+// runtime endpoint (POST), so the method decides that one.
+// `/app/` 与 `/audit/` 在本应用里没有页面，前缀就够。`/ai/` 没这么简单：AI 模块自己的页面也在
+// `/ai/chat`、`/ai/image`、`/ai/console/…`，故裸的 `/ai/` 前缀会用后端的 JSON 去答它们，页面看起来是
+// **坏掉**而不是**走错路由**。这里只列运行时自己的路径；`/ai/chat` 既是页面（GET）又是运行时端点
+// （POST），这一个由方法决定。
+const API_ROOT_RE = /^\/(app|audit)\//
+const AI_RUNTIME_RE = /^\/ai\/(task|chat\/stream|confirmations|my\/confirmations|tool-effects|tools)(\/|$)/
+const isApiPath = (p, method = 'GET') =>
+  API_PREFIXES.some((prefix) => p.startsWith(prefix)) ||
+  API_ROOT_RE.test(p) ||
+  AI_RUNTIME_RE.test(p) ||
+  (p === '/ai/chat' && method === 'POST')
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -111,7 +125,7 @@ function proxy(req, res, path) {
 const server = createServer(async (req, res) => {
   const path = (req.url || '/').split('?')[0]
 
-  if (isApiPath(path)) {
+  if (isApiPath(path, req.method)) {
     console.log(`→ ${req.method} ${req.url}`)
     proxy(req, res, req.url)
     return
