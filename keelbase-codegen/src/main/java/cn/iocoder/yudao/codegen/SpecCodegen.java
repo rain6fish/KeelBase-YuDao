@@ -125,7 +125,13 @@ public final class SpecCodegen {
             // The host writes NULL for "nobody is logged in"; MySQL coerced it, PostgreSQL refuses.
             // Relaxing the column is what keeps that row rather than dropping it.
             // 宿主对「没有登录用户」写 NULL；MySQL 会强转，PostgreSQL 拒绝。放宽该列，那一行才留得住而不是丢掉。
-            "sql/keelbase-operate-log-nullable.sql");
+            "sql/keelbase-operate-log-nullable.sql",
+            // Upstream's seed carries pictures hosted on the vendor's own file server. A deployment
+            // that keeps them asks every visitor to fetch from a host we do not control, so the rows
+            // are pointed at what this host serves.
+            // 上游种子里带着挂在厂商自己文件服务器上的图片。沿用它们的部署会让每个访问者去一个我们并不
+            // 控制的主机取图，故把这些行指向本机自己提供的东西。
+            "sql/keelbase-local-images.sql");
 
     private SpecCodegen() {
     }

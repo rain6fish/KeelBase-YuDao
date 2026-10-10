@@ -50,6 +50,7 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-ai1.sql"
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
+  "$REPO_ROOT/sql/keelbase-local-images.sql"
 )
 
 psql_super() { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d postgres "$@"; }
