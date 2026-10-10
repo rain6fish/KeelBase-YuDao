@@ -1,0 +1,25 @@
+-- KeelBase: let the host's operation log record "no login user" as what it is.
+--
+-- The host writes an operation-log row for anonymous requests too — a login, for instance — and it
+-- writes NULL for `user_id` there, because that is the truth: nobody is logged in yet. Upstream's
+-- schema declares the column NOT NULL, and on MySQL that is survivable: a non-strict server coerces
+-- the NULL to 0 and carries on. PostgreSQL refuses, so every such request logs an error and loses its
+-- operation-log row.
+--
+-- Relaxing the column is the change that keeps the record honest. The other way to match MySQL is to
+-- make the host write a zero, which would put a user number on the row that no user has.
+--
+-- Idempotent: dropping NOT NULL from a column that is already nullable does nothing.
+--
+-- KeelBase：让宿主的操作日志把「没有登录用户」如实记下来。
+--
+-- 宿主对匿名请求也会写一行操作日志——登录就是——并在那里把 `user_id` 写成 NULL，因为那是事实：此刻还没有人
+-- 登录。上游 schema 把该列声明为 NOT NULL，而在 MySQL 上这还能活：非严格的服务器把 NULL 强制成 0 就过去了。
+-- PostgreSQL 拒收，于是每个这样的请求都报一次错、并丢掉那一行操作日志。
+--
+-- 放开这一列，是让记录保持诚实的那个改法。另一种与 MySQL 对齐的做法是让宿主写 0，那会给这一行安上一个
+-- **没有任何用户持有**的用户编号。
+--
+-- 幂等：对一个本就可空的列再执行 DROP NOT NULL 什么也不做。
+
+ALTER TABLE system_operate_log ALTER COLUMN user_id DROP NOT NULL;

@@ -115,6 +115,15 @@ One fact about the schema worth having before reading any failure: `sql/postgres
 table. It loaded cleanly here; a failure in it would be a fact about that converted file, not about this
 line.
 
+A concrete consequence of that conversion, found by running rather than by reading: `system_operate_log.user_id`
+is `NOT NULL` in the converted file, and the host writes `NULL` into it whenever there is no login user.
+MySQL survives that by coercing the value to zero; PostgreSQL refuses outright, so those requests lost
+their operation-log row **and** logged an error. `sql/keelbase-operate-log-nullable.sql` relaxes the
+column, which keeps the row and says truthfully that no user was attached — the alternative, writing a
+zero, would put a user number on the row that no user holds. It is not only an anonymous-request case:
+a write executed by the AI runs on a thread with no login user, which is how this was found. A fresh
+install needs the file too, for the same reason.
+
 **⚠ Not covered:** pgvector being present is what lets the runtime's knowledge layer take its semantic
 path, but that path also needs an embedding model, and none is configured here — so the **semantic path
 itself has not been exercised**, only the extension's presence.
