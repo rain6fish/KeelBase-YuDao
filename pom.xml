@@ -19,7 +19,7 @@
         <!-- YD-2 enables it: `yudao-module-crm` depends on it, so it has to be in the reactor. /
              YD-2 把它打开：`yudao-module-crm` 依赖它，故必须在 reactor 里。 -->
         <module>yudao-module-bpm</module>
-<!--        <module>yudao-module-report</module>-->
+        <module>yudao-module-report</module>
 <!--        <module>yudao-module-mp</module>-->
 <!--        <module>yudao-module-pay</module>-->
 <!--        <module>yudao-module-mall</module>-->
@@ -30,13 +30,13 @@
 <!--        <module>yudao-module-iot</module>-->
 <!--        <module>yudao-module-mes</module>-->
 <!--        <module>yudao-module-wms</module>-->
-<!--        <module>yudao-module-hrm</module>-->
-<!--        <module>yudao-module-fms</module>-->
-<!--        <module>yudao-module-pms</module>-->
-<!--        <module>yudao-module-oa</module>-->
+        <module>yudao-module-hrm</module>
+        <module>yudao-module-fms</module>
+        <module>yudao-module-pms</module>
+        <module>yudao-module-oa</module>
 <!--        <module>yudao-module-im</module>-->
 <!-- 请参考 https://doc.iocoder.cn/ai/build/ 文档，完成 AI 模块的启动！！！ -->
-<!--        <module>yudao-module-ai</module>-->
+        <module>yudao-module-ai</module>
         <module>yudao-module-ai1-springai</module>
         <!-- Ours, not upstream's: the Spec→(DDL + seam files) generator. It is a module so that it
              compiles with the build and needs no jar installed; nothing depends on it.

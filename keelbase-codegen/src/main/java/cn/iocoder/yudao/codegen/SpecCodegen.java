@@ -131,7 +131,19 @@ public final class SpecCodegen {
             // are pointed at what this host serves.
             // 上游种子里带着挂在厂商自己文件服务器上的图片。沿用它们的部署会让每个访问者去一个我们并不
             // 控制的主机取图，故把这些行指向本机自己提供的东西。
-            "sql/keelbase-local-images.sql");
+            "sql/keelbase-local-images.sql",
+            // The modules this line enables wholesale. Upstream ships a test schema per module — in a
+            // mix of dialects, and not always covering the module's own data objects — so each was
+            // converted (and, where the schema fell short, derived) once, by hand, into these files.
+            // 本线整体启用的那些模块。上游给每个模块带一份测试 schema——方言混杂，而且未必覆盖该模块自己的
+            // 数据对象——故逐份转换（schema 不够的地方则推导）成这些文件，一次性做完。
+            "sql/keelbase-bpm.sql",
+            "sql/keelbase-report.sql",
+            "sql/keelbase-oa.sql",
+            "sql/keelbase-hrm.sql",
+            "sql/keelbase-fms.sql",
+            "sql/keelbase-pms.sql",
+            "sql/keelbase-ai.sql");
 
     private SpecCodegen() {
     }

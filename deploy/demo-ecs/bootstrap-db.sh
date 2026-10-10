@@ -51,6 +51,16 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
   "$REPO_ROOT/sql/keelbase-local-images.sql"
+  # One per module this line enables wholesale; each carries its tables' key sequences as well, since
+  # the host asks for those by name. 本线整体启用的模块各一份；每份也带着自己那些表的主键序列，
+  # 因为宿主是按名字要序列的。
+  "$REPO_ROOT/sql/keelbase-bpm.sql"
+  "$REPO_ROOT/sql/keelbase-report.sql"
+  "$REPO_ROOT/sql/keelbase-oa.sql"
+  "$REPO_ROOT/sql/keelbase-hrm.sql"
+  "$REPO_ROOT/sql/keelbase-fms.sql"
+  "$REPO_ROOT/sql/keelbase-pms.sql"
+  "$REPO_ROOT/sql/keelbase-ai.sql"
 )
 
 psql_super() { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d postgres "$@"; }
