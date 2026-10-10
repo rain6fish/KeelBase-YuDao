@@ -108,18 +108,52 @@ html body .v-menu .el-menu .el-sub-menu .el-menu .el-menu-item {
   position: relative;
 }
 
-// Level 2: a dot, and a third of the indentation the host was using.
-// 二级：一个点，以及上游那份缩进的三分之一。
+// Everything below the first level lands in the same two columns the first level already uses: the
+// marker where an icon would be, and the label where a first-level label is. Depth is carried by the
+// marker's shape and by nothing else — there is no staircase, which is what ran the third level out
+// of room in the first place.
+// 一级之下的一切，都落在**一级已经在用的那两列**上：标记落在图标的位置，标签落在一级标签的位置。深度只
+// 由**标记的形状**承载，别的什么都不背——这里没有台阶，而台阶正是当初把第三级挤没的东西。
 html body .v-menu .el-menu .el-sub-menu > .el-menu {
   padding-left: 0 !important;
 }
-html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-menu-item {
-  padding-left: 26px !important;
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu {
+  padding-left: 0 !important;
 }
+// 45px = the first level's own label column: 16px of row padding + the 24px icon + the icon's 5px
+// margin. 45px = 一级自己的标签列：行内边距 16px + 图标 24px + 图标右边距 5px。
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-menu-item {
+  position: relative;
+}
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-sub-menu__title {
+  position: relative;
+}
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-menu-item {
+  padding-left: 45px !important;
+}
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-sub-menu__title {
+  padding-left: 45px !important;
+}
+
+// Level 2: a dot, sitting in the icon column — the icon box runs from 16px to 40px, so its middle is
+// 28px and a 5px dot starts at 25.5.
+// 二级：一个圆点，落在图标那一列——图标框从 16px 到 40px，故其中线是 28px，5px 的圆点自 25.5px 起。
 html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-menu-item::after {
   content: "";
   position: absolute;
-  left: 13px;
+  left: 25.5px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.5;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-sub-menu__title::after {
+  content: "";
+  position: absolute;
+  left: 25.5px;
   top: 50%;
   width: 5px;
   height: 5px;
@@ -129,20 +163,15 @@ html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-menu-item::after {
   opacity: 0.5;
 }
 
-// Level 3: a dash, one step further in. The shape is the depth signal, so it stays legible whatever
-// colour the row is wearing — `currentColor` follows the label into the open state.
-// 三级：一道短横，再进一格。形状就是深度的信号，故无论这一行穿什么颜色它都读得出来——`currentColor`
-// 会随标签一起进入已打开态。
-html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu {
-  padding-left: 0 !important;
-}
-html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item {
-  padding-left: 44px !important;
-}
+// Level 3: a dash in the same column, centred on the same 28px. The deeper selector carries two more
+// class terms, which is what lets it win over the dot above on the rows where both match — the icon's
+// column is the same at both levels, so the two rules do overlap.
+// 三级：同一列里的一道短横，也以那个 28px 居中。它多出两级类权重，故在两者都命中的行上它压过上面那个
+// 圆点——两个层级的图标列是同一列，所以这两条规则确实重叠。
 html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item::after {
   content: "";
   position: absolute;
-  left: 16px;
+  left: 24px;
   top: 50%;
   width: 8px;
   height: 2px;
@@ -150,12 +179,6 @@ html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .
   border-radius: 1px;
   background-color: currentColor;
   opacity: 0.5;
-}
-
-// A level-2 group title lines up with the level-2 items it opens, so the column reads straight.
-// 二级分组标题与它所展开的二级项对齐，整列才读得直。
-html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-sub-menu__title {
-  padding-left: 26px !important;
 }
 
 // ── the arrow that says "this one has children" ─────────────────────────────────────────────────────
