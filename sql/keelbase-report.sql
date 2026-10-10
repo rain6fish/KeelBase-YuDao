@@ -43,3 +43,16 @@ CREATE TABLE IF NOT EXISTS report_go_view_project (
     deleted int2 NOT NULL DEFAULT 0,
     PRIMARY KEY (id)
 );
+
+-- ---------------------------------------------------------------------------------------------------
+-- Where the converted schema above fell short of what the module's data objects declare. Two gaps,
+-- both found by running the pages rather than by reading: a Java Boolean whose source column was
+-- `tinyint` (not `bit`) stayed a number, and a table whose source schema omitted `tenant_id` kept
+-- omitting it — while the host appends `tenant_id = ?` for every table it touches. The column adds
+-- are idempotent; the Boolean conversions only fire while the column is still numeric.
+--
+-- 上面那份转换 schema 与该模块数据对象的差距之处。两个缺口都是**跑页面跑出来的**、不是读码读出来的：
+-- 源 schema 里写成 `tinyint`（而非 `bit`）的 Java 布尔字段仍是数字；源 schema 没写 `tenant_id` 的表
+-- 仍然没有它——而宿主对**它碰到的每张表**都会拼 `tenant_id = ?`。加列的语句幂等；布尔转换只在列仍是
+-- 数值时才触发。
+alter table report_go_view_project add column if not exists tenant_id bigint not null default 0;

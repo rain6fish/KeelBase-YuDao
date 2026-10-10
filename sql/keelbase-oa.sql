@@ -879,3 +879,61 @@ CREATE TABLE IF NOT EXISTS oa_travel_reimbursement (
   tenant_id bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (id)
 );
+
+-- ---------------------------------------------------------------------------------------------------
+-- Where the converted schema above fell short of what the module's data objects declare. Two gaps,
+-- both found by running the pages rather than by reading: a Java Boolean whose source column was
+-- `tinyint` (not `bit`) stayed a number, and a table whose source schema omitted `tenant_id` kept
+-- omitting it — while the host appends `tenant_id = ?` for every table it touches. The column adds
+-- are idempotent; the Boolean conversions only fire while the column is still numeric.
+--
+-- 上面那份转换 schema 与该模块数据对象的差距之处。两个缺口都是**跑页面跑出来的**、不是读码读出来的：
+-- 源 schema 里写成 `tinyint`（而非 `bit`）的 Java 布尔字段仍是数字；源 schema 没写 `tenant_id` 的表
+-- 仍然没有它——而宿主对**它碰到的每张表**都会拼 `tenant_id = ?`。加列的语句幂等；布尔转换只在列仍是
+-- 数值时才触发。
+alter table oa_mail_message add column if not exists part text;
+alter table oa_mail_message add column if not exists name text;
+alter table oa_mail_provider add column if not exists host text;
+alter table oa_mail_provider add column if not exists port int4;
+alter table oa_mail_provider add column if not exists ssl_enable boolean;
+alter table oa_mail_provider add column if not exists starttls_enable boolean;
+alter table oa_reimbursement add column if not exists expense_time timestamp;
+alter table oa_reimbursement add column if not exists expense_type int4;
+alter table oa_reimbursement add column if not exists description text;
+alter table oa_reimbursement add column if not exists price numeric(24,6);
+do $$
+begin
+  -- Only while the column is still a number: this is what makes the conversion re-runnable.
+  -- 只在列仍是数值时执行：这才让这次转换可以重跑。
+  if exists (select 1 from information_schema.columns
+              where table_schema='public' and table_name='oa_travel_apply' and column_name='reimburse_status'
+                and data_type in ('smallint','integer','bigint')) then
+    execute 'alter table oa_travel_apply alter column reimburse_status drop default';
+    execute 'alter table oa_travel_apply alter column reimburse_status type boolean using (reimburse_status <> 0)';
+    execute 'alter table oa_travel_apply alter column reimburse_status set default false';
+  end if;
+end $$;
+alter table oa_travel_apply add column if not exists departure_area_id int4;
+alter table oa_travel_apply add column if not exists arrival_area_id int4;
+alter table oa_travel_apply add column if not exists transport_type int4;
+do $$
+begin
+  -- Only while the column is still a number: this is what makes the conversion re-runnable.
+  -- 只在列仍是数值时执行：这才让这次转换可以重跑。
+  if exists (select 1 from information_schema.columns
+              where table_schema='public' and table_name='oa_travel_reimbursement' and column_name='pay_status'
+                and data_type in ('smallint','integer','bigint')) then
+    execute 'alter table oa_travel_reimbursement alter column pay_status drop default';
+    execute 'alter table oa_travel_reimbursement alter column pay_status type boolean using (pay_status <> 0)';
+    execute 'alter table oa_travel_reimbursement alter column pay_status set default false';
+  end if;
+end $$;
+alter table oa_travel_reimbursement add column if not exists expense_type int4;
+alter table oa_travel_reimbursement add column if not exists expense_time timestamp;
+alter table oa_travel_reimbursement add column if not exists departure_city text;
+alter table oa_travel_reimbursement add column if not exists arrival_city text;
+alter table oa_travel_reimbursement add column if not exists price numeric(24,6);
+alter table oa_travel_reimbursement add column if not exists description text;
+alter table oa_work_report add column if not exists content text;
+alter table oa_work_report add column if not exists progress int4;
+alter table oa_work_report add column if not exists content text;

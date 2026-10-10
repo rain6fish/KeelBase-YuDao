@@ -143,7 +143,13 @@ public final class SpecCodegen {
             "sql/keelbase-hrm.sql",
             "sql/keelbase-fms.sql",
             "sql/keelbase-pms.sql",
-            "sql/keelbase-ai.sql");
+            "sql/keelbase-ai.sql",
+            // MySQL's date-part function names, defined for PostgreSQL. A few of the enabled modules
+            // build SQL in Java (`MONTH(birthday) = ?`), and those names do not exist here — so they
+            // are supplied rather than the upstream Java being edited.
+            // MySQL 的日期分量函数名，为 PostgreSQL 定义一份。少数启用的模块在 Java 里拼 SQL
+            // （`MONTH(birthday) = ?`），而这些名字在这边不存在——故补上它们，而不是去改上游的 Java。
+            "sql/keelbase-mysql-functions.sql");
 
     private SpecCodegen() {
     }

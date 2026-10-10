@@ -1072,3 +1072,92 @@ CREATE TABLE IF NOT EXISTS hrm_performance_assessment_quota (
     tenant_id bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id)
 );
+
+-- ---------------------------------------------------------------------------------------------------
+-- Where the converted schema above fell short of what the module's data objects declare. Two gaps,
+-- both found by running the pages rather than by reading: a Java Boolean whose source column was
+-- `tinyint` (not `bit`) stayed a number, and a table whose source schema omitted `tenant_id` kept
+-- omitting it — while the host appends `tenant_id = ?` for every table it touches. The column adds
+-- are idempotent; the Boolean conversions only fire while the column is still numeric.
+--
+-- 上面那份转换 schema 与该模块数据对象的差距之处。两个缺口都是**跑页面跑出来的**、不是读码读出来的：
+-- 源 schema 里写成 `tinyint`（而非 `bit`）的 Java 布尔字段仍是数字；源 schema 没写 `tenant_id` 的表
+-- 仍然没有它——而宿主对**它碰到的每张表**都会拼 `tenant_id = ?`。加列的语句幂等；布尔转换只在列仍是
+-- 数值时才触发。
+alter table hrm_attendance_group add column if not exists type int4;
+alter table hrm_attendance_group add column if not exists date timestamp;
+alter table hrm_attendance_group add column if not exists weeks text;
+alter table hrm_attendance_group add column if not exists exclude_rest_time boolean;
+alter table hrm_attendance_group add column if not exists address text;
+alter table hrm_attendance_group add column if not exists latitude numeric(24,6);
+alter table hrm_attendance_group add column if not exists longitude numeric(24,6);
+alter table hrm_attendance_group add column if not exists radius int4;
+alter table hrm_attendance_group add column if not exists ssid text;
+alter table hrm_attendance_group add column if not exists mac text;
+alter table hrm_attendance_group add column if not exists late_method int4;
+alter table hrm_attendance_group add column if not exists late_deduct_money numeric(24,6);
+alter table hrm_attendance_group add column if not exists early_method int4;
+alter table hrm_attendance_group add column if not exists early_deduct_money numeric(24,6);
+alter table hrm_attendance_group add column if not exists absenteeism_method int4;
+alter table hrm_attendance_group add column if not exists absenteeism_deduct_money numeric(24,6);
+alter table hrm_attendance_group add column if not exists misscard_method int4;
+alter table hrm_attendance_group add column if not exists misscard_deduct_money numeric(24,6);
+alter table hrm_insurance_month_employee_record add column if not exists scheme_project_id bigint;
+alter table hrm_insurance_month_employee_record add column if not exists type int4;
+alter table hrm_insurance_month_employee_record add column if not exists name text;
+alter table hrm_insurance_month_employee_record add column if not exists base_amount numeric(24,6);
+alter table hrm_insurance_month_employee_record add column if not exists corporate_rate numeric(24,6);
+alter table hrm_insurance_month_employee_record add column if not exists personal_rate numeric(24,6);
+alter table hrm_insurance_month_employee_record add column if not exists corporate_amount numeric(24,6);
+alter table hrm_insurance_month_employee_record add column if not exists personal_amount numeric(24,6);
+alter table hrm_performance_assessment_template add column if not exists quota_type int4;
+alter table hrm_performance_assessment_template add column if not exists weight numeric(24,6);
+alter table hrm_performance_assessment_template add column if not exists remark text;
+alter table hrm_performance_assessment_template add column if not exists allow_edit boolean;
+alter table hrm_performance_assessment_template add column if not exists quotas text;
+alter table hrm_performance_assessment_template add column if not exists standard text;
+alter table hrm_performance_assessment_template add column if not exists weight numeric(24,6);
+alter table hrm_performance_assessment_template add column if not exists score_type int4;
+alter table hrm_performance_result_template add column if not exists min_score numeric(24,6);
+alter table hrm_performance_result_template add column if not exists max_score numeric(24,6);
+alter table hrm_performance_result_template add column if not exists coefficient numeric(24,6);
+alter table hrm_performance_plan add column if not exists type int4;
+alter table hrm_performance_plan add column if not exists employee_ids text;
+alter table hrm_performance_plan add column if not exists dept_ids text;
+alter table hrm_performance_plan add column if not exists employee_type int4;
+alter table hrm_performance_plan add column if not exists employee_statuses text;
+alter table hrm_performance_plan add column if not exists weight numeric(24,6);
+alter table hrm_performance_plan add column if not exists scoring_type int4;
+alter table hrm_performance_plan add column if not exists visible_content int4;
+alter table hrm_performance_plan add column if not exists required_setting boolean;
+alter table hrm_performance_plan add column if not exists reject_authority boolean;
+alter table hrm_performance_plan add column if not exists type int4;
+alter table hrm_performance_plan add column if not exists level int4;
+alter table hrm_performance_plan add column if not exists employee_id bigint;
+alter table hrm_performance_plan add column if not exists levels text;
+alter table hrm_salary_change_template add column if not exists code int4;
+alter table hrm_salary_change_record add column if not exists code int4;
+alter table hrm_salary_change_record add column if not exists name text;
+alter table hrm_salary_change_record add column if not exists value numeric(24,6);
+alter table hrm_salary_employee_info add column if not exists code int4;
+alter table hrm_salary_employee_info add column if not exists name text;
+alter table hrm_salary_employee_info add column if not exists value numeric(24,6);
+alter table hrm_salary_month_employee_record add column if not exists code int4;
+alter table hrm_salary_month_employee_record add column if not exists name text;
+alter table hrm_salary_month_employee_record add column if not exists value numeric(24,6);
+alter table hrm_salary_month_record add column if not exists code int4;
+alter table hrm_salary_month_record add column if not exists name text;
+alter table hrm_salary_month_record add column if not exists children text;
+alter table hrm_salary_slip add column if not exists name text;
+alter table hrm_salary_slip add column if not exists type int4;
+alter table hrm_salary_slip add column if not exists code int4;
+alter table hrm_salary_slip add column if not exists value numeric(24,6);
+alter table hrm_salary_slip add column if not exists sort int4;
+alter table hrm_salary_slip add column if not exists children text;
+alter table hrm_salary_slip_template add column if not exists type int4;
+alter table hrm_salary_slip_template add column if not exists code int4;
+alter table hrm_salary_slip_template add column if not exists remark text;
+alter table hrm_salary_slip_template add column if not exists hidden boolean;
+alter table hrm_salary_slip_template add column if not exists sort int4;
+alter table hrm_salary_slip_template add column if not exists children text;
+alter table hrm_salary_option_template add column if not exists tenant_id bigint not null default 0;

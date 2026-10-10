@@ -61,6 +61,10 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-fms.sql"
   "$REPO_ROOT/sql/keelbase-pms.sql"
   "$REPO_ROOT/sql/keelbase-ai.sql"
+  # MySQL's date-part names, defined for PostgreSQL: a few of the modules' queries build SQL in Java
+  # (`MONTH(birthday) = ?`), and those names do not exist here. 把 MySQL 的日期分量函数名在 PostgreSQL
+  # 上定义一份：少数模块在 Java 里拼 SQL（`MONTH(birthday) = ?`），而这些名字在这边不存在。
+  "$REPO_ROOT/sql/keelbase-mysql-functions.sql"
 )
 
 psql_super() { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d postgres "$@"; }
