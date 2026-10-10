@@ -95,7 +95,10 @@ at the root; those are deliberately **not** forwarded — see `admin-nginx.conf`
   which is git-ignored. The database password is the host's existing Postgres role's, read off the
   running container; the audit key must be generated once and then left alone, because the audit
   chain is verified by recomputing hashes from it.
-- **The datastore is shared.** The database `ruoyi-vue-pro` lives inside the host's other stack's
+- **Uploads are stored on this host, not on the platform vendor's server.** The master file-storage
+  config is the *local* client (`file-storage.sql`), writing under `/app/uploads` — which is why
+  `docker-compose.yml` mounts `./uploads` there. The two move together: a storage config whose path
+  is not mounted writes into the container and loses every upload at the next `up -d`.
   Postgres container, and Redis is that stack's, on **database index 1** so it does not collide with
   the other stack's cache. Nothing here creates a container for either.
 - **Memory is the binding constraint on the demo host**, not disk. The server runs with
