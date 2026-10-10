@@ -51,21 +51,14 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
   "$REPO_ROOT/sql/keelbase-local-images.sql"
-  # One per module this line enables wholesale; each carries its tables' key sequences as well, since
-  # the host asks for those by name. 本线整体启用的模块各一份；每份也带着自己那些表的主键序列，
-  # 因为宿主是按名字要序列的。
-  "$REPO_ROOT/sql/keelbase-bpm.sql"
-  "$REPO_ROOT/sql/keelbase-report.sql"
-  "$REPO_ROOT/sql/keelbase-oa.sql"
-  "$REPO_ROOT/sql/keelbase-hrm.sql"
-  "$REPO_ROOT/sql/keelbase-fms.sql"
-  "$REPO_ROOT/sql/keelbase-pms.sql"
-  "$REPO_ROOT/sql/keelbase-ai.sql"
-  # MySQL's date-part names, defined for PostgreSQL: a few of the modules' queries build SQL in Java
-  # (`MONTH(birthday) = ?`), and those names do not exist here. 把 MySQL 的日期分量函数名在 PostgreSQL
-  # 上定义一份：少数模块在 Java 里拼 SQL（`MONTH(birthday) = ?`），而这些名字在这边不存在。
-  "$REPO_ROOT/sql/keelbase-mysql-functions.sql"
 )
+
+# This deployment runs a subset of the modules — the ones its jar actually carries — so the menus
+# upstream seeded for the others are turned off. That is a property of this deployment rather than of
+# the line, which is why it is a file here and not one under `sql/`.
+# 本部署只跑它 jar 里真正有的那些模块，故上游为其余模块播下的菜单要关掉。这是**本部署**的属性、不是
+# 这条线的属性，所以它是这里的文件、而不是 `sql/` 下的一个。
+SCOPE="$HERE/module-scope.sql"
 
 psql_super() { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d postgres "$@"; }
 psql_db()    { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" "$@"; }
@@ -105,6 +98,13 @@ for f in "${ADDITIONS[@]}"; do
     echo "  ⚠ $f 导入失败" >&2; exit 1; }
 done
 
-echo "== 5) 收尾 =="
+echo "== 5) 收掉本部署不跑的模块的菜单 =="
+if [ -f "$SCOPE" ]; then
+  docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -q < "$SCOPE" || exit 1
+else
+  echo "  ⚠ 找不到 $SCOPE —— 菜单不会收，侧栏会出现「模块已禁用」的死页" >&2
+fi
+
+echo "== 6) 收尾 =="
 psql_db -tAc "select '  表数 = ' || count(*) from information_schema.tables where table_schema='public';"
 psql_db -tAc "select '  租户 1 = ' || name from system_tenant where id=1;"
