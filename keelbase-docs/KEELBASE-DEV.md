@@ -56,6 +56,7 @@ can be pointed at a different stack without editing anything.
 | `--keelbase.audit.hmac-key=…` | the runtime's audit chain; with no `application.yml` of its own when embedded, this fails startup without it |
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | keeps the runtime's response envelope off this host's own controllers |
 | `--yudao.tenant.ignore-tables=…` | names the tables **KeelBase governs**, so the host's tenant interceptor does not narrow them too (one authority per row — see the line's decision index) |
+| `--yudao.access-log.enable=true` | the host's profile ships this **off**, which leaves the API access-log table empty — and the dashboard's "interface calls" figure is read from that table, so it sat at zero. A command-line argument outranks the profile yaml, so this turns it on without editing upstream. Each request now writes a row: that is the cost, and it is why the value is a parameter rather than a constant. Set `ACCESS_LOG=false` to put it back |
 | `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | the host's own value is `SELECT 1 FROM DUAL`, which is MySQL — PostgreSQL has no `DUAL` |
 | `--spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource` | **the pool.** See below — with Druid, about half of all logins fail |
 

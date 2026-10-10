@@ -51,6 +51,7 @@ bash scripts/run-server.sh
 | `--spring.flyway.baseline-on-migrate=true` `--spring.flyway.baseline-version=0` | 平台的 schema 是手工灌的，故核心的 Flyway 需要基线——而版本**必须是 `0`**，否则核心的 **V1 被跳过**、一张表**安静地**消失 |
 | `--keelbase.audit.hmac-key=…` | 运行时的审计链；嵌入时它没有自己的 `application.yml`，缺这项**起不来** |
 | `--keelbase.wire.exclude-packages=cn.iocoder.yudao` | 让运行时的响应信封**不套在**本宿主自己的控制器上 |
+| `--yudao.access-log.enable=true` | 宿主的 profile 里这一项是**关着的**，于是接口访问日志表是空的——而面板上「接口访问」那格正是从那表读的，故它一直停在 0。命令行参数优先于 profile 的 yaml，所以这能在**不编辑上游**的前提下把它打开。代价是**每个请求都会写一行**，这也是它做成参数、而不写死的原因。置 `ACCESS_LOG=false` 可恢复 |
 | `--yudao.tenant.ignore-tables=…` | 点名**由 KeelBase 治理**的表，好让宿主的租户拦截器**不再**去收束它们（一行的权威只有一个——见本线的决定索引） |
 | `--spring.datasource.dynamic.druid.validation-query="SELECT 1"` | 宿主自己的值是 `SELECT 1 FROM DUAL`，那是 **MySQL**——PostgreSQL 没有 `DUAL` |
 | `--spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource` | **换掉连接池**。见下——用 Druid 时约一半的登录会失败 |

@@ -50,4 +50,5 @@ exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar
   --keelbase.wire.exclude-packages=cn.iocoder.yudao \
   --keelbase.memory.max-per-owner="${MEMORY_CAP:-200}" \
   --keelbase.knowledge.chunk-size=800 --keelbase.knowledge.chunk-overlap=120 \
-  --yudao.tenant.ignore-tables=products
+  --yudao.tenant.ignore-tables=products \
+  --yudao.access-log.enable="${ACCESS_LOG:-true}"
