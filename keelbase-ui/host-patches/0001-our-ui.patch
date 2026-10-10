@@ -1,5 +1,5 @@
 diff --git a/index.html b/index.html
-index 8cfcbef..3cde30c 100644
+index 8cfcbef..0e113ff 100644
 --- a/index.html
 +++ b/index.html
 @@ -5,14 +5,8 @@
@@ -19,6 +19,26 @@ index 8cfcbef..3cde30c 100644
      <title>%VITE_APP_TITLE%</title>
    </head>
    <body>
+@@ -47,11 +41,6 @@
+           text-align: center;
+         }
+ 
+-        .app-loading .app-loading-logo {
+-          width: 100px;
+-          margin: 0 auto 15px auto;
+-        }
+-
+         .app-loading .app-loading-item {
+           position: relative;
+           display: inline-block;
+@@ -136,7 +125,6 @@
+       <div class="app-loading">
+         <div class="app-loading-wrap">
+           <div class="app-loading-title">
+-            <img src="/logo.gif" class="app-loading-logo" alt="Logo" />
+             <div class="app-loading-title">%VITE_APP_TITLE%</div>
+           </div>
+           <div class="app-loading-item">
 diff --git a/src/components/DiyEditor/components/mobile/UserCard/index.vue b/src/components/DiyEditor/components/mobile/UserCard/index.vue
 index 14b447c..4877590 100644
 --- a/src/components/DiyEditor/components/mobile/UserCard/index.vue

@@ -55,7 +55,7 @@
   // The band the menu draws for hover and for the open item, inside the two floor values below.
   // Kept as variables so the two states cannot drift apart.
   // 菜单为悬停与已选项画的那条色带的上下内缩；存成变量，免得两个状态各写一份而漂开。
-  --keel-menu-band-inset: 5px;
+  --keel-menu-band-inset: 2px;
 }
 
 // ── the lines yudao draws between regions ───────────────────────────────────────────────────────────
@@ -187,6 +187,49 @@ html body .v-menu .el-menu .el-menu-item.is-active:hover {
 }
 html body .v-menu .el-menu .el-menu-item.is-active:hover::before {
   background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+}
+
+// The same, one level down. A nested item is not the same comparison as a top-level one: yudao's
+// scoped rule for it names the sub-menu as well, which puts it one class above the rule that clears
+// the item's own background. Losing that one leaves the item's flat rectangle painted full height —
+// opaque, square-cornered — under a band that is neither, and because the band is an absolutely
+// positioned pseudo-element it paints over the label on top of that. Which is why a nested open item
+// lost its text while a top-level one kept it.
+// 同一条，下一层。嵌套项与顶层项**不是同一次比较**：yudao 给它写的带作用域规则把 sub-menu 也点上了，
+// 于是比那条清底色的规则高一级。这一级输掉，菜单项那层**平色矩形**就整行画着——不透明、方角——而色带两者
+// 都不是；又因为色带是**绝对定位的伪元素**，它会画在标签**之上**。这就是为什么嵌套的已打开项文字不见了，
+// 而顶层的还在。
+html body .v-menu .el-menu.el-menu--vertical .el-sub-menu .el-menu-item.is-active {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+html body .v-menu .el-menu.el-menu--vertical .el-sub-menu .el-menu-item.is-active::before {
+  content: "";
+  position: absolute;
+  top: var(--keel-menu-band-inset);
+  bottom: var(--keel-menu-band-inset);
+  left: 0;
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+html body .v-menu .el-menu.el-menu--vertical .el-sub-menu .el-menu-item.is-active:hover::before {
+  background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+}
+
+// And the label above the band, whatever else is in the row. The band is positioned, so by the
+// painting order it would otherwise draw over the item's in-flow content — the icon and the title —
+// and an opaque band over a label is a label nobody can read.
+// 标签在色带之上，无论行里还有什么。色带是**定位**元素，按绘制顺序它会画在菜单项的普通内容（图标与标题）
+// **之上**——一条不透明的色带压在标签上，就是一个没人读得到的标签。
+html body .v-menu .el-menu .el-menu-item > * {
+  position: relative;
+  z-index: 1;
+}
+html body .v-menu .el-menu .el-sub-menu__title > * {
+  position: relative;
+  z-index: 1;
 }
 html body .el-menu.el-menu--vertical .el-menu-item.is-active {
   background-color: transparent !important;
