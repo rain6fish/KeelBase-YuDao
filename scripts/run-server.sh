@@ -32,6 +32,30 @@ AUDIT_KEY="${KEELBASE_AUDIT_KEY:-dev-audit-key-not-for-deployment}"
 
 PG_URL="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
 
+# KeelBase's model loop is **off unless a key is given**, and that default is the point rather than a
+# convenience: the scenario gates assert *which* tool ran (`list_crm_customers`, and so on), which a
+# model would turn into a guess. Present a key and the runtime's rule-based planner stands down in
+# favour of the model-driven one on `/ai/chat`, and `/ai/task` gains the governed multi-step loop.
+# The key is read from the environment, never written here.
+# KeelBase 的模型回路**不给 key 就不开**，而这个默认是**要点**、不是图省事：场景门禁断言的是**哪个**工具跑了
+# （`list_crm_customers` 之类），换成模型就把这件事变成猜。给了 key，运行时那个规则版 planner 就让位给 `/ai/chat`
+# 上的模型版，而 `/ai/task` 也拿到那条受治理的多步循环。key 从环境读，**不写在这里**。
+AI_ARGS=()
+if [ -n "${KEELBASE_MODEL_API_KEY:-}" ]; then
+  # The host's own `application.yaml` switches `spring.ai.chat.client.enabled` **off** on purpose —
+  # its comment says the builder wants a single `ChatModel` and the project makes several. That switch
+  # is upstream's, and it stays untouched; what turns it back on is this parameter, and only together
+  # with a key. If the host does make more than one, the startup fails loudly here rather than the
+  # model loop quietly not existing.
+  # 宿主自己的 `application.yaml` **故意**关掉了 `spring.ai.chat.client.enabled`——它的注释说 builder 要唯一一个
+  # `ChatModel`、而项目会建多个。那个开关是上游的、**一字不动**；把它打开的正是这个参数，且只与 key 同时给。
+  # 宿主真建了不止一个的话，这里会**启动失败并说清楚**，而不是让模型回路静静不存在。
+  AI_ARGS+=("--spring.ai.chat.client.enabled=true")
+  AI_ARGS+=("--spring.ai.openai.api-key=$KEELBASE_MODEL_API_KEY")
+  AI_ARGS+=("--spring.ai.openai.base-url=${KEELBASE_MODEL_BASE_URL:-https://api.deepseek.com}")
+  AI_ARGS+=("--spring.ai.openai.chat.options.model=${KEELBASE_MODEL_NAME:-deepseek-v4-flash}")
+fi
+
 exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar" \
   --server.port="$PORT" \
   --spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=0 \
@@ -51,4 +75,5 @@ exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar
   --keelbase.memory.max-per-owner="${MEMORY_CAP:-200}" \
   --keelbase.knowledge.chunk-size=800 --keelbase.knowledge.chunk-overlap=120 \
   --yudao.tenant.ignore-tables=products \
-  --yudao.access-log.enable="${ACCESS_LOG:-true}"
+  --yudao.access-log.enable="${ACCESS_LOG:-true}" \
+  ${AI_ARGS[@]+"${AI_ARGS[@]}"}

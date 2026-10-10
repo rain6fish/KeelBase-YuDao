@@ -39,6 +39,36 @@
             <version>0.1.4</version>
         </dependency>
 
+        <!-- KeelBase's Spring AI adapter — the model loop on KeelBase's **own** path. It implements the
+             runtime's two seams (`ToolCallPlanner` for `/ai/chat`, `TaskRunner` for `/ai/task`) and
+             activates only when a model is actually configured; with no provider it changes nothing and
+             the runtime's own rule-based planner stays in charge. That condition is the whole point —
+             the deterministic scenario gates below assert *which* tool ran, and a model would make that
+             a guess. See `D26 ③`: the AI carrier is the host's, KeelBase governs on top of it.
+             / KeelBase 的 Spring AI 适配器 —— KeelBase **自己**那条路径上的模型回路。它实现运行时那两条缝
+             （`/ai/chat` 的 `ToolCallPlanner`、`/ai/task` 的 `TaskRunner`），且**只有真配了模型才激活**；不配
+             provider 时它什么都不改，规则版 planner 继续执掌。那个条件是**要点**——下面那些确定性场景门禁断言的
+             是**哪个**工具跑了，而模型会把这个变成猜。见 `D26 ③`：AI 载体是宿主的，KeelBase 只在其上施治理。 -->
+        <dependency>
+            <groupId>cn.com.keelbase</groupId>
+            <artifactId>keelbase4j-springai</artifactId>
+            <version>0.1.4</version>
+        </dependency>
+
+        <!-- The model that seam talks to, when it is switched on. KeelBase's adapter activates off a
+             `ChatClient.Builder` bean, and this host has none of its own: `ai1` builds its OpenAI models
+             per request from rows in its own tables (`Ai1LlmModelFactory`) rather than contributing one
+             to the context. This starter brings the OpenAI model auto-configuration in; `run-server.sh`
+             hands it the provider settings as parameters and hands it **none** by default.
+             / 那条缝在打开时所对的模型。KeelBase 的适配器靠 `ChatClient.Builder` bean 激活，而本宿主**自己
+             没有**这样一个 bean：`ai1` 是按它自己表里的行**逐请求**建 OpenAI 模型的（`Ai1LlmModelFactory`），
+             而不是往容器里贡献一个。这个 starter 把 OpenAI 的模型自动配置带进来；`run-server.sh` 以参数交给它
+             provider 设置、**默认一个都不给**。 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
         <!-- PostgreSQL driver. This line's datastore is PostgreSQL (see keelbase-docs/KEELBASE-DEV.md),
              and upstream builds for MySQL and manages no PostgreSQL driver — without this the platform
              fails at startup with `ClassNotFoundException: org.postgresql.Driver`, which is what the
