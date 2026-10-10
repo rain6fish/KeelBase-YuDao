@@ -83,6 +83,25 @@ html body .layout-border__top::before {
 // 渲染成一个带点击处理的普通 `<li>`——故没有选择器挑得出它们，而一条照着它们的目标网址写的规则会**什么都
 // 匹配不到**、看上去却是对的。它们改在**菜单树被构建的地方**去掉；见 `keelbase-ui/host-patches/`。
 
+// ── the arrow that says "this one has children" ─────────────────────────────────────────────────────
+// Element Plus pins it to the end of the row: `position: absolute; right: …`, with the same amount
+// reserved as padding-right so the label never runs under it. The product's own menu keeps it beside
+// the label instead, so it is taken out of that absolute placement and back into the flow. `width`
+// has to be reset too — the stock rule says `width: inherit`, which only made sense while the arrow
+// was positioned against the title's full width.
+// Element Plus 把它钉在行尾：`position: absolute; right: …`，并留出同样多的 `padding-right`，好让标签不会
+// 跑到它下面。产品自己的菜单把它留在**标签旁边**，故这里把它从那个绝对定位里取出来、放回普通流。`width` 也得
+// 重置——原规则是 `width: inherit`，那只在箭头对着标题**整宽**定位时才说得通。
+html body .v-menu .el-menu .el-sub-menu__title .el-sub-menu__icon-arrow {
+  position: static;
+  width: auto;
+  height: auto;
+  top: auto;
+  right: auto;
+  margin: 0 0 0 6px;
+  vertical-align: middle;
+}
+
 // ── the rows, and the band that marks them ──────────────────────────────────────────────────────────
 // Element Plus defaults a row to 56px; the product's own menu runs 42px for a group and 38px for a
 // child, which is what makes the sidebar read as a list instead of a column of blocks. The band that
