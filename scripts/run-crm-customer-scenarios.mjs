@@ -87,6 +87,40 @@ async function confirm(token, confirmationToken, decision) {
   return json.data || json;
 }
 
+// What is waiting on this caller.
+//
+// **Read from the runtime's own table, and the reason is reported rather than worked around quietly**:
+// `/ai/my/confirmations` — the caller's confirmation centre, and the surface the console shows them —
+// **answers 500 on this host**. Its query names a `mode` column that this deployment's schema does not
+// have (see the table's columns), which is a finding about this host, not about the gate. The chat
+// answer cannot be the source either: as of core 0.1.5 it is the frozen `chat-response` and carries no
+// `status`, no `data` and no `token`.
+//
+// 正在等**这位调用方**的是什么。
+//
+// **从运行时自己的表读，而理由报出来、不默默绕过**：`/ai/my/confirmations` —— 调用方的确认中心、也是控制台
+// 给他们看的那条面 —— **在本宿主上答 500**。它的查询点名了一个本部署 schema **没有的 `mode` 列**（见该表的列）；
+// 那是**关于本宿主**的发现，不是关于这道门禁的。聊天答案也不能当来源：core 0.1.5 起它就是冻结的
+// `chat-response`，不带 `status`/`data`/`token`。
+//
+// ⚠ **For the host line, not for this gate**: the 500 belongs on that line's list — the console's
+// "waiting on me" page cannot load here until the schema catches up with the runtime.
+// ⚠ **这是宿主线的事、不是本门禁的事**：那个 500 该记在那条线的清单上 —— 在 schema 追上运行时之前，
+// 控制台的「待我确认」页在本部署上打不开。
+const pendingToken = (operatorId) =>
+  psql(`select token from confirmation_requests where operator_id = '${operatorId}' and status = 'pending' order by id desc limit 1`) || undefined;
+
+const pendingCount = (operatorId) =>
+  Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
+
+// Whether a turn actually ran, read from the trail rather than from the answer — same reason: the
+// answer reports no outcome any more, and an audit row is where the runtime says a call happened.
+//
+// 一个回合**有没有真跑**，从**审计轨**读、不从答案读 —— 同一个理由：答案不再报结果，而**审计行**才是运行时
+// 说「这次调用发生过」的地方。
+const ranAs = (tool) =>
+  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 // The audit chain is signed with `keelbase.audit.hmac-key`, so rows written under a different key can
@@ -140,23 +174,23 @@ console.log('== 场景 2 · 身份传递 + 数据范围 ==');
 {
   const a = await chat(admin, '列出客户');
   check('admin 触发 CRM 工具', 'list_crm_customers', (a.toolCalls || [])[0]);
-  check('admin 的执行状态', 'executed', a.status);
-  // The seed administrator is the one caller the narrowing leaves alone, so this side also shows what
-  // upstream's own default does when nobody narrows: every row of the tenant.
-  // 种子管理员是收束唯一放过的那一个调用方，故这一侧也显出了上游自己的默认：本租户的每一行。
-  check('admin 看得到本次两行', 2,
-    (a.data || []).filter((r) => r.name === adminMarker || r.name === salesMarker).length);
+  // **What this costs, said rather than hidden**: this scene used to assert the rows the tool *returned*
+  // — both of this run's rows for the administrator, only its own for the second caller, and the
+  // returned row's owner. As of core 0.1.5 the answer is the frozen `chat-response` and carries no
+  // `data`, and **neither** runtime puts a tool's result on the wire (the reference's `tool_end` carries
+  // a summary, not the data). So what is asserted here is that each turn **ran**, read from the trail,
+  // and the row scope is asserted where it lives: scenario 4's refusal of another caller's row, which
+  // the module itself answers.
+  //
+  // **代价说出来、不藏着**：本场原本断言的是工具**返回的行** —— 管理员看得到本轮两行、第二个调用方只看得到
+  // 自己那一行、以及回来那一行的属主。从 core 0.1.5 起，答案是冻结的 `chat-response`、不带 `data`，而**两个**
+  // 运行时都不把工具的结果放上线（参照的 `tool_end` 带的是 summary、不是数据）。所以这里断言的是**每一次都跑过了**
+  // （从审计轨读），行范围改在**它所在的地方**断言：情境 4 里那次「改别人的行」的拒绝 —— 那是**模块自己**答的。
+  check('admin 的执行状态（审计轨）', 1, ranAs('list_crm_customers'));
 
   const s = await chat(second, '列出客户');
   check('第二个调用方触发同一个工具', 'list_crm_customers', (s.toolCalls || [])[0]);
-  check('它的执行状态', 'executed', s.status);
-  check('它看得到自己那一行', 1, (s.data || []).filter((r) => r.name === salesMarker).length);
-  check('它看不到 admin 那一行', 0, (s.data || []).filter((r) => r.name === adminMarker).length);
-  // Identity travelled: the row that came back is stamped with the caller the tool passed in, so the
-  // module scoped the page itself rather than being post-filtered by us.
-  // 身份传递到位：回来的那一行盖着**工具传进去的那个调用方**，故分页是**模块自己**收束的、不是我们事后过滤的。
-  const mine = (s.data || []).find((r) => r.name === salesMarker) || {};
-  check('回来的行属主 = 调用方', secondId, mine.ownerUserId);
+  check('它的执行状态（审计轨）', 2, ranAs('list_crm_customers'));
 }
 
 console.log('== 场景 3 · 高风险写入被扣下，批准后落库 ==');
@@ -171,12 +205,17 @@ const writeMarker = `${marker}-write`;
   // 而「两道门禁同时跑」正是它不对的那种情形：它会以 `expected [N], got [N+1]` 失败，而那个失败看上去指着门禁、
   // 不指着另一个写手。按本轮的标记计数**既免疫这个问题、又更强**——它断言的是**这一行**落了，不是表多了一行。
   const own = () => Number(psql(`select count(*) from ${CUSTOMER} where name like '%${writeMarker}%'`));
-  const proposed = await chat(second, `新建客户 ${writeMarker}`);
-  check('写被扣下', 'pending_confirmation', proposed.status);
+  const held = pendingCount(secondId);
+  await chat(second, `新建客户 ${writeMarker}`);
+  // "Held" is **one more waiting row for this caller**, which is also where the token comes from: the
+  // answer carries neither (core 0.1.5).
+  // 「被扣下」就是**这个调用方多了一行**待确认 —— token 也正是从那儿来的：答案两样都不带（core 0.1.5）。
+  check('写被扣下', held + 1, pendingCount(secondId));
   check('未落库', 0, own());
-  checkNot('扣下时给出 token', 'undefined', proposed.token);
+  const proposedToken = pendingToken(secondId);
+  checkNot('扣下时给出 token', 'undefined', proposedToken);
 
-  const outcome = await confirm(second, proposed.token, 'approve');
+  const outcome = await confirm(second, proposedToken, 'approve');
   check('批准后执行', 'executed', outcome.status);
   check('落库', 1, own());
   // The owner is stamped by the governance advice, not named by the tool — the write VO carries the
@@ -192,9 +231,10 @@ const hijackMarker = `${marker}-hijack`;
 {
   // A positive control first: the same tool, the same caller, a row that IS the caller's.
   // 先来一条正对照：同一个工具、同一个调用方，但那一行**是**它自己的。
-  const mine = await chat(second, `修改客户 ${ownMarker}`, { customerId: Number(salesRowId) });
-  check('改自己的行被扣下', 'pending_confirmation', mine.status);
-  const mineDone = await confirm(second, mine.token, 'approve');
+  const mineHeld = pendingCount(secondId);
+  await chat(second, `修改客户 ${ownMarker}`, { customerId: Number(salesRowId) });
+  check('改自己的行被扣下', mineHeld + 1, pendingCount(secondId));
+  const mineDone = await confirm(second, pendingToken(secondId), 'approve');
   check('改自己的行批准后执行', 'executed', mineDone.status);
   check('自己那一行确实改了', true,
     psql(`select name from ${CUSTOMER} where id = ${salesRowId}`).includes(ownMarker));
@@ -203,9 +243,10 @@ const hijackMarker = `${marker}-hijack`;
   // nothing else: the row-scope question is answered lower down, at the module's own seam.
   // 然后是同一次调用、打向**别人的**行。批准了结的是**风险**问题、仅此而已：行范围的问题在更下面、在模块
   // 自己的接缝上回答。
-  const hijack = await chat(second, `修改客户 ${hijackMarker}`, { customerId: Number(adminRowId) });
-  check('改别人的行也被扣下', 'pending_confirmation', hijack.status);
-  const hijackDone = await confirm(second, hijack.token, 'approve');
+  const hijackHeld = pendingCount(secondId);
+  await chat(second, `修改客户 ${hijackMarker}`, { customerId: Number(adminRowId) });
+  check('改别人的行也被扣下', hijackHeld + 1, pendingCount(secondId));
+  const hijackDone = await confirm(second, pendingToken(secondId), 'approve');
   note('越权写批准后的结局', hijackDone.status || JSON.stringify(hijackDone).slice(0, 120));
   check('批准了也没执行', true, hijackDone.status !== 'executed');
   check('别人的行一字未改', adminMarker, psql(`select name from ${CUSTOMER} where id = ${adminRowId}`));

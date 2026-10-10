@@ -70,6 +70,25 @@ async function chat(token, message, extra = {}) {
   return json.data || json;
 }
 
+// What is waiting on this caller, read from the runtime's own table — **not** from the chat answer,
+// which as of core 0.1.5 is the frozen `chat-response` and carries no `status`, no `data` and no `token`.
+// `/ai/my/confirmations` would be the product surface for this, but it answers 500 on this host (its
+// query names a `mode` column this deployment's schema does not have) — reported, not worked around.
+//
+// 正在等**这位调用方**的是什么，从运行时**自己的表**读 —— **不**从聊天答案取，core 0.1.5 起它就是冻结的
+// `chat-response`，不带 `status`/`data`/`token`。本该走的产品面是 `/ai/my/confirmations`，但它在**本宿主上答
+// 500**（它的查询点名了一个本部署 schema 没有的 `mode` 列）—— 这是**报出来**、不是绕过。
+const pendingToken = (operatorId) =>
+  psql(`select token from confirmation_requests where operator_id = '${operatorId}' and status = 'pending' order by id desc limit 1`) || undefined;
+
+const pendingCount = (operatorId) =>
+  Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
+
+// Whether a turn actually ran, from the trail rather than from the answer.
+// 一个回合**有没有真跑**，从审计轨读、不从答案读。
+const ranAs = (tool) =>
+  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 // The audit chain is signed with `keelbase.audit.hmac-key`, so rows written under a different key can
@@ -136,13 +155,19 @@ psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_
 {
   const a = await chat(admin, '列出产品');
   check('admin 触发生成的工具', 'list_generated_products', (a.toolCalls || [])[0]);
-  check('admin 的执行状态', 'executed', a.status);
-  check('admin 看得到本次那一行', 1, (a.data || []).filter((r) => r.name === adminMarker).length);
+  // **What this costs**: this scene used to assert the rows the tool *returned* — see the same note in
+  // `run-crm-customer-scenarios.mjs`. The answer is the frozen `chat-response` and carries no `data`,
+  // and neither runtime puts a tool's result on the wire, so what is asserted is that each turn **ran**
+  // (from the trail) and the row scope is asserted where the module itself answers it.
+  //
+  // **代价**：本场原本断言的是工具**返回的行** —— 说明同 `run-crm-customer-scenarios.mjs`。答案是冻结的
+  // `chat-response`、不带 `data`，而两个运行时都不把工具的结果放上线，故这里断言的是**每一次都跑过了**（从审计轨
+  // 读），行范围在**模块自己答它的地方**断言。
+  check('admin 的执行状态（审计轨）', 1, ranAs('list_generated_products'));
 
   const s = await chat(second, '列出产品');
   check('第二个调用方触发同一个工具', 'list_generated_products', (s.toolCalls || [])[0]);
-  check('它看得到自己那一行', 1, (s.data || []).filter((r) => r.name === salesMarker).length);
-  check('它看不到 admin 那一行', 0, (s.data || []).filter((r) => r.name === adminMarker).length);
+  check('它的执行状态（审计轨）', 2, ranAs('list_generated_products'));
 }
 
 console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
@@ -153,12 +178,16 @@ console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
   // 增量只在**没有别人写**的时候读起来对。
   const writeMarker = `gate-write-${Date.now()}`;
   const own = () => Number(psql(`select count(*) from ${MODULE} where name like '%${writeMarker}%'`));
-  const proposed = await chat(second, `新建产品 ${writeMarker}`);
-  check('写被扣下', 'pending_confirmation', proposed.status);
+  const held = pendingCount(secondId);
+  await chat(second, `新建产品 ${writeMarker}`);
+  // "Held" is one more waiting row for this caller — which is also where the token comes from.
+  // 「被扣下」是这个调用方多了一行待确认 —— token 也正是从那儿来的。
+  check('写被扣下', held + 1, pendingCount(secondId));
   check('未落库', 0, own());
-  checkNot('扣下时给出 token', 'undefined', proposed.token);
+  const proposedToken = pendingToken(secondId);
+  checkNot('扣下时给出 token', 'undefined', proposedToken);
 
-  const decided = await fetch(`${HOST}/ai/confirmations/${proposed.token}`, {
+  const decided = await fetch(`${HOST}/ai/confirmations/${proposedToken}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${second}` },
     body: JSON.stringify({ decision: 'approve' })
