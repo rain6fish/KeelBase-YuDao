@@ -181,6 +181,24 @@ html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .
   opacity: 0.5;
 }
 
+// Level 3 steps in by 12px — asked for, and it does depart from the "no staircase" decision above, so
+// the two are worth keeping next to each other. The dash moves with the label rather than staying in
+// the column, which keeps each level's marker-to-label gap the same and makes the step read as a step
+// instead of as a stray marker. Level 2 is untouched, and these rules come after the ones above so the
+// deeper `::after` wins on the rows where both match.
+// 三级内缩 12px——这是被要求加的，也确实背离了上面「没有台阶」那个决定，故两条放在一起更好读。短横跟着
+// 标签走、而不是留在原来那一列：这样每级的「标记到标签」间距一致，这一步读起来才是**一步**、而不是一个
+// 落单的标记。二级不动；这两条写在上面那些之后，故在两者都命中的行上更深的 `::after` 胜出。
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item {
+  padding-left: 57px !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-sub-menu > .el-sub-menu__title {
+  padding-left: 57px !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item::after {
+  left: 36px;
+}
+
 // ── the arrow that says "this one has children" ─────────────────────────────────────────────────────
 // Element Plus pins it to the end of the row: `position: absolute; right: …`, with the same amount
 // reserved as padding-right so the label never runs under it. The product's own menu keeps it beside
