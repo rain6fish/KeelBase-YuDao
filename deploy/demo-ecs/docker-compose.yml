@@ -71,14 +71,6 @@ services:
       - "--spring.ai.openai.chat.options.model=${MODEL_NAME:-deepseek-v4-flash}"
     volumes:
       - ./yudao-server.jar:/app/yudao-server.jar:ro
-      # Uploaded files. The module keeps a file-storage config in the database, and the one set as
-      # master here is the *local* client — it writes under a path inside this container. Without a
-      # volume that path dies with the container, so every uploaded picture would 404 after the next
-      # `up -d`. The path matches `basePath` in the storage config; see file-storage.sql.
-      # 上传的文件。模块把文件存储配置存在数据库里，这里设为 master 的是**本地**客户端——它写在**这个
-      # 容器内的**一个路径下。没有卷的话那个路径会随容器一起消失，于是下一次 `up -d` 之后，所有上传过的
-      # 图片都会 404。该路径与存储配置里的 `basePath` 一致；见 file-storage.sql。
-      - ./uploads:/app/uploads
     networks:
       - keelbase_net
 

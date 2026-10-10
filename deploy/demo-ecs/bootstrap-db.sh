@@ -59,7 +59,14 @@ ADDITIONS=(
 # 本部署只跑它 jar 里真正有的那些模块，故上游为其余模块播下的菜单要关掉。这是**本部署**的属性、不是
 # 这条线的属性，所以它是这里的文件、而不是 `sql/` 下的一个。
 SCOPE="$HERE/module-scope.sql"
-STORAGE="$HERE/file-storage.sql"
+# The file-storage fix is the line's, not this deployment's: it takes the origin as a parameter, so
+# the same file serves any host that runs this stack.
+# 文件存储那处修法是**这条线**的、不是本部署的：它把 origin 作为参数收下，故同一个文件也伺候别的跑这套
+# 栈的机器。
+STORAGE="$REPO_ROOT/sql/keelbase-file-storage.sql"
+# Where this deployment is reached — a stored file's URL is built from it.
+# 本部署被访问的源——存下来的文件 URL 是由它拼出来的。
+ORIGIN="${PUBLIC_ORIGIN:-https://demo2.keelbase.com.cn}"
 
 psql_super() { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d postgres "$@"; }
 psql_db()    { docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" "$@"; }
@@ -106,9 +113,10 @@ else
   echo "  ⚠ 找不到 $SCOPE —— 菜单不会收，侧栏会出现「模块已禁用」的死页" >&2
 fi
 
-echo "== 6) 上传落到本机（master = 本地存储）=="
+echo "== 6) 上传落到一个真能用的存储（master = 数据库存储，origin=$ORIGIN）=="
 if [ -f "$STORAGE" ]; then
-  docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -q < "$STORAGE" || exit 1
+  docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -q \
+    -v origin="$ORIGIN" < "$STORAGE" || exit 1
 else
   echo "  ⚠ 找不到 $STORAGE —— 上传仍会落到厂商的示例存储上" >&2
 fi

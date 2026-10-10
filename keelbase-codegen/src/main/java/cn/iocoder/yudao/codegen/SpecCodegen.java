@@ -149,7 +149,13 @@ public final class SpecCodegen {
             // are supplied rather than the upstream Java being edited.
             // MySQL 的日期分量函数名，为 PostgreSQL 定义一份。少数启用的模块在 Java 里拼 SQL
             // （`MONTH(birthday) = ?`），而这些名字在这边不存在——故补上它们，而不是去改上游的 Java。
-            "sql/keelbase-mysql-functions.sql");
+            "sql/keelbase-mysql-functions.sql",
+            // Where a deployment's uploads go. Upstream's seed makes an *example* store master with
+            // the vendor's own domain in it, so uploads belong on a server we do not control. Takes
+            // the origin as a parameter, so one file serves every host running this stack.
+            // 一次部署的上传落到哪里。上游种子把一份**示例**存储设成 master、里面写着厂商自己的域名，
+            // 于是上传属于一个我们并不控制的服务器。它把 origin 作参数收下，故一个文件伺候所有跑这套栈的机器。
+            "sql/keelbase-file-storage.sql");
 
     private SpecCodegen() {
     }

@@ -95,10 +95,12 @@ at the root; those are deliberately **not** forwarded — see `admin-nginx.conf`
   which is git-ignored. The database password is the host's existing Postgres role's, read off the
   running container; the audit key must be generated once and then left alone, because the audit
   chain is verified by recomputing hashes from it.
-- **Uploads are stored on this host, not on the platform vendor's server.** The master file-storage
-  config is the *local* client (`file-storage.sql`), writing under `/app/uploads` — which is why
-  `docker-compose.yml` mounts `./uploads` there. The two move together: a storage config whose path
-  is not mounted writes into the container and loses every upload at the next `up -d`.
+- **Uploads go into the database, not onto the platform vendor's server.** Upstream's seed makes an
+  *example* store master with the vendor's own domain in it, so every upload landed on a server we do
+  not control. `sql/keelbase-file-storage.sql` makes the **database-backed** store master instead —
+  files go into the database, so there is no host directory that has to exist and nothing to mount.
+  It takes the origin as a parameter (`PUBLIC_ORIGIN` in the bootstrap), because a stored file's URL
+  is built from it.
   Postgres container, and Redis is that stack's, on **database index 1** so it does not collide with
   the other stack's cache. Nothing here creates a container for either.
 - **Memory is the binding constraint on the demo host**, not disk. The server runs with
