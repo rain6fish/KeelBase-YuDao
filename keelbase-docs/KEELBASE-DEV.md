@@ -189,8 +189,11 @@ cannot quietly become a hole.
 `KeelBase-Private/.githooks/` by `KeelBase-Private/scripts/install-hooks.sh`, and it runs the check
 in any checkout that holds this script — a no-op everywhere else in the group. It reads the **working
 tree**, not the index, so in a shared checkout an edit someone else has in flight can block your
-commit; `git commit --no-verify` is the way past it. **No CI job runs it** — `.github/workflows/` is
-upstream's and runs none of our checks.
+commit; `git commit --no-verify` is the way past it. **It also runs in CI**
+(`.github/workflows/ci.yml`, added 2026-10-10) on every push and pull request to `main`, so the hook
+is the fast local copy of a gate that does not depend on anyone running it. Upstream's own two
+workflows are left as they were found and stay dormant — they trigger on `master`, while this
+repository's branch is `main`.
 
 ## Upstream, and how to compare against it
 

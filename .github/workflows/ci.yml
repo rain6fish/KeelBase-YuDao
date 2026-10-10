@@ -1,0 +1,46 @@
+# KeelBase-YuDao CI.
+#
+# Upstream ships two workflows of its own — `maven.yml` and `yudao-ui-admin.yml` — and both are
+# dormant here: they trigger on `master`, while this repository's branch is `main`. They are
+# upstream's files and are left as they were found; this repository adds its own rather than editing
+# them, which is the same rule that keeps every other upstream file untouched (the running count of
+# what we *have* touched is `YD-T4`).
+#
+# The job below proves one thing: every path this repository writes about itself — in a comment, a
+# doc, a script — points at a file it actually holds. `--check-boundary` and `--check` prove other
+# things and are deliberately not run here: both want a JDK 25 toolchain and a Maven build, and a job
+# that takes minutes to answer a question about file names gets run less often, not more.
+#
+# 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
+# `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
+# 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
+#
+# 下面这个 job 只证明一件事：本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个
+# 它确实持有的文件。`--check-boundary` 与 `--check` 证明别的事，**刻意不在这里跑**：两者都要一套 JDK 25
+# 工具链与一次 Maven 构建，而一个要跑上几分钟才回答一个文件名问题的 job，只会被跑得更少，不会更多。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  path-refs:
+    name: Every path this repository cites resolves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # Called through `node`, not by its own path. This repository is developed on Windows, where
+      # `core.filemode` is false, so the executable bit cannot be committed — a step that depended on
+      # the bit would fail on a permission problem that has nothing to do with path references. The
+      # same note, for the same reason, is in the sibling repositories' workflows.
+      - name: Cited paths must exist
+        run: node scripts/check-path-refs.mjs

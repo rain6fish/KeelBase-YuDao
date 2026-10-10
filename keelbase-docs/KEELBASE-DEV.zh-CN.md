@@ -160,7 +160,9 @@ node scripts/check-path-refs.mjs
 **它每次提交都跑**（2026-10-10 接进 `pre-commit`）。该 hook 由 `KeelBase-Private/.githooks/` 经
 `KeelBase-Private/scripts/install-hooks.sh` 装出来，并在**任何持有本脚本的检出**里跑这道检查——仓群里其余检出是空操作。
 它读的是**工作树**、不是索引，故在共用检出里，别人**在途**的一处编辑可能挡住你的提交；过去的方式是
-`git commit --no-verify`。**没有 CI 作业跑它**——`.github/workflows/` 是上游的，不跑我们任何一道检查。
+`git commit --no-verify`。**它同时也在 CI 里跑**（`.github/workflows/ci.yml`，2026-10-10 加），每次推送到
+`main` 与每个针对 `main` 的 PR 都跑——故那个 hook 是这道闸的快副本，而这道闸不依赖任何人记得跑它。
+上游自带的那两个 workflow 照原样留着、仍是**休眠**的：它们触发于 `master`，而本仓分支是 `main`。
 
 ## 上游，以及怎么对着它比
 
