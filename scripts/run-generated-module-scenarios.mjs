@@ -6,15 +6,17 @@
 //   bash scripts/run-server.sh &            # a running stack, PostgreSQL + redis
 //   node scripts/run-generated-module-scenarios.mjs
 //
-// Every assertion is against a **delta taken first**, so the gate still holds on a database it has
-// already been run against — the same discipline the sibling host's scenarios use.
+// Every assertion is scoped by a **name unique to this run**, so the gate holds both on a database it
+// has already been run against **and alongside another run of itself** — the same discipline the
+// sibling host's scenarios use, with the one whole-table count that discipline's measurement removed.
 //
 // 生成模块的门禁：Spike 观测过一次的东西，此后每次都要断言一遍。
 //
 //   bash scripts/run-server.sh &            # 一套跑着的栈：PostgreSQL + redis
 //   node scripts/run-generated-module-scenarios.mjs
 //
-// 每条断言都对着**先取好的增量**，故这道门禁在一个它已经跑过的库上**照样成立**——与兄弟宿主那些场景同一条纪律。
+// 每条断言都用**本次唯一的名字**收束，故这道门禁**在一个已经跑过的库上**、**以及跟它自己的另一次运行并排**时都
+// **照样成立**——与兄弟宿主那些场景同一条纪律；那条纪律的实测把唯一一处整表计数去掉了。
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -145,10 +147,15 @@ psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_
 
 console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
 {
-  const before = Number(psql(`select count(*) from ${MODULE}`));
-  const proposed = await chat(second, `新建产品 gate-write-${Date.now()}`);
+  // Counted by this run's own marker rather than by a whole-table delta — see the same note in
+  // `run-crm-customer-scenarios.mjs`: a delta reads correctly only while nothing else writes.
+  // 按**本轮自己的标记**计数，不用整表增量——理由同 `run-crm-customer-scenarios.mjs` 里那条注记：
+  // 增量只在**没有别人写**的时候读起来对。
+  const writeMarker = `gate-write-${Date.now()}`;
+  const own = () => Number(psql(`select count(*) from ${MODULE} where name like '%${writeMarker}%'`));
+  const proposed = await chat(second, `新建产品 ${writeMarker}`);
   check('写被扣下', 'pending_confirmation', proposed.status);
-  check('未落库', before, Number(psql(`select count(*) from ${MODULE}`)));
+  check('未落库', 0, own());
   checkNot('扣下时给出 token', 'undefined', proposed.token);
 
   const decided = await fetch(`${HOST}/ai/confirmations/${proposed.token}`, {
@@ -158,7 +165,7 @@ console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
   });
   const outcome = (await decided.json()).data || {};
   check('批准后执行', 'executed', outcome.status);
-  check('落库', before + 1, Number(psql(`select count(*) from ${MODULE}`)));
+  check('落库', 1, own());
 }
 
 console.log('== 场景 4 · 审计链 ==');

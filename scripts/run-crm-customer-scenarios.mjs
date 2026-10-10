@@ -11,8 +11,11 @@
 // business module, reachable by AI under an explicit identity, with out-of-scope access refused,
 // a high-risk write held for a human, and the side effect auditable — all of it through tests.
 //
-// Every assertion is against a **delta taken first** or against a **name unique to this run**, so the
-// gate still holds on a database it has already been run against.
+// Every assertion is scoped by a **name unique to this run** — never by a count of the whole table —
+// so the gate holds both on a database it has already been run against **and alongside another run of
+// itself**. The one place that used to count whole rows was measured the hard way: with two runs side
+// by side it failed `落库 — expected [11], got [12]`, and the failure pointed at this gate rather than
+// at the other writer.
 //
 // YD-2 的门禁：治理一个**上游写的**模块，而不是适配器生成的那个。
 //
@@ -23,7 +26,9 @@
 // **第一道验收门**：一个既有业务模块，能被 AI 以**明确身份**访问、越权被拒、高风险写入被扣下等人、副作用可审计
 // ——且这一切都由测试证明。
 //
-// 每条断言都对着**先取好的增量**或**本次唯一的名字**，故本门禁在一个它已经跑过的库上照样成立。
+// 每条断言都用**本次唯一的名字**收束——**不**按整张表计数——故本门禁**在一个已经跑过的库上**、**以及跟它自己的
+// 另一次运行并排**时都成立。曾经按整表计数的那一处是**实测出来**的：两次并排跑时它报
+// `落库 — expected [11], got [12]`，而那个失败看上去指着本门禁、不指着另一个写手。
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -157,15 +162,23 @@ console.log('== 场景 2 · 身份传递 + 数据范围 ==');
 console.log('== 场景 3 · 高风险写入被扣下，批准后落库 ==');
 const writeMarker = `${marker}-write`;
 {
-  const before = Number(psql(`select count(*) from ${CUSTOMER}`));
+  // Both halves of this scene count **this run's own row**, not the table. A whole-table delta
+  // (`before` … `before + 1`) reads correctly only while nothing else writes, and two gates running at
+  // once is exactly the case where it does not: it then fails with `expected [N], got [N+1]`, and the
+  // failure points at the gate rather than at the other writer. Counting by this run's marker is both
+  // immune to that and strictly stronger — it asserts *this* row landed, not that the table grew by one.
+  // 本场两半都数**本轮自己那一行**、不数整张表。整表增量（`before` … `before + 1`）只在没有别人写的时候读起来对，
+  // 而「两道门禁同时跑」正是它不对的那种情形：它会以 `expected [N], got [N+1]` 失败，而那个失败看上去指着门禁、
+  // 不指着另一个写手。按本轮的标记计数**既免疫这个问题、又更强**——它断言的是**这一行**落了，不是表多了一行。
+  const own = () => Number(psql(`select count(*) from ${CUSTOMER} where name like '%${writeMarker}%'`));
   const proposed = await chat(second, `新建客户 ${writeMarker}`);
   check('写被扣下', 'pending_confirmation', proposed.status);
-  check('未落库', before, Number(psql(`select count(*) from ${CUSTOMER}`)));
+  check('未落库', 0, own());
   checkNot('扣下时给出 token', 'undefined', proposed.token);
 
   const outcome = await confirm(second, proposed.token, 'approve');
   check('批准后执行', 'executed', outcome.status);
-  check('落库', before + 1, Number(psql(`select count(*) from ${CUSTOMER}`)));
+  check('落库', 1, own());
   // The owner is stamped by the governance advice, not named by the tool — the write VO carries the
   // column and a client could have pointed it at someone else.
   // 属主由治理通知盖章、不由工具点名——保存 VO 带着那一列，客户端本可以把它指到别人身上。
