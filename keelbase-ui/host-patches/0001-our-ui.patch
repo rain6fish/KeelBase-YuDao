@@ -718,6 +718,87 @@ index d5e05ec..a440844 100644
  
  import LoginFormTitle from './LoginFormTitle.vue'
  import { LoginStateEnum, useLoginState } from './useLogin'
+diff --git a/src/views/Profile/components/UserAvatar.vue b/src/views/Profile/components/UserAvatar.vue
+index 23ecc3a..9c8ca00 100644
+--- a/src/views/Profile/components/UserAvatar.vue
++++ b/src/views/Profile/components/UserAvatar.vue
+@@ -8,6 +8,25 @@
+       width="120px"
+       @change="handelUpload"
+     />
++    <!--
++      The preset row: an avatar that needs no upload, and what gets stored is this path itself. A
++      relative path resolves against whatever origin serves the console, so the same choice works on
++      every deployment and survives a redeploy — which a stored absolute URL would not.
++
++      预设行：不靠上传的头像，而存下来的就是这条路径本身。相对路径对**服务控制台的那个源**解析，所以同一个
++      选择在每个部署上都成立、也挺得过重新部署——而存下来的绝对 URL 挺不过。
++    -->
++    <div class="keelbase-avatar-presets">
++      <img
++        v-for="preset in presets"
++        :key="preset"
++        :src="preset"
++        :alt="preset"
++        :title="preset"
++        :class="{ 'is-current': img === preset }"
++        @click="choosePreset(preset)"
++      />
++    </div>
+   </div>
+ </template>
+ <script lang="ts" setup>
+@@ -27,6 +46,20 @@ defineProps({
+ const userStore = useUserStore()
+ 
+ const cropperRef = ref()
++
++// One click, no upload: these ship with the console's own assets rather than the file store.
++// 一次点击、不经上传：它们随控制台自己的资产一起发，不走文件存储。
++const presets = [
++  '/keelbase-avatar-blue.svg',
++  '/keelbase-avatar-teal.svg',
++  '/keelbase-avatar-graphite.svg',
++  '/keelbase-avatar-warm.svg'
++]
++const choosePreset = async (preset: string) => {
++  await updateUserProfile({ avatar: preset })
++  await userStore.setUserAvatarAction(preset)
++}
++
+ const handelUpload = async ({ data }) => {
+   const { httpRequest } = useUpload()
+   const avatar = (
+@@ -50,5 +83,29 @@ const handelUpload = async ({ data }) => {
+     margin-bottom: 15px;
+     border-radius: 50%;
+   }
++
++  .keelbase-avatar-presets {
++    display: flex;
++    gap: 8px;
++    margin-top: 10px;
++
++    img {
++      width: 34px;
++      height: 34px;
++      margin-bottom: 0;
++      cursor: pointer;
++      border: 2px solid transparent;
++      border-radius: 50%;
++      transition: border-color 0.2s ease;
++
++      &:hover {
++        border-color: var(--el-border-color-darker);
++      }
++
++      &.is-current {
++        border-color: var(--el-color-primary);
++      }
++    }
++  }
+ }
+ </style>
 diff --git a/src/views/ai/chat/index/components/message/MessageListEmpty.vue b/src/views/ai/chat/index/components/message/MessageListEmpty.vue
 index 11f7f68..41996ef 100644
 --- a/src/views/ai/chat/index/components/message/MessageListEmpty.vue
