@@ -740,7 +740,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * %s's governance at the module's own seam: the pointcut <em>is</em> the list of what is governed
- * (KEELBASE-AI-GUIDE.md §3.2), and it names the module's own service, not a reflective lookup.
+ * (keelbase-docs/KEELBASE-MODULE-ONBOARDING.md §2.1), and it names the module's own service, not a
+ * reflective lookup.
  *
  * <p>This is the half the first cut did not port. Without it the narrowing lived inside the AI tool,
  * which governs the tool's own call and nothing else — the module's own REST path stayed ungoverned.
@@ -753,8 +754,8 @@ import org.springframework.stereotype.Component;
  * the call, and the total is narrowed too — no post-filtering, and no page whose total disagrees with
  * its rows.
  *
- * %s 在**模块自己的接缝**上的治理：pointcut **就是**那份被治理的清单（`KEELBASE-AI-GUIDE.md` §3.2），
- * 且点的是模块自己的 service、不是反射查找。
+ * %s 在**模块自己的接缝**上的治理：pointcut **就是**那份被治理的清单
+ * （`keelbase-docs/KEELBASE-MODULE-ONBOARDING.zh-CN.md` §2.1），且点的是模块自己的 service、不是反射查找。
  *
  * <p>这是第一版**没有移植**的那一半。没有它时，收束住在 AI 工具里——它只管得住工具自己那一次调用，模块自己的
  * REST 路径**不受治理**。有了它，两条路径被**同四条通知**管住：因为治理发生在**模块被调用的地方**，而不是
