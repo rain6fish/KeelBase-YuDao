@@ -52,6 +52,13 @@
   --top-header-hover-color: var(--el-color-primary-light-9) !important;
   --top-tool-border-color: transparent !important;
 
+  // The sidebar's width. The stock 200px is what a two-level tree fits into; with three levels the
+  // third one runs out of room for a label, an icon and the arrow. The product's own shell runs at
+  // 240px, which is where a third level fits without squeezing.
+  // 侧边栏宽度。上游的 200px 是**两层**树放得下的宽度；到第三层，标签、图标与箭头就挤不下了。
+  // 产品自己的壳跑 240px，第三层在这里放得下、且不必压扁。
+  --left-menu-max-width: 240px !important;
+
   // The band the menu draws for hover and for the open item, inside the two floor values below.
   // Kept as variables so the two states cannot drift apart.
   // 菜单为悬停与已选项画的那条色带的上下内缩；存成变量，免得两个状态各写一份而漂开。
@@ -82,6 +89,74 @@ html body .layout-border__top::before {
 // 侧边栏通向平台厂商的那几个出口**不在这里隐藏**。它们既没有 anchor 也没有 href——yudao 把任何站外菜单
 // 渲染成一个带点击处理的普通 `<li>`——故没有选择器挑得出它们，而一条照着它们的目标网址写的规则会**什么都
 // 匹配不到**、看上去却是对的。它们改在**菜单树被构建的地方**去掉；见 `keelbase-ui/host-patches/`。
+
+// ── depth: icons above the first level, markers below it ────────────────────────────────────────────
+// A level-1 entry identifies itself with its icon; that is the one place the icon earns its 24px. Two
+// levels down the same icon repeats a picture the label already gives, and it is charged at every
+// level — which is what pushed the third level out of the sidebar. Below the first level the icon
+// gives way to a marker, and the marker's shape is what says how deep the entry is.
+// 一级项靠图标认自己，那是图标配得上那 24px 的唯一位置。往下两层，同一个图标重复的是标签已经说过的
+// 东西，而它**每一层都要收一遍**——正是这一点把第三层挤出了侧边栏。一级之下，图标让位给一个标记，
+// 而标记的**形状**说明该项有多深。
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-icon:not(.el-sub-menu__icon-arrow) {
+  display: none;
+}
+
+// The marker is positioned against its row, so the row has to be what it is positioned against.
+// 标记是相对它那一行定位的，故那一行必须是它的定位参照。
+html body .v-menu .el-menu .el-sub-menu .el-menu .el-menu-item {
+  position: relative;
+}
+
+// Level 2: a dot, and a third of the indentation the host was using.
+// 二级：一个点，以及上游那份缩进的三分之一。
+html body .v-menu .el-menu .el-sub-menu > .el-menu {
+  padding-left: 0 !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-menu-item {
+  padding-left: 26px !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-menu-item::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.5;
+}
+
+// Level 3: a dash, one step further in. The shape is the depth signal, so it stays legible whatever
+// colour the row is wearing — `currentColor` follows the label into the open state.
+// 三级：一道短横，再进一格。形状就是深度的信号，故无论这一行穿什么颜色它都读得出来——`currentColor`
+// 会随标签一起进入已打开态。
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu {
+  padding-left: 0 !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item {
+  padding-left: 44px !important;
+}
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-menu > .el-menu-item::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 8px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background-color: currentColor;
+  opacity: 0.5;
+}
+
+// A level-2 group title lines up with the level-2 items it opens, so the column reads straight.
+// 二级分组标题与它所展开的二级项对齐，整列才读得直。
+html body .v-menu .el-menu .el-sub-menu > .el-menu > .el-sub-menu > .el-sub-menu__title {
+  padding-left: 26px !important;
+}
 
 // ── the arrow that says "this one has children" ─────────────────────────────────────────────────────
 // Element Plus pins it to the end of the row: `position: absolute; right: …`, with the same amount
