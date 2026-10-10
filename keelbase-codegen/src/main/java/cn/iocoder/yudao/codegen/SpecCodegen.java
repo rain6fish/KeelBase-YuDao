@@ -117,7 +117,15 @@ public final class SpecCodegen {
             // ai1: enabled and compiled with no schema of its own, so its endpoints answered 500 until
             // this file existed. Upstream publishes no DDL for it either.
             // ai1：被启用、被编译，却没有自己的 schema，故在本文件存在之前它的端点一律答 500。上游同样不发布它的 DDL。
-            "sql/keelbase-ai1.sql");
+            "sql/keelbase-ai1.sql",
+            // The deployment's own names, replacing the platform vendor's — a file of ours rather than
+            // edits scattered through upstream's several-thousand-line, multi-dialect seed.
+            // 本部署自己的名字，替换掉平台厂商的——写成我们自己的一个文件，而不是在上游那份几千行、多方言的种子里散改。
+            "sql/keelbase-brand-names.sql",
+            // The host writes NULL for "nobody is logged in"; MySQL coerced it, PostgreSQL refuses.
+            // Relaxing the column is what keeps that row rather than dropping it.
+            // 宿主对「没有登录用户」写 NULL；MySQL 会强转，PostgreSQL 拒绝。放宽该列，那一行才留得住而不是丢掉。
+            "sql/keelbase-operate-log-nullable.sql");
 
     private SpecCodegen() {
     }
