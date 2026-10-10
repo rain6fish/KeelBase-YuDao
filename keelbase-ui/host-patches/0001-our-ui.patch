@@ -65,6 +65,57 @@ index c22c950..029a7e9 100644
        />
        <div
          v-if="show"
+diff --git a/src/layout/components/ToolHeader.vue b/src/layout/components/ToolHeader.vue
+index 23f8a3a..4bff14a 100644
+--- a/src/layout/components/ToolHeader.vue
++++ b/src/layout/components/ToolHeader.vue
+@@ -48,19 +48,20 @@ const locale = computed(() => appStore.getLocale)
+ // 消息图标
+ const message = computed(() => appStore.getMessage)
+ 
+-// IM即时通讯图标
+-const im = computed(() => appStore.getIm)
+-
+ // 租户切换权限
+ const hasTenantVisitPermission = computed(
+   () => import.meta.env.VITE_APP_TENANT_ENABLE === 'true' && checkPermi(['system:tenant:visit'])
+ )
+ 
+-// 顶部聊天入口：用路由 name resolve 出完整 URL，在新标签页打开 IM 主页
+-// 场景考虑：IM 是全屏沉浸式壳，如果在当前页 push 会把原来在用的后台管理界面挤掉；开新 Tab 更符合用户预期
+-const goToChat = () => {
+-  // 用路由 name resolve 出完整 URL，在新标签页打开 IM 主页
+-  const { href } = router.resolve({ name: 'ImHome' })
++// The product's own assistant, reachable from every page. It opens in a new tab for the same reason
++// the entry it replaces did: the assistant is a full-screen surface, and pushing it onto the current
++// history would displace whatever console page is in use. Resolved by path rather than by name —
++// this route comes from a menu record, so its name is generated rather than written down.
++// 产品自己的助手，每一页都够得着。它在新标签页里打开，理由与被它替换掉的那个入口相同：助手是**整屏**的一个
++// 面，push 进当前历史会把正在用的控制台页面挤掉。按**路径**解析而不是名字——这条路由来自菜单记录，它的名字
++// 是生成的、不是写下来的。
++const goToAssistant = () => {
++  const { href } = router.resolve({ path: '/ai/chat' })
+   window.open(href, '_blank')
+ }
+ 
+@@ -121,12 +122,11 @@ export default defineComponent({
+           {message.value ? (
+             <Message class="custom-hover" color="var(--top-header-text-color)"></Message>
+           ) : undefined}
+-          {/* IM 聊天入口 */}
+-          {im.value ? (
+-            <div class="custom-hover" onClick={goToChat}>
+-              <Icon color="var(--top-header-text-color)" size={18} icon="ep:chat-dot-round" />
+-            </div>
+-          ) : undefined}
++          {/* 全局 AI 助手入口。不挂在 `im` 那个开关上：它守的是即时通讯，而这里已经不是那个入口了。
++              图标用 AI 那一组自己的。 */}
++          <div class="custom-hover" onClick={goToAssistant}>
++            <Icon color="var(--top-header-text-color)" size={18} icon="tabler:ai" />
++          </div>
+           <UserInfo></UserInfo>
+         </div>
+       </div>
 diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 9d14564..2540eb8 100644
 --- a/src/locales/en.ts
@@ -100,21 +151,32 @@ index 13065de..cca60e7 100644
      shortcutOperation: '快捷入口',
      operation: '操作',
 diff --git a/src/store/modules/permission.ts b/src/store/modules/permission.ts
-index e9ca174..8d802c0 100644
+index e9ca174..48597d1 100644
 --- a/src/store/modules/permission.ts
 +++ b/src/store/modules/permission.ts
-@@ -59,8 +59,16 @@ export const usePermissionStore = defineStore('permission', {
+@@ -59,8 +59,27 @@ export const usePermissionStore = defineStore('permission', {
              }
            }
          ])
-+        // The platform vendor's own outbound entries are menus, not parts of this system, and the
-+        // product's console does not show them. They are dropped here, where the menu tree is built,
-+        // so the sidebar and everything else that reads the tree lose them together — they carry no
-+        // anchor and no href, so no stylesheet can pick them out.
-+        // 平台厂商自己的对外入口是菜单，不是本系统的组成部分，产品的控制台不显示它们。在这里——菜单树被
-+        // 构建的地方——去掉，于是侧边栏与任何其他读这棵树的地方一起少掉它们；它们既没有 anchor 也没有
-+        // href，任何样式表都挑不出它们。
-+        const menuRouters = routerMap.filter((route) => !route.path.startsWith('/external-link'))
++        // Two kinds of entry leave the menu here, and they leave for different reasons.
++        //
++        // The platform vendor's outbound links are menus but not parts of this system, and they carry
++        // no anchor and no href, so no stylesheet can pick them out.
++        //
++        // `/im` is different: it is a whole module this product does not ship. The server no longer
++        // loads it — the dependency is commented out in `yudao-server/pom.xml` — so its menu would
++        // lead to a page whose API is not there. A menu that goes nowhere is worse than no menu.
++        //
++        // 两类入口在这里离开菜单，理由不同。
++        //
++        // 平台厂商的对外链接是菜单、但不是本系统的组成部分，且它们既没有 anchor 也没有 href，任何样式表都
++        // 挑不出它们。
++        //
++        // `/im` 不一样：那是一整个**本产品不发布**的模块。服务端已不再加载它——`yudao-server/pom.xml` 里
++        // 那条依赖是注释状态——故它的菜单会通向一个 API 不在的页面。通往空处的菜单比没有菜单更糟。
++        const menuRouters = routerMap.filter(
++          (route) => !route.path.startsWith('/external-link') && route.path !== '/im'
++        )
          // 渲染菜单的所有路由
 -        this.routers = cloneDeep(remainingRouter).concat(routerMap)
 +        this.routers = cloneDeep(remainingRouter).concat(menuRouters)
