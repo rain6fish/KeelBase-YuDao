@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.pipeline.ModuleRoute;
+
 import cn.com.keelbase.runtime.pipeline.ToolCallPlanner;
 import java.util.List;
 import org.springframework.context.annotation.Bean;

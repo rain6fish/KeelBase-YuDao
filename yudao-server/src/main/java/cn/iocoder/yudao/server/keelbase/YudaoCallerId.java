@@ -1,44 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.identity.ActingCallerId;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import org.springframework.stereotype.Component;
 
 /**
- * Who is acting, read from wherever this host keeps it — the same two places the RuoYi adapter read,
- * in the same order.
+ * This host's binding of the runtime's caller-id rule: <b>where to ask</b> for the request-side
+ * identity. The order, the fallback and the parsing live in {@link ActingCallerId}; what stays here is
+ * the one line only this host can write — {@code SecurityFrameworkUtils}. A second host writes its own
+ * and the shape is shared. As of {@code D34} it is shared, rather than copied.
  *
- * <p>On a request that came through Yudao's own chain the login user is in the security context. On a
- * KeelBase path it is not: the runtime's chain is scoped to its own controllers, Yudao's filter never
- * ran, and the runtime carries the caller on {@link ActingCaller} instead. Reading the first and
- * falling back to the second is what makes one governance aspect cover both paths.
- *
- * 谁在行动，从**这个宿主放它的地方**读——与 RuoYi 适配器读的同样是那两处、同样那个顺序。
- *
- * <p>经芋道自己那条链进来的请求，登录用户在安全上下文里。在 KeelBase 路径上则不在：运行时的链只认自己的
- * 控制器、芋道的过滤器**从未运行**，而运行时把调用方放在 {@link ActingCaller} 上。先读前者、再回落后者，
- * 才使**一个**治理切面同时盖住两条路。
+ * 本宿主对运行时那条「调用方 id」规则的**绑定**：请求侧身份**去问哪里**。次序、回落与解析都在
+ * {@link ActingCallerId} 里；留在这里的，只有**这宿主才写得出的那一行**——{@code SecurityFrameworkUtils}。
+ * 第二个宿主写它自己那份，而**形状是共用的**——{@code D34} 之后是**真共用**，不再是一人一份的抄本。
  */
 @Component
 public class YudaoCallerId {
 
     public Long current() {
-        try {
-            Long fromRequest = SecurityFrameworkUtils.getLoginUserId();
-            if (fromRequest != null) {
-                return fromRequest;
-            }
-        } catch (RuntimeException noSecurityContext) {
-            // No authentication in context: fall through to the acting caller. / 上下文里没有认证：落到调用方。
-        }
-        String acting = ActingCaller.current();
-        if (acting == null) {
-            return null;
-        }
-        try {
-            return Long.valueOf(acting);
-        } catch (NumberFormatException notAnId) {
-            return null;
-        }
+        return ActingCallerId.current(SecurityFrameworkUtils::getLoginUserId);
     }
 }

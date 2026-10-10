@@ -15,8 +15,8 @@ import cn.iocoder.yudao.module.products.controller.admin.products.vo.ProductsPag
 import cn.iocoder.yudao.module.products.controller.admin.products.vo.ProductsSaveReqVO;
 import cn.iocoder.yudao.module.products.dal.dataobject.products.ProductsDO;
 import cn.iocoder.yudao.module.products.service.products.ProductsService;
-import cn.iocoder.yudao.server.keelbase.ActingCaller;
-import cn.iocoder.yudao.server.keelbase.ModuleRoute;
+import cn.com.keelbase.runtime.identity.ActingCaller;
+import cn.com.keelbase.runtime.pipeline.ModuleRoute;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.identity.ActingCaller;
+
 import cn.com.keelbase.runtime.authz.OwnershipGuard;
 import cn.com.keelbase.runtime.authz.PermissionAuthorizer;
 import cn.com.keelbase.runtime.identity.Principal;

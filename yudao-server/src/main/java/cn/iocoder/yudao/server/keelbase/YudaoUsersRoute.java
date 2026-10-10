@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.pipeline.ModuleRoute;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

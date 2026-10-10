@@ -1,58 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
-import cn.com.keelbase.runtime.pipeline.IntentPlan;
-import cn.com.keelbase.runtime.pipeline.RuleBasedPlanner;
-import cn.com.keelbase.runtime.pipeline.ToolCallPlanner;
-import java.util.LinkedHashMap;
+import cn.com.keelbase.runtime.pipeline.ModuleRoute;
+import cn.com.keelbase.runtime.pipeline.ModuleRoutePlanner;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
- * Routes the host's own tool face, and falls back to the runtime's rule-based planner for everything
- * the host says nothing about.
+ * The host's planner: the routes this deployment declares, asked before the runtime's rule-based one.
  *
- * <p>The fallback is load-bearing, not politeness. Supplying any {@code ToolCallPlanner} makes the
- * runtime's own {@code RuleBasedPlannerAutoConfiguration} back off — that is what lets a host bring
- * its own tools — so a planner that did not fall back would silently take the sample CRM away. The
- * RuoYi host did the same thing for the same reason.
+ * <p>As of {@code D34} the walk belongs to the platform — {@link ModuleRoutePlanner} asks this host's
+ * routes first, puts the turn's message into the context a route reads, and hands the runtime's
+ * {@code RuleBasedPlanner} the <b>original</b> context. Nothing is overridden here beyond which routes
+ * this host owns: the behaviour is what this class used to carry, moved up so that a second host does
+ * not have to carry it too.
  *
- * 路由宿主自己的工具面；宿主没说的，一律回落到运行时的规则规划器。
+ * 宿主的 planner：本部署声明的路由，**先问它们**、再落到运行时的规则版。
  *
- * <p>**这条回落是承重的，不是客气**。提供任何一个 {@code ToolCallPlanner} 都会让运行时自己的
- * {@code RuleBasedPlannerAutoConfiguration} **让位**——这正是宿主能自带工具的机制——所以**不回落的规划器
- * 会悄悄把样例 CRM 拿走**。RuoYi 宿主出于同一理由做了同一件事。
+ * <p>{@code D34} 之后，走法属于**平台**——{@link ModuleRoutePlanner} 先问本宿主的路由、把本轮消息放进路由
+ * 读的上下文里，最后把**原**上下文交给运行时的 {@code RuleBasedPlanner}。这里除了「本宿主拥有哪些路由」之外
+ * **什么都不 override**：行为就是本类原来那一份，上提了，好让第二个宿主不必再带一遍。
  */
-public class YudaoToolPlanner implements ToolCallPlanner {
+public class YudaoToolPlanner extends ModuleRoutePlanner {
 
     private final List<ModuleRoute> routes;
-    private final ToolCallPlanner fallback = new RuleBasedPlanner();
 
     public YudaoToolPlanner(List<ModuleRoute> routes) {
         this.routes = routes == null ? List.of() : routes;
     }
 
     @Override
-    public Optional<IntentPlan> plan(String message, Map<String, Object> context) {
-        String text = message == null ? "" : message;
-        // The turn's message is handed to the route as well: the runtime's context carries only what the
-        // request declared, and a route that fills a write's arguments from what the user typed has
-        // nothing else to read. Declared rather than hidden — a route that ignores it is unaffected.
-        // 本轮的消息也交给路由：运行时的上下文只带**请求声明过的**东西，而「从用户所写里填一次写的参数」的路由
-        // 没有别的可读。这是**声明出来**的、不是藏起来的——用不到它的路由不受影响。
-        Map<String, Object> withMessage = new LinkedHashMap<>();
-        if (context != null) {
-            withMessage.putAll(context);
-        }
-        withMessage.put("message", text);
-        for (ModuleRoute route : routes) {
-            for (String trigger : route.triggers()) {
-                if (!text.isEmpty() && text.contains(trigger)) {
-                    return Optional.of(new IntentPlan(route.toolName(), new LinkedHashMap<>(route.args(withMessage))));
-                }
-            }
-        }
-        return fallback.plan(message, context);
+    protected List<ModuleRoute> routes() {
+        return routes;
     }
 }
