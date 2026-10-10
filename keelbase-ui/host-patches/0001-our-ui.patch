@@ -748,7 +748,7 @@ index 23ecc3a..9c8ca00 100644
    </div>
  </template>
  <script lang="ts" setup>
-@@ -27,6 +46,20 @@ defineProps({
+@@ -27,6 +46,26 @@ defineProps({
  const userStore = useUserStore()
  
  const cropperRef = ref()
@@ -761,11 +761,10 @@ index 23ecc3a..9c8ca00 100644
 +  '/keelbase-avatar-graphite.svg',
 +  '/keelbase-avatar-warm.svg'
 +]
-+// The API validates the avatar as a URL, and these paths are site-relative — so the *path* stays
-+// relative (it has to be, to survive being served from another origin) and only what is sent is made
-+// absolute. Sending the path as-is is answered with 「头像地址格式不正确」.
-+// 接口把头像按 URL 校验，而这几条是站点相对路径——所以**路径**保持相对（必须如此，换个源服务它才活得
-+// 下去），只把**发出去的那个**变成绝对。原样发路径会被答「头像地址格式不正确」。
++// The API validates this field as a URL, so what is sent has to be absolute. The paths themselves
++// stay site-relative: made absolute here rather than in the list, they survive being served from
++// whatever origin this console ends up on. 接口把该字段按 URL 校验，故**发出去的**必须是绝对地址；
++// 路径本身保持站点相对——在这里变绝对而不是写死在清单里，控制台换到哪个源服务都还活得下去。
 +const absolute = (p: string) => new URL(p, window.location.origin).href
 +const choosePreset = async (preset: string) => {
 +  const url = absolute(preset)
@@ -776,7 +775,7 @@ index 23ecc3a..9c8ca00 100644
  const handelUpload = async ({ data }) => {
    const { httpRequest } = useUpload()
    const avatar = (
-@@ -50,5 +83,29 @@ const handelUpload = async ({ data }) => {
+@@ -50,5 +89,29 @@ const handelUpload = async ({ data }) => {
      margin-bottom: 15px;
      border-radius: 50%;
    }
