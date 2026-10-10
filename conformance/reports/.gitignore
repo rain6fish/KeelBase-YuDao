@@ -1,0 +1,8 @@
+# Reports are evidence, not source. The directory exists so the record has a home; everything written
+# into it stays untracked. This file is the one exception, because a directory with nothing tracked in
+# it cannot be carried by git at all.
+#
+# 报告是证据、不是源码。目录存在只是给记录一个落点；写进去的东西一律不入版本控制。本文件是唯一的例外——
+# 一个没有任何被跟踪文件的目录，git 根本带不走。
+*
+!.gitignore
