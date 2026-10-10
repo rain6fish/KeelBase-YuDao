@@ -34,7 +34,11 @@ bash scripts/jdk25.sh mvn -q -DskipTests package -pl yudao-server -am
 > leave the fat jar replaced by a thin one. Stop the instance first, or build in a separate worktree.
 
 **The admin UI** is not in this repository. `scripts/build-host-ui.sh` fetches the upstream tree,
-builds it, and lays the KeelBase visual layer over the built page:
+builds it, and lays the KeelBase visual layer over the built page. It also pins the page's API base
+to **the same origin**: upstream's own `.env.prod` sets `VITE_BASE_URL=http://localhost:48080`, which
+is right for the machine that builds the page and wrong for every machine that serves it — a
+deployed page would ask its *visitor's* machine for the API, and every call would fail as a network
+error while the page itself looked fine.
 
 ```bash
 bash scripts/build-host-ui.sh

@@ -198,6 +198,19 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # 这正是它要与 `sql/keelbase-brand-names.sql` **一起**改、而不能单独改的原因。
   export VITE_APP_DEFAULT_LOGIN_TENANT="${KEELBASE_YUDAO_UI_TENANT:-KeelBase}"
 
+  # Where the built page sends its API calls. Upstream's own `.env.prod` pins this to
+  # `http://localhost:48080`, which is right for the machine that builds it and wrong for every
+  # machine that serves it: the page would ask the *visitor's* own machine for the API, and every
+  # call fails as a network error while the page itself loads fine. Empty means "same origin", so the
+  # page asks whichever host served it — and the outer nginx decides where /admin-api goes. Override
+  # with KEELBASE_YUDAO_UI_BASE_URL when the API lives on a different origin than the page.
+  # 构建产物把接口打到哪里。上游自己的 `.env.prod` 把它钉在 `http://localhost:48080`（Vite 用
+  # `VITE_BASE_URL + VITE_API_URL` 拼出 base）。那对**构建它的机器**是对的，对**任何服务它的机器**
+  # 都是错的：页面会去问**访问者自己的机器**要接口，于是页面本身加载正常、每次调用却以网络错误收场。
+  # 留空＝同源，页面就问服务它的那个主机，而 `/admin-api` 去哪由外层 nginx 决定。页面与接口不同源时，
+  # 用 KEELBASE_YUDAO_UI_BASE_URL 覆盖。
+  export VITE_BASE_URL="${KEELBASE_YUDAO_UI_BASE_URL:-}"
+
   echo "installing the app's dependencies (this is upstream's own toolchain)…"
   ( cd "$UI_DIR" && "${PM[@]}" --registry="$REGISTRY" install )
   ( cd "$UI_DIR" && "${PM[@]}" run "$BUILD_SCRIPT" )
@@ -208,6 +221,23 @@ INDEX="$DIST/index.html"
 if [[ ! -f "$INDEX" ]]; then
   echo "no built page at $INDEX — run without --skip-build, or set KEELBASE_YUDAO_UI_OUT" >&2
   exit 2
+fi
+
+# --- 2b. the page must not carry an absolute API base pointing at a build machine -----------------
+# Upstream's `.env.prod` ships `VITE_BASE_URL=http://localhost:48080`. If that survives into the
+# artifact, the page loads fine while every call goes to the *visitor's own* machine and fails as a
+# network error — silent, because the page still renders. It is therefore asserted here rather than
+# discovered on a deployed host. `VITE_BASE_URL` is emptied above for this reason; this is the check
+# that it stayed empty.
+# 产物里不得带指向构建机的绝对接口地址。上游 `.env.prod` 写着 `VITE_BASE_URL=http://localhost:48080`；
+# 它若活到产物里，页面加载正常、而每次调用都打到**访问者自己的机器**上、以网络错误收场——而且是**静默**的，
+# 因为页面照常渲染。所以在这里断言，而不是等部署到机器上才发现。上面正是为此把 `VITE_BASE_URL` 清空；
+# 这一段是「它确实还是空的」的检查。
+if grep -rqsE "localhost:48080|127\.0\.0\.1:48080" "$DIST"; then
+  echo "the built page still points its API at a build machine:" >&2
+  grep -rlE "localhost:48080|127\.0\.0\.1:48080" "$DIST" | sed 's/^/  /' >&2
+  echo "  leave VITE_BASE_URL empty (or set KEELBASE_YUDAO_UI_BASE_URL) and rebuild" >&2
+  exit 1
 fi
 
 # --- 3. find a sass to compile the tokens with -----------------------------------------------------
@@ -231,11 +261,18 @@ fi
 # needs `!important`. The transform is deliberately narrow — it rewrites declarations of
 # `--el-color-primary` / `-light-N` / `-dark-N` and nothing else. The tokens never reference the
 # family inside `var()`, so a line-level rewrite cannot catch a value by accident.
+#
+# The `sourceMappingURL` line is dropped on the way through. Sass names the map after a temporary
+# file, so leaving it in would (a) point at something that is not in the artefact and (b) change the
+# stylesheet's bytes on every build, which changes the hash in the page and defeats caching.
+# 顺带丢掉 `sourceMappingURL` 那一行。sass 用临时文件给这份 map 命名，留着它既会（a）指向一个**不在
+# 产物里**的文件，又会（b）让样式表的字节每次构建都变——页面里的哈希随之变、缓存也就失效了。
 raw="$(mktemp)"
 tmp=""
 trap 'rm -f "$raw" ${tmp:+"$tmp"}' EXIT
 "$SASS" "$THEME_SCSS" "$raw"
 awk '
+  /^\/\*# sourceMappingURL=/ { next }
   /^[ \t]*--el-color-primary(-light-[0-9]+|-dark-[0-9]+)?[ \t]*:[^;]*;[ \t]*$/ { sub(/;[ \t]*$/, " !important;") }
   { print }
 ' "$raw" > "$DIST/$THEME_CSS_NAME"

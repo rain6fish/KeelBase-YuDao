@@ -30,7 +30,9 @@ bash scripts/jdk25.sh mvn -q -DskipTests package -pl yudao-server -am
 > 重建前先停掉那个实例，或在一个独立 worktree 里构建。
 
 **后台界面**不在本仓。`scripts/build-host-ui.sh` 会去取上游那棵树、构建它，再把 KeelBase 视觉层铺到
-构建产物上：
+构建产物上。它还会把页面的接口地址钉成**同源**：上游自己的 `.env.prod` 里写着
+`VITE_BASE_URL=http://localhost:48080`——那对**构建它的机器**是对的、对**任何服务它的机器**都是错的：
+部署出去的页面会去问**访问者自己的机器**要接口，于是页面看着正常、每次调用却以网络错误收场。
 
 ```bash
 bash scripts/build-host-ui.sh
