@@ -21,13 +21,43 @@
 -- 幂等：每条语句都按「那个外部主机」匹配，重跑不改动任何东西。与其它 `keelbase-*.sql` 一样，它是**我们
 -- 自己的一个文件**，而不是去改上游种子。
 
+-- The avatar's replacement has to carry the origin it will be served from, so it is passed in — the
+-- same way `keelbase-file-storage.sql` takes it. Required rather than defaulted: a wrong origin here
+-- is a URL that 404s, which is the very thing this file exists to remove.
+-- 头像的替代值必须带上它将来被服务的那个源，故由外部传入——与 `keelbase-file-storage.sql` 收下它的方式
+-- 相同。**必填而非给默认值**：这里填错源，就是一个 404 的 URL，而 404 正是本文件要消掉的东西。
+\if :{?origin}
+\else
+  \echo 'origin is required: psql -v origin=https://<this deployment> -f sql/keelbase-local-images.sql'
+  \quit 1
+\endif
+
 -- The admin's avatar — the one that actually renders, since every page's top bar shows it. A failed
 -- fetch here is a visibly broken avatar rather than a missing image tucked inside a dialog.
+--
+-- It is written as an **absolute** URL on purpose: the profile endpoint validates the field with
+-- Hibernate's `@URL`, so a site-relative path is answered with 「头像地址格式不正确」 and the whole
+-- profile save fails. The path alone renders fine — it just cannot be saved back.
+--
 -- 管理员的头像——真正会渲染的那一张：每一页的顶栏都显示它。这里取不到，就是一个肉眼可见的坏头像，
 -- 而不是某个弹窗里悄悄缺掉的一张图。
+--
+-- 它**有意写成绝对 URL**：资料接口用 Hibernate 的 `@URL` 校验该字段，站点相对路径会被答
+-- 「头像地址格式不正确」，整次资料保存随之失败。只用路径**显示**是好的——问题是它**存不回去**。
 update system_users
-   set avatar = '/keelbase-avatar.svg'
+   set avatar = :'origin' || '/keelbase-avatar.svg'
  where avatar like '%test.yudao.iocoder.cn%';
+
+-- And a relative avatar is made absolute by prefixing the origin rather than being replaced — so
+-- whichever preset the row carries survives. Any site-relative value here is one the profile
+-- endpoint cannot save back, which is the same defect seen from the other side.
+-- 而相对路径的头像**补上 origin 前缀**、而不是被替换掉——这样该行带着的是哪个预置头像就留哪个。这里的
+-- 站点相对值都是**资料接口存不回去**的那些，是同一个缺陷的另一面。
+update system_users
+   set avatar = :'origin' || avatar
+ where avatar <> ''
+   and avatar not like 'http%'
+   and avatar like '/%';
 
 -- The maintenance notice's body is HTML whose <img> tags point at the same host. The tags go, the
 -- words stay: the notice is upstream's own demo content, and its text is not the problem.

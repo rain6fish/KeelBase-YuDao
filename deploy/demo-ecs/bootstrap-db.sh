@@ -106,6 +106,10 @@ for f in "${ADDITIONS[@]}"; do
     echo "  ⚠ $f 导入失败" >&2; exit 1; }
 done
 
+echo "== 4b) 把指向厂商文件服务器的行改掉（头像写成绝对 URL，故要传 origin）=="
+docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -q \
+  -v origin="$ORIGIN" < "$REPO_ROOT/sql/keelbase-local-images.sql" || exit 1
+
 echo "== 5) 收掉本部署不跑的模块的菜单 =="
 if [ -f "$SCOPE" ]; then
   docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -q < "$SCOPE" || exit 1
