@@ -209,10 +209,20 @@ index e9ca174..48597d1 100644
        })
      },
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
-index 5326389..6812a90 100644
+index 5326389..e980812 100644
 --- a/src/views/Home/Index.vue
 +++ b/src/views/Home/Index.vue
-@@ -25,27 +25,27 @@
+@@ -12,9 +12,6 @@
+                 <div class="text-20px">
+                   {{ t('workplace.welcome') }} {{ username }} {{ t('workplace.happyDay') }}
+                 </div>
+-                <div class="mt-10px text-14px text-gray-500">
+-                  {{ t('workplace.toady') }}，20℃ - 32℃！
+-                </div>
+               </div>
+             </div>
+           </el-col>
+@@ -25,27 +22,27 @@
                  <CountTo
                    class="text-20px"
                    :start-val="0"
@@ -245,7 +255,7 @@ index 5326389..6812a90 100644
                    :duration="2600"
                  />
                </div>
-@@ -57,19 +57,11 @@
+@@ -57,19 +54,11 @@
    </div>
  
    <el-row class="mt-8px" :gutter="8" justify="space-between">
@@ -266,7 +276,7 @@ index 5326389..6812a90 100644
            </div>
          </template>
          <el-skeleton :loading="loading" animated>
-@@ -103,17 +95,9 @@
+@@ -103,17 +92,9 @@
                  </div>
                  <div
                    class="mt-12px break-all line-clamp-2 text-12px text-gray-400"
@@ -286,7 +296,7 @@ index 5326389..6812a90 100644
                  </div>
                </el-card>
              </el-col>
-@@ -142,65 +126,17 @@
+@@ -142,65 +123,17 @@
          </el-skeleton>
        </el-card>
      </el-col>
@@ -356,7 +366,7 @@ index 5326389..6812a90 100644
  import { pieOptions, barOptions } from './echarts-data'
  import { useRouter } from 'vue-router'
  
-@@ -209,6 +145,7 @@ defineOptions({ name: 'Index' })
+@@ -209,6 +142,7 @@ defineOptions({ name: 'Index' })
  const { t } = useI18n()
  const router = useRouter()
  const userStore = useUserStore()
@@ -364,7 +374,7 @@ index 5326389..6812a90 100644
  // const { setWatermark } = useWatermark()
  const loading = ref(true)
  const avatar = userStore.getUser.avatar
-@@ -216,151 +153,48 @@ const username = userStore.getUser.nickname
+@@ -216,151 +150,48 @@ const username = userStore.getUser.nickname
  const pieOptionsData = reactive<EChartsOption>(pieOptions) as EChartsOption
  // 获取统计数
  let totalSate = reactive<WorkplaceTotal>({
@@ -549,7 +559,7 @@ index 5326389..6812a90 100644
  }
  
  // 用户来源
-@@ -415,8 +249,6 @@ const getAllApi = async () => {
+@@ -415,8 +246,6 @@ const getAllApi = async () => {
    await Promise.all([
      getCount(),
      getProject(),
@@ -558,7 +568,7 @@ index 5326389..6812a90 100644
      getUserAccessSource(),
      getWeeklyUserActivity()
    ])
-@@ -424,11 +256,11 @@ const getAllApi = async () => {
+@@ -424,11 +253,11 @@ const getAllApi = async () => {
  }
  
  const handleProjectClick = (message: string) => {
