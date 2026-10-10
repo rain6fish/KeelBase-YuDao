@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The deployed host holds these next to the tracked config; keep them out of the index there too.
+#
+# 部署机上这些与受跟踪的配置并排放着；在这边也把它们挡在索引外。
+.env
+yudao-server.jar
+ui/

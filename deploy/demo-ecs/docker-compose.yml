@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The KeelBase-YuDao instance behind demo2.keelbase.com.cn. Two containers: the Spring Boot server,
+# and an nginx that serves the admin UI and forwards the API to it.
+#
+# It joins an **existing** network (`keelbase_default`) rather than creating one, because the
+# datastore is shared with the host's other stack: the server connects to that stack's PostgreSQL and
+# Redis containers by name. So this file is not standalone — see README.md for what must already be
+# running, and for how the database and the two artifacts are prepared.
+#
+# Secrets are not here. `PG_PASSWORD` and `AUDIT_KEY` are read from a sibling `.env`; see
+# `.env.example` for where each comes from and why the audit key must stay stable.
+#
+# KeelBase-YuDao 在 demo2.keelbase.com.cn 背后的实例。两个容器：Spring Boot 服务，以及一个提供后台
+# 界面、并把接口转发给它的 nginx。
+#
+# 它加入一个**既有**网络（`keelbase_default`）而不是自建，因为数据存储与宿主另一套栈共用：服务按名字连
+# 到那套栈的 PostgreSQL 与 Redis 容器。所以本文件不能单独跑——要先跑着什么、库与两份产物怎么准备，见
+# README.zh-CN.md。
+#
+# 密钥不在这里。`PG_PASSWORD` 与 `AUDIT_KEY` 读自同目录的 `.env`；两者的来处、以及审计密钥为何必须
+# 保持不变，见 `.env.example`。
+
+name: keelbase-yudao
+
+services:
+  server:
+    image: eclipse-temurin:25-jre
+    container_name: yudao-server
+    restart: unless-stopped
+    command:
+      - java
+      - -Xms256m
+      - -Xmx384m
+      - -XX:MaxMetaspaceSize=256m
+      - -Djava.security.egd=file:/dev/./urandom
+      - -jar
+      - /app/yudao-server.jar
+      - --server.port=48080
+      - --spring.flyway.baseline-on-migrate=true
+      - --spring.flyway.baseline-version=0
+      - --spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource
+      - --spring.datasource.dynamic.datasource.master.url=jdbc:postgresql://keelbase-postgres-1:5432/ruoyi-vue-pro
+      - --spring.datasource.dynamic.datasource.master.username=front_app
+      - "--spring.datasource.dynamic.datasource.master.password=${PG_PASSWORD}"
+      - --spring.datasource.dynamic.datasource.slave.lazy=true
+      - --spring.datasource.dynamic.datasource.slave.url=jdbc:postgresql://keelbase-postgres-1:5432/ruoyi-vue-pro
+      - --spring.datasource.dynamic.datasource.slave.username=front_app
+      - "--spring.datasource.dynamic.datasource.slave.password=${PG_PASSWORD}"
+      - --spring.data.redis.host=keelbase-redis-1
+      - --spring.data.redis.port=6379
+      - --spring.data.redis.database=1
+      - "--spring.datasource.dynamic.druid.validation-query=SELECT 1"
+      - "--spring.datasource.druid.validation-query=SELECT 1"
+      - "--keelbase.audit.hmac-key=${AUDIT_KEY}"
+      - --keelbase.wire.exclude-packages=cn.iocoder.yudao
+      - --keelbase.memory.max-per-owner=200
+      - --keelbase.knowledge.chunk-size=800
+      - --keelbase.knowledge.chunk-overlap=120
+      - --yudao.tenant.ignore-tables=products
+      - --yudao.access-log.enable=true
+    volumes:
+      - ./yudao-server.jar:/app/yudao-server.jar:ro
+    networks:
+      - keelbase_net
+
+  admin:
+    image: nginx:alpine
+    container_name: yudao-admin
+    restart: unless-stopped
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+      - ./admin-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - keelbase_net
+
+networks:
+  keelbase_net:
+    external: true
+    name: keelbase_default
