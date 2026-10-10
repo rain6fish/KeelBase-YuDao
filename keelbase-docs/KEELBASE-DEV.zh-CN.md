@@ -157,8 +157,10 @@ node scripts/check-path-refs.mjs
 它与 `--check-boundary` 一样**两个方向都报错**：被引用却缺席的路径，以及它 `ELSEWHERE` 清单里**再没人引用**的条目。
 后者的存在，是为了让一条被声明的例外不会悄悄变成一个洞。
 
-**它还没接到任何东西上**——没有 CI 作业跑它、也没有 hook 跑它。它在这里、且被写进文档，是为了**能**跑；
-那与**被强制**不是一回事。
+**它每次提交都跑**（2026-10-10 接进 `pre-commit`）。该 hook 由 `KeelBase-Private/.githooks/` 经
+`KeelBase-Private/scripts/install-hooks.sh` 装出来，并在**任何持有本脚本的检出**里跑这道检查——仓群里其余检出是空操作。
+它读的是**工作树**、不是索引，故在共用检出里，别人**在途**的一处编辑可能挡住你的提交；过去的方式是
+`git commit --no-verify`。**没有 CI 作业跑它**——`.github/workflows/` 是上游的，不跑我们任何一道检查。
 
 ## 上游，以及怎么对着它比
 

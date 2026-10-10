@@ -185,8 +185,12 @@ Like `--check-boundary` it fails in **both** directions: a cited path that is ab
 its `ELSEWHERE` list that nothing cites any more. The second one exists so that a declared exception
 cannot quietly become a hole.
 
-**It is not wired into anything yet** — no CI job runs it and no hook does either. It is here, and
-documented, so that it can be run; that is not the same as being enforced.
+**It runs on every commit** (wired into `pre-commit` on 2026-10-10). The hook is installed from
+`KeelBase-Private/.githooks/` by `KeelBase-Private/scripts/install-hooks.sh`, and it runs the check
+in any checkout that holds this script — a no-op everywhere else in the group. It reads the **working
+tree**, not the index, so in a shared checkout an edit someone else has in flight can block your
+commit; `git commit --no-verify` is the way past it. **No CI job runs it** — `.github/workflows/` is
+upstream's and runs none of our checks.
 
 ## Upstream, and how to compare against it
 
