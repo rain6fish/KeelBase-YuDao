@@ -69,6 +69,24 @@ never renders at all. Vite lets an environment variable that already exists win 
 which is what keeps this a build flag rather than an edit to an upstream file. Set
 `KEELBASE_YUDAO_UI_DOCALERT=true` to get upstream's behaviour back.
 
+## Seeing the layer locally
+
+The layer lives in the artefact, so checking it means serving the artefact. Serving the files alone is
+not enough: the built page asks for its API at the **same origin** on purpose (the build empties
+`VITE_BASE_URL` so the page asks whichever host served it, and the outer nginx decides where
+`/admin-api` goes). On a deployed host that is exactly the point; locally it means a plain static
+server answers every API call with the SPA fallback — `index.html`, HTTP 200 — which the app reads as
+a successful response whose body carries no data. Sign-in then fails with an error that names neither
+the API nor the proxy, and the fault looks like it is in the client.
+
+`scripts/serve-host-ui.mjs` fills that gap: static files at the root, and the same forwarding the
+deployment's nginx does (`/admin-api`, `/app-api`, `/app`, `/ai`, `/audit`) to a backend you point it
+at. An API path is never answered with the SPA fallback, and an API call that cannot reach the backend
+is reported as a failure (`502`) — so the next symptom is never a silently empty response.
+
+    node scripts/serve-host-ui.mjs                        # page on :18099, backend http://127.0.0.1:48080
+    node scripts/serve-host-ui.mjs --port 18100 --backend http://127.0.0.1:48080
+
 ## Two facts that differ from the RuoYi host
 
 1. **The admin UI is not in this repository.** Upstream keeps `yudao-ui/yudao-ui-admin-vue3` as a
