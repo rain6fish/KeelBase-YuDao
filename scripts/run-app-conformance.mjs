@@ -210,25 +210,53 @@ gate('Tool path (MCP)', 'run-mcp-governance-scenarios.mjs', "the host's own tool
     Number(approved) > 0 ? 'PASS' : 'FAIL', spread || 'none');
 }
 
+// Run a gate for its evidence **without** writing a row of its own — for a column whose verdict is read
+// from somewhere else and only needs to report whether the attempt was made and how it went.
+// 跑一道门禁、**不让它自己写行** —— 给那种「判决取自别处、只需要报『尝试做了没有、做得怎么样』」的栏。
+function runGate(script) {
+  const r = spawnSync(process.execPath, [join('scripts', script)], {
+    cwd: ROOT, encoding: 'utf8',
+    env: { ...process.env, HOST_URL: HOST, PG_CONTAINER: PG, PG_USER, PG_PASSWORD: PG_PASS, PG_DB: DB }
+  });
+  const out = `${r.stdout || ''}${r.stderr || ''}`;
+  const m = out.match(/(\d+) ok \/ (\d+) failed/);
+  const status = r.status === null ? `spawn failed (${r.error?.message || 'no status'})` : r.status;
+  return { status: r.status, summary: m ? `${m[1]} ok / ${m[2]} failed` : `no summary (exit ${status})` };
+}
+
 // 8 · Revoke — a side effect was withdrawn, and the ledger says so. The deciding fact is whether a
-// revocation was ever **attempted**: this line has no revoke scenario yet, and a ledger full of
-// executed effects is what confirmations produce, not evidence that revoke works. So the column says
-// which of the two it is looking at rather than reading an unexercised capability as a failure.
-// 撤销——副作用被撤回过、且台账记着。**决定事实是「有没有尝试过撤销」**：本线还没有撤销场景，而一本全是
-// `executed` 的台账是**确认**产生的、不是「撤销能工作」的证据。所以这一栏**点名自己看的是哪一种**，而不是把
-// 一个没被跑过的能力读成失败。
+// revocation was ever **attempted**: a ledger full of executed effects is what confirmations produce,
+// not evidence that revoke works. So the column says which of the two it is looking at rather than
+// reading an unexercised capability as a failure.
+//
+// **And the attempt is made here**, before the ledger is read. Until `run-revoke-scenario.mjs` existed
+// nothing on this line ever attempted a withdrawal, so the column could only ever read SKIP; that gate
+// makes the attempt and asserts the invariant that holds on **both sides of the platform seam**, so it
+// is green today and stays green the day the seam and the host's compensator land.
+// 撤销——副作用被撤回过、且台账记着。**决定事实是「有没有尝试过撤销」**：一本全是 `executed` 的台账是**确认**
+// 产生的、不是「撤销能工作」的证据。所以这一栏**点名自己看的是哪一种**，而不是把一个没被跑过的能力读成失败。
+//
+// **而那次尝试就在这里做**，在读账本之前。在 `run-revoke-scenario.mjs` 存在之前，本线**从没有人试过撤销**，
+// 故这一栏只可能读到 SKIP；那道闸把尝试做出来，并断言**平台那条缝两侧都成立**的不变量 —— 今天绿、缝与宿主
+// 补偿器落地之后仍绿。
 {
+  const attempt = runGate('run-revoke-scenario.mjs');
   const attempts = psql("select count(*) from ai_audit_logs where action='effect_revoke'") || '0';
   const ledger = psql('select count(*) from side_effects') || '0';
   const spread = psql(`select string_agg(revoke_status || '=' || n, ' ') from
       (select revoke_status, count(*) n from side_effects group by revoke_status order by revoke_status) s`);
-  if (Number(attempts) === 0) {
+  if (attempt.status !== 0) {
+    // A red attempt is a real failure — the path this column is about was exercised and did not hold.
+    // 转红的尝试是**真的失败** —— 这一栏所讲的那条路被跑过、且没站住。
+    row('Revoke', 'a withdrawal is attempted and its outcome asserted', 'FAIL',
+      `run-revoke-scenario.mjs: ${attempt.summary}`);
+  } else if (Number(attempts) === 0) {
     row('Revoke', 'a withdrawal is on the effect ledger', 'SKIP',
-      `no revoke scenario on this line yet (revoke attempts on the audit: ${attempts}; ledger rows: ${ledger}${spread ? `, ${spread}` : ''})`);
+      `attempted this run (${attempt.summary}) and did not land — no local revoke path on this host yet (revoke attempts on the audit: ${attempts}; ledger rows: ${ledger}${spread ? `, ${spread}` : ''})`);
   } else {
     const revoked = psql("select count(*) from side_effects where revoke_status='revoked'") || '0';
     row('Revoke', 'a withdrawal is on the effect ledger',
-      Number(revoked) > 0 ? 'PASS' : 'FAIL', spread || 'none');
+      Number(revoked) > 0 ? 'PASS' : 'FAIL', `${spread || 'none'} (attempted this run: ${attempt.summary})`);
   }
 }
 
