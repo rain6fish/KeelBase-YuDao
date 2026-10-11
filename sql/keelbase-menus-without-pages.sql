@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 --
--- A menu that asks to route to something that was never a page.
+-- Two menus this deployment does not show, and why. The first asks to route to something that was
+-- never a page; the second leads, by design, to the platform vendor's own website.
 --
 -- Upstream's seed carries `项目分组` (`pms/pm/project/list/components/group/index`). No such file
 -- exists: what sits in that directory is `ProjectGroupList.vue`, and that is a *dialog* — the project
@@ -20,7 +21,8 @@
 --
 -- Idempotent: both statements match on the current shape, so a second run changes nothing.
 --
--- 一条要求路由到一个**从来不是页面**的东西上的菜单。
+-- 本部署不显示的两条菜单，以及为什么。第一条要求路由到一个**从来不是页面**的东西上；第二条按设计**指向平台
+-- 厂商自己的网站**。
 --
 -- 上游种子里带着 `项目分组`（`pms/pm/project/list/components/group/index`）。**没有这个文件**：那个目录里
 -- 放的是 `ProjectGroupList.vue`，而它是一个**弹窗**——项目列表页把它内嵌渲染、由自己的按钮打开，这也是那个
@@ -50,3 +52,16 @@ update system_menu
  where deleted = 0
    and status <> 1
    and component = 'pms/pm/project/list/components/group/index';
+
+-- 3) `作者动态` is an external-link menu: its `path` is `https://www.iocoder.cn`, so it opens the
+-- platform vendor's website in a new tab. That is a deliberate thing for upstream's own demo and it
+-- has no place in this deployment's sidebar. Matched on the path rather than on the row id, and the
+-- same `status <> 1` guard keeps it idempotent.
+-- 3) `作者动态` 是一条**外链菜单**：它的 `path` 就是 `https://www.iocoder.cn`，点开在新标签页里打开**平台
+-- 厂商的网站**。那在上游自己的 demo 里是有意为之，而本部署的侧栏里没有它的位置。按**路径**匹配而不是按行 id，
+-- 同一个 `status <> 1` 守卫让它幂等。
+update system_menu
+   set status = 1
+ where deleted = 0
+   and status <> 1
+   and path in ('https://www.iocoder.cn', 'https://doc.iocoder.cn/', 'https://cloud.iocoder.cn');

@@ -893,3 +893,29 @@ index a1b2c3d..e4f5a6b 100644
 +    img: '/keelbase-social-wecom.svg'
    }
  }
+diff --git a/src/views/infra/skywalking/index.vue b/src/views/infra/skywalking/index.vue
+index f5055d7..36dad8d 100644
+--- a/src/views/infra/skywalking/index.vue
++++ b/src/views/infra/skywalking/index.vue
+@@ -2,7 +2,11 @@
+   <doc-alert title="服务监控" url="https://doc.iocoder.cn/server-monitor/" />
+ 
+   <ContentWrap :bodyStyle="{ padding: '0px' }" class="!mb-0">
+-    <IFrame v-if="!loading" v-loading="loading" :src="src" />
++    <IFrame v-if="!loading && src" v-loading="loading" :src="src" />
++    <el-empty
++      v-else-if="!loading"
++      description="本部署未配置 SkyWalking 地址（配置项 url.skywalking）"
++    />
+   </ContentWrap>
+ </template>
+ <script lang="ts" setup>
+@@ -11,7 +15,7 @@ import * as ConfigApi from '@/api/infra/config'
+ defineOptions({ name: 'InfraSkyWalking' })
+ 
+ const loading = ref(true) // 是否加载中
+-const src = ref('http://skywalking.shop.iocoder.cn')
++const src = ref('') // 不指向任何别人的实例：未配置时页面如实说「没配」
+ 
+ /** 初始化 */
+ onMounted(async () => {
