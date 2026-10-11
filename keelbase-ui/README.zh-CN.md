@@ -134,13 +134,35 @@ IM 模块照样会被构建、被部署出去；两条路都够不到它，这�
 **两份构建不共用注册表。** `@iconify/vue` 与 `@iconify/vue/offline` 各留各的 `storage`，故
 `addCollection` 必须与组件来自同一个入口——因此 `plugins/svgIcon/index.ts` 也从 `.../offline` 导入它。
 
-## 头像与品牌标记
+## 选一个头像，以及「没有头像」时顶上的那个标记
 
 `assets/keelbase-avatar.svg` 由 [DiceBear](https://www.dicebear.com) 生成（`shapes` 风格）。它**自带
 的元数据**声明该图形为 **CC0 1.0**；其所在包声明 MIT。两者都可用于商业用途，归属写在 `NOTICE` 里。
 
-它是通过**样式表**而不是组件铺上去的，这正是让一条规则覆盖控制台里**全部**头像的原因——含表格里与个人页
-里的那些——而不必逐个去改。宿主发下来的图被藏起来，由它下面那层承载我们的；`src` 从这里够不到，换不掉。
+它是**自己没有图**的头像的兜底。这条规则原先发给**每一个** `.el-avatar` 并把下面的图藏起来，于是所有
+头像渲染成同一张：选了哪个，控制台显示出来的都不变，这个功能读起来就是坏的。现在的选择器是
+`:not(:has(> img))`——样式表问这个问题只有这一种写法；浏览器解析不了时该规则整条被丢弃、露出 Element
+Plus 的占位图标，那是**降级**而不是显示错图。`host-overlay/src/assets/imgs/keelbase-avatar.svg` 是同一
+份字节，给那些从源码 import 默认头像的组件用。
+
+用户可以挑的十个头像是 `host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`，同样是 DiceBear、
+同样 **CC0 1.0**——`notionists` 风格，Notionists by Zoish 的再混合。每个文件都自带这层出处。它们是
+**取一次、入库**，而不是外链：一个由生成器的 API 现供的预置，会让每位访客的浏览器都去访问一个本部署
+控制不了的主机——那正是当初清掉图标 CDN 与统计脚本的同一种痕迹。
+
+    curl -s 'https://api.dicebear.com/9.x/notionists/svg?seed=<seed>&size=256&backgroundColor=<hex>' \
+      -o host-overlay/public/keelbase-avatar-01.svg
+
+种子依次是 `keelbase-01`、`-06`、`-07`、`-08`、`-09`、`-11`、`-12`、`-13`、`-14`、`-15`，底色依次是
+`dbeafe e0e7ff d1fae5 fef3c7 cffafe fce7f3 f3e8ff e5e7eb ccfbf1 ffe4e6`；两者都记在这里，因为从文件名
+里一个也还原不出来。
+
+先前那四个预置——`-blue` `-teal` `-graphite` `-warm`——**已撤下但仍在发**，也仍被认得出。它们不再被
+提供，而在这之前存下的头像可能指着一个：删掉文件会让那个人的头像解析不出来，删掉名字则会让弹窗把他自己
+的那个旧选择当成「上次上传」提供回来，像是他传上去的。**撤下一个选择，不等于删掉它。**
+
+`host-overlay/src/utils/keelbaseAvatar.ts` 存着提供的清单、撤下的清单，以及**唯一**记住「这个人上次上传
+的那张图」的地方（按浏览器、按用户键）。换头像弹窗与个人页都读它，故两者不会在「怎么认出一个预置」上走岔。
 
 `host-overlay/src/assets/imgs/keelbase-logo.svg` 是产品的品牌标记，路径与颜色都与 Web-Admin-Vue 自己的
 logo 组件和 favicon 相同，于是这个标记仍然只有一个源。

@@ -39,6 +39,196 @@ index 8cfcbef..0e113ff 100644
              <div class="app-loading-title">%VITE_APP_TITLE%</div>
            </div>
            <div class="app-loading-item">
+diff --git a/src/components/Cropper/src/CopperModal.vue b/src/components/Cropper/src/CopperModal.vue
+index c69c967..0926597 100644
+--- a/src/components/Cropper/src/CopperModal.vue
++++ b/src/components/Cropper/src/CopperModal.vue
+@@ -116,6 +116,43 @@
+           </template>
+         </div>
+       </div>
++
++      <!--
++        Choosing an avatar, as opposed to uploading one. One click applies and stores it, so the
++        footer's crop-and-upload button stays what it was: the way to put your own picture in.
++
++        选一个头像，与上传一个头像是两回事。这里一次点击就应用并保存，故页脚那个「裁剪并上传」按钮
++        仍是它本来的角色：把你自己的图放进来。
++      -->
++      <div :class="`${prefixCls}-picker`">
++        <div v-if="lastUpload" :class="`${prefixCls}-picker-row`">
++          <span :class="`${prefixCls}-picker-label`">{{ t('cropper.lastUpload') }}</span>
++          <div :class="`${prefixCls}-picker-items`">
++            <img
++              :src="lastUpload"
++              :alt="t('cropper.lastUpload')"
++              :title="t('cropper.lastUpload')"
++              :class="{ 'is-current': isCurrent(lastUpload) }"
++              @click="chooseAvatar(lastUpload)"
++            />
++          </div>
++        </div>
++        <div :class="`${prefixCls}-picker-row`">
++          <span :class="`${prefixCls}-picker-label`">{{ t('cropper.presets') }}</span>
++          <div :class="`${prefixCls}-picker-items`">
++            <img
++              v-for="preset in AVATAR_PRESETS"
++              :key="preset"
++              :src="preset"
++              :alt="preset"
++              :title="preset"
++              :class="{ 'is-current': isCurrent(preset) }"
++              @click="chooseAvatar(preset)"
++            />
++          </div>
++        </div>
++      </div>
++
+       <template #footer>
+         <el-button type="primary" @click="handleOk">{{ t('cropper.okText') }}</el-button>
+       </template>
+@@ -129,6 +166,9 @@ import { useI18n } from 'vue-i18n'
+ import type { CropendResult, Cropper } from './types'
+ import { propTypes } from '@/utils/propTypes'
+ import { CropperImage } from '@/components/Cropper'
++import { updateUserProfile } from '@/api/system/user/profile'
++import { useUserStore } from '@/store/modules/user'
++import { AVATAR_PRESETS, isOwnImage, readLastUpload } from '@/utils/keelbaseAvatar'
+ 
+ defineOptions({ name: 'CopperModal' })
+ 
+@@ -140,15 +180,50 @@ const emit = defineEmits(['uploadSuccess'])
+ const { t } = useI18n()
+ const { getPrefixCls } = useDesign()
+ const prefixCls = getPrefixCls('cropper-am')
++const userStore = useUserStore()
++const message = useMessage()
+ 
+ const src = ref(props.srcValue)
+ const previewSource = ref('')
+ const cropper = ref<Cropper>()
+ const dialogVisible = ref(false)
++const lastUpload = ref('')
+ let filename = ''
+ let scaleX = 1
+ let scaleY = 1
+ 
++// Whether the avatar in use is the one this tile stands for. Both sides are absolute in the end, but
++// the comparison is on the site-relative tail so a preset reused on another origin still matches.
++// 正在用的头像是不是这一格所代表的那张。两边最终都是绝对地址，但按站点相对的尾部比对，故同一个预置
++// 换到另一个来源上仍能匹配上。
++const isCurrent = (url: string) => !!props.srcValue && props.srcValue.endsWith(url)
++
++// The person's own picture: the avatar in use when that is one of their own, otherwise the one this
++// browser recorded. Neither a preset nor the default mark counts — the dialog would be claiming a
++// picture the console supplied had been uploaded.
++// 这个人自己的那张图：正在用的那个若属于他本人就用它，否则用本浏览器记下的那个。预置与默认标记都
++// 不算——否则弹窗就在把控制台自带的图说成是「上传的」。
++function refreshLastUpload() {
++  const current = props.srcValue || ''
++  const saved = readLastUpload(userStore.getUser?.id)
++  lastUpload.value = isOwnImage(current) ? current : isOwnImage(saved) ? saved : ''
++}
++
++function absolute(url: string) {
++  return new URL(url, window.location.origin).href
++}
++
++// No crop, no upload — the preset is already an image the console ships, so one click stores it.
++// 不裁剪也不上传——预置本身就是控制台自带的图，故一次点击就存下它。
++async function chooseAvatar(url: string) {
++  const avatar = absolute(url)
++  await updateUserProfile({ avatar })
++  await userStore.setUserAvatarAction(avatar)
++  previewSource.value = avatar
++  message.success(t('cropper.changeSuccess'))
++  closeModal()
++}
++
+ // Block upload
+ function handleBeforeUpload(file: File) {
+   const reader = new FileReader()
+@@ -197,6 +272,7 @@ async function handleOk() {
+ }
+ 
+ function openModal() {
++  refreshLastUpload()
+   dialogVisible.value = true
+ }
+ 
+@@ -278,5 +354,59 @@ $prefix-cls: #{$namespace}-cropper-am;
+     justify-content: space-around;
+     align-items: center;
+   }
++
++  // Below both columns rather than inside the right one: ten choices do not fit in 45% of an
++  // 800px dialog, and a row of ten reads as a set, which is what it is.
++  // 放在两栏**下面**而不是右栏里：十个选择放不进 800px 弹窗的 45%，而排成一行读起来就是一个集合
++  // ——它本来也是。
++  &-picker {
++    padding-top: 14px;
++    margin-top: 16px;
++    border-top: 1px solid var(--el-border-color-lighter);
++  }
++
++  &-picker-row {
++    display: flex;
++    align-items: center;
++
++    & + & {
++      margin-top: 12px;
++    }
++  }
++
++  &-picker-label {
++    flex: none;
++    width: 96px;
++    font-size: 13px;
++    color: var(--el-text-color-secondary);
++  }
++
++  &-picker-items {
++    display: flex;
++    flex-wrap: wrap;
++    gap: 10px;
++
++    img {
++      width: 46px;
++      height: 46px;
++      cursor: pointer;
++      background-color: var(--el-fill-color-light);
++      border: 2px solid transparent;
++      border-radius: 50%;
++      transition:
++        border-color 0.2s ease,
++        transform 0.2s ease;
++
++      &:hover {
++        border-color: var(--el-color-primary-light-5);
++        transform: translateY(-2px);
++      }
++
++      &.is-current {
++        border-color: var(--el-color-primary);
++        box-shadow: 0 0 0 3px var(--el-color-primary-light-8);
++      }
++    }
++  }
+ }
+ </style>
+diff --git a/src/components/Cropper/src/CropperAvatar.vue b/src/components/Cropper/src/CropperAvatar.vue
+index 9464c2a..23f5b64 100644
+--- a/src/components/Cropper/src/CropperAvatar.vue
++++ b/src/components/Cropper/src/CropperAvatar.vue
+@@ -18,7 +18,7 @@ import { useDesign } from '@/hooks/web/useDesign'
+ import { propTypes } from '@/utils/propTypes'
+ import { useI18n } from 'vue-i18n'
+ import CopperModal from './CopperModal.vue'
+-import avatar from '@/assets/imgs/avatar.gif'
++import avatar from '@/assets/imgs/keelbase-avatar.svg'
+ 
+ defineOptions({ name: 'CropperAvatar' })
+ 
 diff --git a/src/components/DiyEditor/components/mobile/UserCard/index.vue b/src/components/DiyEditor/components/mobile/UserCard/index.vue
 index 14b447c..4877590 100644
 --- a/src/components/DiyEditor/components/mobile/UserCard/index.vue
@@ -62,7 +252,7 @@ index 99e27b0..488076a 100644
 -import { Icon as IconifyIcon } from '@iconify/vue'
 +import { Icon as IconifyIcon } from '@iconify/vue/offline'
  import { useDesign } from '@/hooks/web/useDesign'
-
+ 
  defineOptions({ name: 'Icon' })
 diff --git a/src/config/axios/service.ts b/src/config/axios/service.ts
 index 3305354..0ad729c 100644
@@ -103,6 +293,19 @@ index c22c950..029a7e9 100644
        />
        <div
          v-if="show"
+diff --git a/src/layout/components/Message/src/Message.vue b/src/layout/components/Message/src/Message.vue
+index 8d522ef..63fedf5 100644
+--- a/src/layout/components/Message/src/Message.vue
++++ b/src/layout/components/Message/src/Message.vue
+@@ -75,7 +75,7 @@ onBeforeUnmount(() => {
+           <el-scrollbar class="message-list">
+             <template v-for="item in list" :key="item.id">
+               <div class="message-item">
+-                <img alt="" class="message-icon" src="@/assets/imgs/avatar.gif" />
++                <img alt="" class="message-icon" src="@/assets/imgs/keelbase-avatar.svg" />
+                 <div class="message-content">
+                   <span class="message-title">
+                     {{ item.templateNickname }}：{{ item.templateContent }}
 diff --git a/src/layout/components/ToolHeader.vue b/src/layout/components/ToolHeader.vue
 index 23f8a3a..4bff14a 100644
 --- a/src/layout/components/ToolHeader.vue
@@ -155,9 +358,18 @@ index 23f8a3a..4bff14a 100644
          </div>
        </div>
 diff --git a/src/layout/components/UserInfo/src/UserInfo.vue b/src/layout/components/UserInfo/src/UserInfo.vue
-index 355aabc..590aacb 100644
+index 355aabc..679978a 100644
 --- a/src/layout/components/UserInfo/src/UserInfo.vue
 +++ b/src/layout/components/UserInfo/src/UserInfo.vue
+@@ -1,7 +1,7 @@
+ <script lang="ts" setup>
+ import { ElMessageBox } from 'element-plus'
+ 
+-import avatarImg from '@/assets/imgs/avatar.gif'
++import avatarImg from '@/assets/imgs/keelbase-avatar.svg'
+ import { useDesign } from '@/hooks/web/useDesign'
+ import { useTagsViewStore } from '@/store/modules/tagsView'
+ import { useUserStore } from '@/store/modules/user'
 @@ -49,9 +49,6 @@ const loginOut = async () => {
  const toProfile = async () => {
    push('/user/profile')
@@ -179,8 +391,34 @@ index 355aabc..590aacb 100644
          <ElDropdownItem divided>
            <Icon icon="ep:lock" />
            <div @click="lockScreen">{{ t('lock.lockScreen') }}</div>
+diff --git a/src/layout/components/UserInfo/src/components/LockDialog.vue b/src/layout/components/UserInfo/src/components/LockDialog.vue
+index 8e5f5c0..86c6331 100644
+--- a/src/layout/components/UserInfo/src/components/LockDialog.vue
++++ b/src/layout/components/UserInfo/src/components/LockDialog.vue
+@@ -2,7 +2,7 @@
+ import { useValidator } from '@/hooks/web/useValidator'
+ import { useDesign } from '@/hooks/web/useDesign'
+ import { useLockStore } from '@/store/modules/lock'
+-import avatarImg from '@/assets/imgs/avatar.gif'
++import avatarImg from '@/assets/imgs/keelbase-avatar.svg'
+ import { useUserStore } from '@/store/modules/user'
+ 
+ const { getPrefixCls } = useDesign()
+diff --git a/src/layout/components/UserInfo/src/components/LockPage.vue b/src/layout/components/UserInfo/src/components/LockPage.vue
+index d70d19d..db9d351 100644
+--- a/src/layout/components/UserInfo/src/components/LockPage.vue
++++ b/src/layout/components/UserInfo/src/components/LockPage.vue
+@@ -5,7 +5,7 @@ import { useNow } from '@/hooks/web/useNow'
+ import { useDesign } from '@/hooks/web/useDesign'
+ import { useTagsViewStore } from '@/store/modules/tagsView'
+ import { useUserStore } from '@/store/modules/user'
+-import avatarImg from '@/assets/imgs/avatar.gif'
++import avatarImg from '@/assets/imgs/keelbase-avatar.svg'
+ 
+ const tagsViewStore = useTagsViewStore()
+ 
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 9d14564..2540eb8 100644
+index 9d14564..96269a8 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
 @@ -208,9 +208,11 @@ export default {
@@ -196,8 +434,21 @@ index 9d14564..2540eb8 100644
      introduction: 'A serious introduction',
      shortcutOperation: 'Quick entry',
      operation: 'Operation',
+@@ -455,8 +457,11 @@ export default {
+   cropper: {
+     selectImage: 'Select Image',
+     uploadSuccess: 'Uploaded success!',
+-    modalTitle: 'Avatar upload',
++    modalTitle: 'Change avatar',
+     okText: 'Confirm and upload',
++    presets: 'Choose an avatar',
++    lastUpload: 'Last uploaded',
++    changeSuccess: 'Avatar changed',
+     btn_reset: 'Reset',
+     btn_rotate_left: 'Counterclockwise rotation',
+     btn_rotate_right: 'Clockwise rotation',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 13065de..cca60e7 100644
+index 13065de..35f1e1a 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
 @@ -210,9 +210,11 @@ export default {
@@ -213,24 +464,87 @@ index 13065de..cca60e7 100644
      introduction: '一个正经的简介',
      shortcutOperation: '快捷入口',
      operation: '操作',
+@@ -450,8 +452,11 @@ export default {
+   cropper: {
+     selectImage: '选择图片',
+     uploadSuccess: '上传成功',
+-    modalTitle: '头像上传',
++    modalTitle: '更换头像',
+     okText: '确认并上传',
++    presets: '选择头像',
++    lastUpload: '上次上传',
++    changeSuccess: '头像已更换',
+     btn_reset: '重置',
+     btn_rotate_left: '逆时针旋转',
+     btn_rotate_right: '顺时针旋转',
 diff --git a/src/plugins/svgIcon/index.ts b/src/plugins/svgIcon/index.ts
 index cce2395..3fcfe83 100644
 --- a/src/plugins/svgIcon/index.ts
 +++ b/src/plugins/svgIcon/index.ts
 @@ -1,10 +1,12 @@
  import 'virtual:svg-icons-register'
-
+ 
 -import { addCollection } from '@iconify/vue'
 +import { addCollection } from '@iconify/vue/offline'
  import epIcons from '@iconify/json/json/ep.json'
  import faIcons from '@iconify/json/json/fa.json'
  import faSolidIcons from '@iconify/json/json/fa-solid.json'
 +import keelbaseIcons from '@/assets/keelbase-icons'
-
+ 
  addCollection(epIcons)
  addCollection(faIcons)
  addCollection(faSolidIcons)
 +keelbaseIcons.forEach((collection) => addCollection(collection))
+diff --git a/src/router/modules/remaining.ts b/src/router/modules/remaining.ts
+index 76e7a16..5b8d992 100644
+--- a/src/router/modules/remaining.ts
++++ b/src/router/modules/remaining.ts
+@@ -1183,34 +1183,18 @@ const remainingRouter: AppRouteRecordRaw[] = [
+       }
+     ]
+   },
++  // `项目分组` used to be a menu whose `component` named a file that does not exist — the group
++  // manager beside it is a dialog the project list page renders inline. Its four button permissions
++  // moved to that page (see `sql/keelbase-menus-without-pages.sql`), so what is left is this path,
++  // which lands where the function actually lives.
++  // `项目分组` 原是一条 `component` 指着一个并不存在的文件的菜单——它旁边那个分组管理器是**项目列表页**
++  // 内嵌渲染的弹窗。它的四条按钮权限已改挂到那个页面（见 `sql/keelbase-menus-without-pages.sql`），
++  // 于是这里剩下这条路径，落到那个功能真正所在的地方。
+   {
+-    path: '/im',
+-    name: 'Im',
+-    redirect: '/im/home/conversation',
+-    meta: { hidden: true, title: 'IM 即时通讯' },
+-    children: [
+-      {
+-        path: 'home',
+-        component: () => import('@/views/im/home/index.vue'),
+-        name: 'ImHome',
+-        redirect: '/im/home/conversation',
+-        meta: { hidden: true, title: '聊天' },
+-        children: [
+-          {
+-            path: 'conversation',
+-            component: () => import('@/views/im/home/pages/conversation/index.vue'),
+-            name: 'ImHomeConversation',
+-            meta: { hidden: true, title: '消息' }
+-          },
+-          {
+-            path: 'contact',
+-            component: () => import('@/views/im/home/pages/contact/index.vue'),
+-            name: 'ImHomeContact',
+-            meta: { hidden: true, title: '通讯录' }
+-          }
+-        ]
+-      }
+-    ]
++    path: '/pms/pm/project/list/group',
++    name: 'PmsProjectGroupRedirect',
++    redirect: '/pms/pm/project/list',
++    meta: { hidden: true }
+   }
+ ]
+ 
 diff --git a/src/store/modules/permission.ts b/src/store/modules/permission.ts
 index e9ca174..48597d1 100644
 --- a/src/store/modules/permission.ts
@@ -264,11 +578,38 @@ index e9ca174..48597d1 100644
          resolve()
        })
      },
+diff --git a/src/utils/constants.ts b/src/utils/constants.ts
+index 5736a49..f4e5ea2 100644
+--- a/src/utils/constants.ts
++++ b/src/utils/constants.ts
+@@ -54,13 +54,13 @@ export const SystemUserSocialTypeEnum = {
+     title: '钉钉',
+     type: 20,
+     source: 'dingtalk',
+-    img: 'https://s1.ax1x.com/2022/05/22/OzMDRs.png'
++    img: '/keelbase-social-dingtalk.svg'
+   },
+   WECHAT_ENTERPRISE: {
+     title: '企业微信',
+     type: 30,
+     source: 'wechat_enterprise',
+-    img: 'https://s1.ax1x.com/2022/05/22/OzMrzn.png'
++    img: '/keelbase-social-wecom.svg'
+   }
+ }
+ 
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
-index 5326389..e980812 100644
+index 5326389..4f5ad89 100644
 --- a/src/views/Home/Index.vue
 +++ b/src/views/Home/Index.vue
-@@ -12,9 +12,6 @@
+@@ -6,15 +6,12 @@
+           <el-col :xl="12" :lg="12" :md="12" :sm="24" :xs="24">
+             <div class="flex items-center">
+               <el-avatar :src="avatar" :size="70" class="mr-16px">
+-                <img src="@/assets/imgs/avatar.gif" alt="" />
++                <img src="@/assets/imgs/keelbase-avatar.svg" alt="" />
+               </el-avatar>
+               <div>
                  <div class="text-20px">
                    {{ t('workplace.welcome') }} {{ username }} {{ t('workplace.happyDay') }}
                  </div>
@@ -801,92 +1142,41 @@ index d5e05ec..a440844 100644
  import LoginFormTitle from './LoginFormTitle.vue'
  import { LoginStateEnum, useLoginState } from './useLogin'
 diff --git a/src/views/Profile/components/UserAvatar.vue b/src/views/Profile/components/UserAvatar.vue
-index 23ecc3a..9c8ca00 100644
+index 23ecc3a..7fc3a02 100644
 --- a/src/views/Profile/components/UserAvatar.vue
 +++ b/src/views/Profile/components/UserAvatar.vue
-@@ -8,6 +8,25 @@
-       width="120px"
-       @change="handelUpload"
-     />
-+    <!--
-+      The preset row: an avatar that needs no upload. The API validates this field as a URL, so what
-+      is stored is the absolute form — but the paths below stay site-relative, and the comparison is
-+      on the path, so the same choice reads as "current" on every deployment.
-+
-+      预设行：不靠上传的头像。接口把该字段按 URL 校验，故**存下来的是绝对形式**——但下面这些路径保持
-+      站点相对，而比对的是那条路径，于是同一个选择在每个部署上都读作「当前在用」。
-+    -->
-+    <div class="keelbase-avatar-presets">
-+      <img
-+        v-for="preset in presets"
-+        :key="preset"
-+        :src="preset"
-+        :alt="preset"
-+        :title="preset"
-+        :class="{ 'is-current': (img || '').endsWith(preset) }"
-+        @click="choosePreset(preset)"
-+      />
-+    </div>
-   </div>
- </template>
- <script lang="ts" setup>
-@@ -27,6 +46,26 @@ defineProps({
- const userStore = useUserStore()
+@@ -17,6 +17,7 @@ import { CropperAvatar } from '@/components/Cropper'
+ import { useUserStore } from '@/store/modules/user'
+ import { useUpload } from '@/components/UploadFile/src/useUpload'
+ import { UploadRequestOptions } from 'element-plus/es/components/upload/src/upload'
++import { rememberUpload } from '@/utils/keelbaseAvatar'
  
- const cropperRef = ref()
+ defineOptions({ name: 'UserAvatar' })
+ 
+@@ -37,6 +38,10 @@ const handelUpload = async ({ data }) => {
+   ).data
+   await updateUserProfile({ avatar })
+ 
++  // Kept so the change-avatar dialog can offer this picture back after the person tries a preset.
++  // 记下它，好让换头像弹窗在对方试过某个预置之后还能把这张图提供回来。
++  rememberUpload(avatar, userStore.getUser?.id)
 +
-+// One click, no upload: these ship with the console's own assets rather than the file store.
-+// 一次点击、不经上传：它们随控制台自己的资产一起发，不走文件存储。
-+const presets = [
-+  '/keelbase-avatar-blue.svg',
-+  '/keelbase-avatar-teal.svg',
-+  '/keelbase-avatar-graphite.svg',
-+  '/keelbase-avatar-warm.svg'
-+]
-+// The API validates this field as a URL, so what is sent has to be absolute. The paths themselves
-+// stay site-relative: made absolute here rather than in the list, they survive being served from
-+// whatever origin this console ends up on. 接口把该字段按 URL 校验，故**发出去的**必须是绝对地址；
-+// 路径本身保持站点相对——在这里变绝对而不是写死在清单里，控制台换到哪个源服务都还活得下去。
-+const absolute = (p: string) => new URL(p, window.location.origin).href
-+const choosePreset = async (preset: string) => {
-+  const url = absolute(preset)
-+  await updateUserProfile({ avatar: url })
-+  await userStore.setUserAvatarAction(url)
-+}
-+
- const handelUpload = async ({ data }) => {
-   const { httpRequest } = useUpload()
-   const avatar = (
-@@ -50,5 +89,29 @@ const handelUpload = async ({ data }) => {
-     margin-bottom: 15px;
-     border-radius: 50%;
-   }
-+
-+  .keelbase-avatar-presets {
-+    display: flex;
-+    gap: 8px;
-+    margin-top: 10px;
-+
-+    img {
-+      width: 34px;
-+      height: 34px;
-+      margin-bottom: 0;
-+      cursor: pointer;
-+      border: 2px solid transparent;
-+      border-radius: 50%;
-+      transition: border-color 0.2s ease;
-+
-+      &:hover {
-+        border-color: var(--el-border-color-darker);
-+      }
-+
-+      &.is-current {
-+        border-color: var(--el-color-primary);
-+      }
-+    }
-+  }
- }
- </style>
+   // 关闭弹窗，并更新 userStore
+   cropperRef.value.close()
+   await userStore.setUserAvatarAction(avatar)
+diff --git a/src/views/ai/chat/index/components/message/MessageList.vue b/src/views/ai/chat/index/components/message/MessageList.vue
+index da5c338..893c10e 100644
+--- a/src/views/ai/chat/index/components/message/MessageList.vue
++++ b/src/views/ai/chat/index/components/message/MessageList.vue
+@@ -122,7 +122,7 @@ import { ArrowDownBold, Edit, RefreshRight } from '@element-plus/icons-vue'
+ import { ChatMessageApi, ChatMessageVO } from '@/api/ai/chat/message'
+ import { ChatConversationVO } from '@/api/ai/chat/conversation'
+ import { useUserStore } from '@/store/modules/user'
+-import userAvatarDefaultImg from '@/assets/imgs/avatar.gif'
++import userAvatarDefaultImg from '@/assets/imgs/keelbase-avatar.svg'
+ import roleAvatarDefaultImg from '@/assets/ai/gpt.svg'
+ 
+ const message = useMessage() // 消息弹窗
 diff --git a/src/views/ai/chat/index/components/message/MessageListEmpty.vue b/src/views/ai/chat/index/components/message/MessageListEmpty.vue
 index 11f7f68..41996ef 100644
 --- a/src/views/ai/chat/index/components/message/MessageListEmpty.vue
@@ -900,81 +1190,6 @@ index 11f7f68..41996ef 100644
        <div class="flex flex-row flex-wrap items-center justify-center w-460px mt-20px">
          <div
            class="flex justify-center w-180px leading-50px border border-solid border-[#e4e4e4] rounded-10px m-10px cursor-pointer hover:bg-[rgba(243,243,243,0.73)]"
-diff --git a/src/router/modules/remaining.ts b/src/router/modules/remaining.ts
-index 76e7a16..8112fca 100644
---- a/src/router/modules/remaining.ts
-+++ b/src/router/modules/remaining.ts
-@@ -1182,34 +1182,18 @@ const remainingRouter: AppRouteRecordRaw[] = [
-         }
-       }
-     ]
--  },
--  {
--    path: '/im',
--    name: 'Im',
--    redirect: '/im/home/conversation',
--    meta: { hidden: true, title: 'IM 即时通讯' },
--    children: [
--      {
--        path: 'home',
--        component: () => import('@/views/im/home/index.vue'),
--        name: 'ImHome',
--        redirect: '/im/home/conversation',
--        meta: { hidden: true, title: '聊天' },
--        children: [
--          {
--            path: 'conversation',
--            component: () => import('@/views/im/home/pages/conversation/index.vue'),
--            name: 'ImHomeConversation',
--            meta: { hidden: true, title: '消息' }
--          },
--          {
--            path: 'contact',
--            component: () => import('@/views/im/home/pages/contact/index.vue'),
--            name: 'ImHomeContact',
--            meta: { hidden: true, title: '通讯录' }
--          }
--        ]
--      }
--    ]
--  }
-+  },
-+  // `项目分组` used to be a menu whose `component` named a file that does not exist — the group
-+  // manager beside it is a dialog the project list page renders inline. Its four button permissions
-+  // moved to that page (see `sql/keelbase-menus-without-pages.sql`), so what is left is this path,
-+  // which lands where the function actually lives.
-+  // `项目分组` 原是一条 `component` 指着一个并不存在的文件的菜单——它旁边那个分组管理器是**项目列表页**
-+  // 内嵌渲染的弹窗。它的四条按钮权限已改挂到那个页面（见 `sql/keelbase-menus-without-pages.sql`），
-+  // 于是这里剩下这条路径，落到那个功能真正所在的地方。
-+  {
-+    path: '/pms/pm/project/list/group',
-+    name: 'PmsProjectGroupRedirect',
-+    redirect: '/pms/pm/project/list',
-+    meta: { hidden: true }
-+  }
- ]
-
-diff --git a/src/utils/constants.ts b/src/utils/constants.ts
-index a1b2c3d..e4f5a6b 100644
---- a/src/utils/constants.ts
-+++ b/src/utils/constants.ts
-@@ -52,14 +52,14 @@ export const SystemUserSocialTypeEnum = {
- export const SystemUserSocialTypeEnum = {
-   DINGTALK: {
-     title: '钉钉',
-     type: 20,
-     source: 'dingtalk',
--    img: 'https://s1.ax1x.com/2022/05/22/OzMDRs.png'
-+    img: '/keelbase-social-dingtalk.svg'
-   },
-   WECHAT_ENTERPRISE: {
-     title: '企业微信',
-     type: 30,
-     source: 'wechat_enterprise',
--    img: 'https://s1.ax1x.com/2022/05/22/OzMrzn.png'
-+    img: '/keelbase-social-wecom.svg'
-   }
- }
 diff --git a/src/views/bpm/model/form/FormDesign.vue b/src/views/bpm/model/form/FormDesign.vue
 index 6a9d851..8d25cf8 100644
 --- a/src/views/bpm/model/form/FormDesign.vue

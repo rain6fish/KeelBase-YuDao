@@ -422,21 +422,28 @@ html body .el-menu .el-sub-menu.is-active > .el-sub-menu__title::before {
 }
 
 // ── avatars ─────────────────────────────────────────────────────────────────────────────────────────
-// Every avatar in this console is either the vendor's mascot or an image the backend hands out, and
-// neither is ours. The src cannot be reached from here, so the image is hidden and the ground beneath
-// it carries ours instead. That covers every avatar in one place, including the ones inside tables
-// and the profile page, which a component-by-component change would have to visit one at a time.
-// 这个控制台里的头像，要么是厂商的吉祥物、要么是后端发下来的图，都不是我们的。`src` 从这里够不到，
-// 故把图藏起来、由它下面那层承载我们的。这样一处覆盖到全部头像，含表格里与个人页里的那些——逐组件改
-// 就得一处一处去。
-html body .el-avatar {
+// An avatar carrying no image of its own is the one case where the console would otherwise show
+// Element Plus's placeholder icon, so that case — and only that case — gets our mark instead. An
+// avatar that does carry an image is the user's own: a preset from the change-avatar dialog, an
+// upload, or an image the backend hands out. It is shown as it is.
+//
+// The rule used to cover *every* `.el-avatar` and hide the image underneath, which made all of them
+// render as the same picture — so picking one changed nothing the user could see, and the console
+// read as if avatars could not be changed at all. The narrow selector is what makes a choice visible.
+// `:has()` is the only way to ask "does this element have an image child?"; where a browser cannot
+// parse it the rule is dropped and the placeholder icon shows, which is a degradation, not a break.
+// 一个**自己没有图**的头像，是这个控制台里唯一会露出 Element Plus 占位图标的情况——故只给这一种
+// 用我们的标记。带图的头像是用户自己的：换头像弹窗里选的预置、上传的、或后端发下来的，按原样显示。
+//
+// 这条规则原先覆盖**每一个** `.el-avatar` 并把它下面的图藏起来，于是所有头像渲染成同一张——选哪个
+// 在用户眼里都没变，整个控制台读起来就像头像根本改不了。窄选择器正是让「选了什么」看得见的那一步。
+// `:has()` 是唯一能问「这个元素有没有图子节点」的写法；浏览器解析不了时该规则整条被丢弃、露出占位
+// 图标——那是降级，不是损坏。
+html body .el-avatar:not(:has(> img)) {
   background-image: url(keelbase-avatar.svg) !important;
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
-}
-html body .el-avatar > img {
-  visibility: hidden !important;
 }
 html body .el-avatar > .el-icon {
   visibility: hidden !important;
