@@ -822,7 +822,7 @@ diff --git a/src/router/modules/remaining.ts b/src/router/modules/remaining.ts
 index 76e7a16..8112fca 100644
 --- a/src/router/modules/remaining.ts
 +++ b/src/router/modules/remaining.ts
-@@ -1182,35 +1182,6 @@ const remainingRouter: AppRouteRecordRaw[] = [
+@@ -1182,34 +1182,18 @@ const remainingRouter: AppRouteRecordRaw[] = [
          }
        }
      ]
@@ -855,6 +855,20 @@ index 76e7a16..8112fca 100644
 -        ]
 -      }
 -    ]
-   }
+-  }
++  },
++  // `项目分组` used to be a menu whose `component` named a file that does not exist — the group
++  // manager beside it is a dialog the project list page renders inline. Its four button permissions
++  // moved to that page (see `sql/keelbase-menus-without-pages.sql`), so what is left is this path,
++  // which lands where the function actually lives.
++  // `项目分组` 原是一条 `component` 指着一个并不存在的文件的菜单——它旁边那个分组管理器是**项目列表页**
++  // 内嵌渲染的弹窗。它的四条按钮权限已改挂到那个页面（见 `sql/keelbase-menus-without-pages.sql`），
++  // 于是这里剩下这条路径，落到那个功能真正所在的地方。
++  {
++    path: '/pms/pm/project/list/group',
++    name: 'PmsProjectGroupRedirect',
++    redirect: '/pms/pm/project/list',
++    meta: { hidden: true }
++  }
  ]
- 
+
