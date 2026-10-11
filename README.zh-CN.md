@@ -55,6 +55,8 @@ KeelBase-YuDao 拿一个成熟的企业应用平台当地基，给它补上这�
 - **知识层的语义路径未跑过。** pgvector 在位（那是它的前提），但那条路还要一个嵌入模型，而这里没配。
 - **它不主张验证。** 没有用户、客户或试点走过它。
 
+> **⚠ 2026-10-11 复核** —— 上面两条**已在本宿主落地**：**模型驱动那条路**现已接真模型（`scripts/run-model-loop-scenarios.mjs`）；**符合性套件与四率**现已在此有脚本（`scripts/run-app-conformance.mjs`、`scripts/measure-governance-rates.mjs`）。清单按原样保留（2026-10-09 快照），其余仍成立。
+
 ## 它站在哪
 
 KeelBase 把**一个**运行时作为**平台 + 适配器**来承载：运行时是 `keelbase4j-core`，而**每条宿主线一个仓**。

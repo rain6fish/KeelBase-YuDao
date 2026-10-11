@@ -66,6 +66,8 @@ adapter work, and until then read every claim here as **observed once**, not **a
   precondition, but that path also needs an embedding model and none is configured.
 - **It does not claim verification.** No user, customer or trial has been through it.
 
+> **⚠ Rechecked 2026-10-11** — two items above have since landed on this host: the **model-driven path** now runs with a real model (`scripts/run-model-loop-scenarios.mjs`), and the **conformance suite and the four rates** now have scripts here (`scripts/run-app-conformance.mjs`, `scripts/measure-governance-rates.mjs`). The list is kept as written (a 2026-10-09 snapshot); the rest still stands.
+
 ## Where this sits
 
 KeelBase carries one runtime as a **platform with adapters**: the runtime is `keelbase4j-core`, and
