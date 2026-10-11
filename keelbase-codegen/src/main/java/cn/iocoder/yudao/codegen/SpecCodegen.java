@@ -144,12 +144,14 @@ public final class SpecCodegen {
             "sql/keelbase-fms.sql",
             "sql/keelbase-pms.sql",
             "sql/keelbase-ai.sql",
-            // MySQL's date-part function names, defined for PostgreSQL. A few of the enabled modules
-            // build SQL in Java (`MONTH(birthday) = ?`), and those names do not exist here — so they
-            // are supplied rather than the upstream Java being edited.
-            // MySQL 的日期分量函数名，为 PostgreSQL 定义一份。少数启用的模块在 Java 里拼 SQL
-            // （`MONTH(birthday) = ?`），而这些名字在这边不存在——故补上它们，而不是去改上游的 Java。
-            "sql/keelbase-mysql-functions.sql",
+            // What MySQL has and PostgreSQL does not: some date-part function names (`MONTH(...)` is
+            // built in Java by a few of the enabled modules) and one operator (`smallint = boolean`,
+            // which two callers need at once on the same column). Supplied here rather than by editing
+            // upstream's Java or by retyping a column.
+            // MySQL 有、PostgreSQL 没有的东西：几个日期分量函数名（少数启用的模块在 Java 里拼
+            // `MONTH(...)`），以及**一个算符**（`smallint = boolean`——两个调用方在同一列上同时需要它）。
+            // 补在这里，而不是去改上游的 Java 或把某一列改型。
+            "sql/keelbase-mysql-compat.sql",
             // Where a deployment's uploads go. Upstream's seed makes an *example* store master with
             // the vendor's own domain in it, so uploads belong on a server we do not control. Takes
             // the origin as a parameter, so one file serves every host running this stack.

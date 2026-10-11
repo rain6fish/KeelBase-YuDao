@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 --
--- MySQL's date-part functions, defined for PostgreSQL.
+-- What MySQL has and PostgreSQL does not, defined for PostgreSQL: some date-part function names, and
+-- one operator.
 --
 -- The modules this line enabled are written against MySQL, and a few of their queries build SQL in
 -- Java rather than in a mapper file — `MONTH(birthday) = ?` on the employee table is one. Those names
@@ -32,6 +33,45 @@
 -- 编号 1–53）。下面的公式是 MySQL 的 mode 0，于是在这里算出的周数，与上游的含义一致。
 --
 -- 幂等：每条语句都是 `create or replace`。
+
+-- ---------------------------------------------------------------------------------------------------
+-- The operator: `smallint = boolean`.
+--
+-- MySQL's `bit(1)` compares happily with both `0` and `true`, and two callers here depend on that at
+-- once on the same column. The host's own logic-delete writes its configured value as a literal
+-- (`deleted = 0`), while a MyBatis-Plus-Join condition binds the entity field's Java type and so sends
+-- a real boolean (`t1.deleted = ?`). With the column typed as a number the first works and the second
+-- is answered `operator does not exist: smallint = boolean`; typed as a boolean it is the other way
+-- round — `boolean = integer`. Neither type satisfies both, and the column is smallint everywhere else
+-- in this schema, so what is missing is the comparison itself.
+--
+-- Defined here rather than by editing upstream's Java, or by switching one table's column type and
+-- breaking every other query on it. This pair did not resolve before, so nothing that worked earlier
+-- changes meaning.
+--
+-- 算符：`smallint = boolean`。
+--
+-- MySQL 的 `bit(1)` 与 `0` 和 `true` 都愉快地比得上，而这里**有两个调用方在同一列上同时**依赖这一点：
+-- 宿主自己的逻辑删除把它配置里的值当**字面量**写进去（`deleted = 0`），而 MyBatis-Plus-Join 的条件按
+-- 实体字段的 Java 类型**绑定参数**，于是送的是真的布尔（`t1.deleted = ?`）。列若是数字，前者成立、后者
+-- 被答 `operator does not exist: smallint = boolean`；列若是布尔则反过来——`boolean = integer`。
+-- **两种类型都满足不了两个**，而这一列在这份 schema 的**其它地方都是 smallint**，所以缺的正是**这个比较
+-- 本身**。
+--
+-- 定义在这里，而不是去改上游的 Java、也不是把某张表的列型换掉（那会打断它上面的每一条其它查询）。
+-- 这一对参数原本**根本解析不了**，故**先前能跑的查询，含义一条都没变**。
+
+create or replace function kb_smallint_eq_bool(smallint, boolean) returns boolean
+  language sql immutable as $$ select $1 = (case when $2 then 1 else 0 end) $$;
+
+create or replace function kb_bool_eq_smallint(boolean, smallint) returns boolean
+  language sql immutable as $$ select (case when $1 then 1 else 0 end) = $2 $$;
+
+drop operator if exists = (smallint, boolean);
+create operator = (leftarg = smallint, rightarg = boolean, procedure = kb_smallint_eq_bool);
+
+drop operator if exists = (boolean, smallint);
+create operator = (leftarg = boolean, rightarg = smallint, procedure = kb_bool_eq_smallint);
 
 create or replace function month(d timestamp) returns int
   language sql immutable as $$ select extract(month from d)::int $$;
