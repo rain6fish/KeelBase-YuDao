@@ -441,18 +441,3 @@ html body .el-avatar > img {
 html body .el-avatar > .el-icon {
   visibility: hidden !important;
 }
-
-// ── the login page ──────────────────────────────────────────────────────────────────────────────────
-// It ends with a block of links into the vendor's own site — a reading list, a video course, an
-// interview collection and an outsourcing contact. Static markup with no flag behind it, identified
-// by where its links point rather than by position, so a row added after it cannot hide the wrong
-// thing. The divider that introduces it goes too: the block is what is being removed.
-// 它末尾是一组指向**厂商自己站点**的链接——书单、视频课、面试题、外包咨询。写死的标记、背后没有开关，
-// 靠**链接指向哪里**识别而不是排在第几位，于是往后再加一行也不会藏错东西。引出它的那条分隔线一并去掉：
-// 要拿掉的是**整块**。
-html body .login-form .el-row > .el-col:has(a[href*="iocoder.cn"]) {
-  display: none !important;
-}
-html body .login-form .el-row > .el-divider:has(+ .el-col a[href*="iocoder.cn"]) {
-  display: none !important;
-}

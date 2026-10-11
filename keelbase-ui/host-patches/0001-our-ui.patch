@@ -52,6 +52,18 @@ index 14b447c..4877590 100644
        </div>
        <Icon icon="tdesign:qrcode" :size="20" />
      </div>
+diff --git a/src/components/Icon/src/Icon.vue b/src/components/Icon/src/Icon.vue
+index 99e27b0..488076a 100644
+--- a/src/components/Icon/src/Icon.vue
++++ b/src/components/Icon/src/Icon.vue
+@@ -1,6 +1,6 @@
+ <script lang="ts" setup>
+ import { propTypes } from '@/utils/propTypes'
+-import { Icon as IconifyIcon } from '@iconify/vue'
++import { Icon as IconifyIcon } from '@iconify/vue/offline'
+ import { useDesign } from '@/hooks/web/useDesign'
+
+ defineOptions({ name: 'Icon' })
 diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
 index c22c950..029a7e9 100644
 --- a/src/layout/components/Logo/src/Logo.vue
@@ -175,6 +187,24 @@ index 13065de..cca60e7 100644
      introduction: '一个正经的简介',
      shortcutOperation: '快捷入口',
      operation: '操作',
+diff --git a/src/plugins/svgIcon/index.ts b/src/plugins/svgIcon/index.ts
+index cce2395..3fcfe83 100644
+--- a/src/plugins/svgIcon/index.ts
++++ b/src/plugins/svgIcon/index.ts
+@@ -1,10 +1,12 @@
+ import 'virtual:svg-icons-register'
+
+-import { addCollection } from '@iconify/vue'
++import { addCollection } from '@iconify/vue/offline'
+ import epIcons from '@iconify/json/json/ep.json'
+ import faIcons from '@iconify/json/json/fa.json'
+ import faSolidIcons from '@iconify/json/json/fa-solid.json'
++import keelbaseIcons from '@/assets/keelbase-icons'
+
+ addCollection(epIcons)
+ addCollection(faIcons)
+ addCollection(faSolidIcons)
++keelbaseIcons.forEach((collection) => addCollection(collection))
 diff --git a/src/store/modules/permission.ts b/src/store/modules/permission.ts
 index e9ca174..48597d1 100644
 --- a/src/store/modules/permission.ts
@@ -692,6 +722,32 @@ index 241cea1..3401051 100644
      username: 'admin',
      password: 'admin123',
      captchaVerification: '',
+diff --git a/src/views/Login/components/LoginForm.vue b/src/views/Login/components/LoginForm.vue
+index 3671612..39015a3 100644
+--- a/src/views/Login/components/LoginForm.vue
++++ b/src/views/Login/components/LoginForm.vue
+@@ -119,21 +119,6 @@
+           </div>
+         </el-form-item>
+       </el-col>
+-      <el-divider content-position="center">萌新必读</el-divider>
+-      <el-col :span="24" class="px-10px">
+-        <el-form-item>
+-          <div class="w-full flex justify-between">
+-            <el-link href="https://doc.iocoder.cn/" target="_blank">📚开发指南</el-link>
+-            <el-link href="https://doc.iocoder.cn/video/" target="_blank">🔥视频教程</el-link>
+-            <el-link href="https://www.iocoder.cn/Interview/good-collection/" target="_blank">
+-              ⚡面试手册
+-            </el-link>
+-            <el-link href="http://static.yudao.iocoder.cn/mp/Aix9975.jpeg" target="_blank">
+-              🤝外包咨询
+-            </el-link>
+-          </div>
+-        </el-form-item>
+-      </el-col>
+     </el-row>
+   </el-form>
+ </template>
 diff --git a/src/views/Login/components/MobileForm.vue b/src/views/Login/components/MobileForm.vue
 index e27ef86..597a2e3 100644
 --- a/src/views/Login/components/MobileForm.vue

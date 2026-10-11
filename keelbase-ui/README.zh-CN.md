@@ -109,6 +109,26 @@
 `import.meta.glob('../views/**/*.{vue,tsx}')` 把每个视图都收进来，好让后端菜单能按路径点到某一个。只删路由，
 IM 模块照样会被构建、被部署出去；两条路都够不到它，这正是代价始终只是那点字节的原因。
 
+## 图标，以及它们原先来自的那个 CDN
+
+控制台渲染 Iconify 图标，而上游只注册了三个集合（`ep`、`fa`、`fa-solid`）。交给它的其余每一个图标，
+它都在**运行时**从 Iconify 的公共 API 取——`api.iconify.design` / `api.simplesvg.com`——于是每位访客
+的浏览器都在访问一个这里没人控制的主机。那是厂商痕迹，而且是一次请求，不只是字符串。
+
+两处改动把它关掉。Icon 组件改为从 `@iconify/vue/offline` 导入，那份包里根本没有任何 fetch；产品真正
+渲染的图标则收进一个随页面发出的集合。
+
+    node scripts/gen-offline-icons.mjs           # 写出 keelbase-ui/host-overlay/src/assets/keelbase-icons.ts
+    node scripts/gen-offline-icons.mjs --check   # 只校验；有漂移则非零
+
+生成器扫描检出源码里的图标引用（故检出须带着我们的增量——先跑一次构建）。上游树跨约 35 个集合，整套
+打包要加约 70MB，故只保留被引用的那些（约 250 个图标、约 100KB）。`host-icons-extra.txt` 列出少数来自
+**数据**的图标——数据库菜单行带一个图标名，扫源码看不见。构建在装依赖之后跑 `--check`，于是上游日后新增
+的一处图标引用会让构建失败，而不是渲染成空白——在离线组件下，漏注册就长这样。
+
+**两份构建不共用注册表。** `@iconify/vue` 与 `@iconify/vue/offline` 各留各的 `storage`，故
+`addCollection` 必须与组件来自同一个入口——因此 `plugins/svgIcon/index.ts` 也从 `.../offline` 导入它。
+
 ## 头像与品牌标记
 
 `assets/keelbase-avatar.svg` 由 [DiceBear](https://www.dicebear.com) 生成（`shapes` 风格）。它**自带

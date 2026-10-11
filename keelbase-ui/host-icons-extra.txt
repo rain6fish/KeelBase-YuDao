@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Icons referenced by data rather than by source. The database's menu rows carry an `icon` column,
+# so no scan of the checkout can see them — these are the ones the seeded menus point at, listed by
+# hand so the generator stays a source-only scan. Each line is `prefix:name`; blank lines and lines
+# starting with `#` are ignored. A `prefix:name` whose prefix is not an @iconify/json collection, or
+# whose name the collection does not carry, is reported and skipped.
+#
+# 由数据而非源码引用的图标。数据库的菜单行带一个 `icon` 列，扫检出看不到它们——这些就是种子菜单指
+# 向的那些，手工列出，好让生成器保持「只看源码」。每行 `prefix:name`；空行与 `#` 开头的行忽略。
+# 前缀不是 @iconify/json 集合、或集合里没有该名字的行，会被报告并跳过。
+fa6-solid:brush
+foundation:page-edit
+simple-icons:civicrm
+simple-icons:erpnext
+tabler:ai

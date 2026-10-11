@@ -258,6 +258,19 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
 
   echo "installing the app's dependencies (this is upstream's own toolchain)…"
   ( cd "$UI_DIR" && "${PM[@]}" --registry="$REGISTRY" install )
+
+  # The offline icon set is derived from the checkout's own source, and the console's Icon component
+  # no longer asks a CDN — so an icon reference upstream adds after the set was last generated would
+  # render blank. It is verified here, the same loud failure the patch and the removal list get.
+  # 离线图标集由检出自身的源码派生，而控制台的 Icon 组件已不再问 CDN——故上游在集合上次生成之后新增的
+  # 一处图标引用会渲染成空白。在此校验——与补丁、删除清单同样的响亮失败。
+  if [[ -f "$REPO_ROOT/scripts/gen-offline-icons.mjs" ]]; then
+    node "$REPO_ROOT/scripts/gen-offline-icons.mjs" --check "$UI_DIR" || {
+      echo "the offline icon set is stale — regenerate: node scripts/gen-offline-icons.mjs" >&2
+      exit 1
+    }
+  fi
+
   ( cd "$UI_DIR" && "${PM[@]}" run "$BUILD_SCRIPT" )
 fi
 
