@@ -14,6 +14,9 @@ we did not write, regenerate, or edit) and `products` (generated from `specs/pro
 samples is the same limit the cross-host evidence note states: enough to see a shape repeat, not
 enough to freeze a contract.
 
+**Revised 2026-10-11**: `YudaoRowScope` replaced the scope machine's declared narrowing with a read of
+this host's own roles (§4.1 and §5, which is where the two sentences it changed are).
+
 ## 1. Which half is which
 
 | Half | Where it lives | A new module touches it? |
@@ -129,7 +132,10 @@ wrote, there is no Spec to write — see §2.
 1. **The scope machine is an owner-column machine.** `YudaoModuleScope.belongsToCaller` compares an
    `ownerUserId`. A module whose row range is a department, a permission table, or the tenant will not
    fit it and will need a second machine. This is the line between "the same every time" and
-   "different every time".
+   "different every time". A second machine now **partly** exists — `YudaoRowScope` reads *this host's
+   own* role table — but it answers a different question: whether the caller ranges over every row and
+   is therefore exempt from narrowing at all, and not "which rows does this caller see". The narrowing
+   itself is still the ownership column.
 2. **Nothing enumerates the governed modules.** RuoYi has a `GovernedModule` interface and a registry;
    YuDao's `CrmCustomerGovernance` and `ProductsGovernance` are bare `@Component`s. There is no single
    place that lists what is governed — so there is nowhere to read that a module was forgotten.
@@ -144,8 +150,10 @@ wrote, there is no Spec to write — see §2.
 - Two modules is two samples. Everything above describes the shape those two repeated, not a contract.
 - **Only CRM has been run end to end** (the `YD-2` gate). `products` has been generated and built, not
   put through the same gate.
-- The scope machine's administrator test is a **placeholder**: "administrator" means user 1 until a
-  role mapping is decided, and there is no read of the host's role table yet.
+- The scope machine's administrator test is still a **placeholder**: "administrator" means user 1
+  until a role mapping is decided. That half is unchanged. What changed on **2026-10-11** is the other
+  half — the host's role table *is* read now (`YudaoRowScope`), for the every-row exemption only.
+  Until then this file said there was no such read, and that sentence was true when it was written.
 
 ## 6. Where the source of truth is
 
