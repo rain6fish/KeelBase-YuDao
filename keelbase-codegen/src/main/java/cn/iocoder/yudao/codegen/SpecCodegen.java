@@ -152,6 +152,12 @@ public final class SpecCodegen {
             // `MONTH(...)`），以及**一个算符**（`smallint = boolean`——两个调用方在同一列上同时需要它）。
             // 补在这里，而不是去改上游的 Java 或把某一列改型。
             "sql/keelbase-mysql-compat.sql",
+            // A seeded menu routes to something that was never a page; its four `type = 3` children
+            // are the button permissions the dialog beside it checks, so they are re-parented to the
+            // page that uses them before the bogus row is switched off.
+            // 一条种子菜单路由到一个**从来不是页面**的东西上；它那四个 `type = 3` 子行是旁边那个弹窗要检查的
+            // 按钮权限，故先把它们改挂到真正使用它们的页面上，再把那行关掉。
+            "sql/keelbase-menus-without-pages.sql",
             // Where a deployment's uploads go. Upstream's seed makes an *example* store master with
             // the vendor's own domain in it, so uploads belong on a server we do not control. Takes
             // the origin as a parameter, so one file serves every host running this stack.
