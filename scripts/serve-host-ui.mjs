@@ -150,7 +150,20 @@ const server = createServer(async (req, res) => {
   }
   try {
     const body = await readFile(file)
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' })
+    // Same policy as `admin-nginx.conf`, and for the same reason: the assets are renamed with a
+    // content hash on every build and the old ones are dropped, so a remembered page would point at
+    // files that are gone and the console would come up on the previous build.
+    // 与 `admin-nginx.conf` 同一套策略，理由也相同：资源每次构建都按内容哈希改名、旧的会被删掉，故被记住
+    // 的页面会指向已经不在的文件，控制台于是跑在上一版。
+    const rel = file.slice(ROOT.length).replace(/\\/g, '/')
+    const cacheControl =
+      rel === '/index.html' ? 'no-store'
+        : rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable'
+          : 'no-cache, must-revalidate'
+    res.writeHead(200, {
+      'Content-Type': TYPES[extname(file)] || 'application/octet-stream',
+      'Cache-Control': cacheControl
+    })
     res.end(body)
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' })
