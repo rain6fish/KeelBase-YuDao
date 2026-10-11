@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Hosts that belong to some *other product* and must not survive in the artefact. The build blanks
+# every URL on these hosts after laying the delta on (scripts/sweep-vendor-hosts.mjs) and then
+# asserts none of them reached the built page — an upstream page carrying one is a vendor trace, and
+# a trace that only shows up in a lazily-loaded chunk is exactly the kind a grep of the entry file
+# misses.
+#
+# What belongs here: another product's own site, or demo assets it hosts — the platform this host was
+# forked from, a third-party shop theme, a model gallery. What does NOT: namespaces (w3.org,
+# json-schema.org), library docs (element-plus.org, vuejs.org), and the endpoints and assets of
+# integrations the product actually uses (a font CDN, a payment endpoint, a map API) — those are
+# functional, not branding.
+#
+# One domain per line, matched as a host or a subdomain of it. Blank lines and `#` lines are ignored.
+#
+# 属于**别的产品**、不得活在产物里的主机。构建在铺完增量后把这些主机上的每条 URL 清空
+# （scripts/sweep-vendor-hosts.mjs），随后断言它们一条都没进构建出的页面——上游某个页面带着一条，
+# 就是一处厂商痕迹；而只出现在**懒加载分片**里的那种，正是只 grep 入口文件会漏掉的。
+#
+# 该收进来的：另一个产品自己的站点，或它托管的演示资产——被 fork 的平台、第三方商城主题、模型图库。
+# 不该收的：命名空间（w3.org、json-schema.org）、库文档（element-plus.org、vuejs.org），
+# 以及产品**真的在用**的集成的端点与资产（字体 CDN、支付端点、地图 API）——那些是功能，不是品牌。
+#
+# 一行一个域名，按「该域或其子域」匹配。空行与 `#` 行忽略。
+iocoder.cn
+sheepjs.com
+bigpt8.com

@@ -101,21 +101,30 @@ is reported as a failure (`502`) — so the next symptom is never a silently emp
    else. The side effect is that the host's primary-colour picker no longer visibly changes the page:
    this layer pins it on purpose.
 
-## Three deltas the layer cannot express
+## Four deltas the layer cannot express
 
 A stylesheet can restyle what the host renders. It cannot change what the host renders from its own
-source — and three of the things this product needs are exactly that: the dashboard card's contents are
-a static array in a component, the logo is a source import, and the IM module is not shipped at all.
-They are therefore carried as deltas and laid over the checkout before it is built.
+source — and four of the things this product needs are exactly that: the dashboard card's contents are
+a static array in a component, the logo is a source import, the IM module is not shipped at all, and
+several hundred module pages name a host this product does not own. They are therefore carried as
+deltas and laid over the checkout before it is built.
 
-    keelbase-ui/host-overlay/      files we add to the checkout
-    keelbase-ui/host-patches/      a patch applied to the checkout
-    keelbase-ui/host-removals.txt  paths we take out of the checkout
+    keelbase-ui/host-overlay/          files we add to the checkout
+    keelbase-ui/host-patches/          a patch applied to the checkout
+    keelbase-ui/host-removals.txt      paths we take out of the checkout
+    keelbase-ui/host-vendor-hosts.txt  hosts whose URLs are blanked, then asserted absent
 
 The checkout is disposable and refetched, so the build resets it to upstream first and then lays the
-delta on. All three fail loudly on purpose: an overlay whose file was moved upstream, a patch that no
-longer applies, and a removal whose path is no longer there, all mean our delta needs revisiting —
-never that it should be skipped, which would leave the artefact quietly half-ours.
+delta on. All of them fail loudly on purpose: an overlay whose file was moved upstream, a patch that
+no longer applies, a removal whose path is no longer there, and a vendor host that survives into the
+artefact, all mean our delta needs revisiting — never that it should be skipped, which would leave the
+artefact quietly half-ours.
+
+**The last one is a sweep, not a list of paths**, because the links into the platform this host was
+forked from are spread over ~350 files and cannot be patched one by one.
+`scripts/sweep-vendor-hosts.mjs` blanks the URL on every listed host after the patch has been
+applied, and the build then asserts none reached the built page. The assertion is the point: those
+links never render, so a missed one shows up nowhere except inside a lazily-loaded chunk.
 
 **The overlay adds, it does not replace.** That is what keeps the coupling loud: a file we add is
 referenced only from a patch, so upstream moving the code that references it makes the patch fail and

@@ -64,6 +64,32 @@ index 99e27b0..488076a 100644
  import { useDesign } from '@/hooks/web/useDesign'
 
  defineOptions({ name: 'Icon' })
+diff --git a/src/config/axios/service.ts b/src/config/axios/service.ts
+index 3305354..0ad729c 100644
+--- a/src/config/axios/service.ts
++++ b/src/config/axios/service.ts
+@@ -202,14 +202,13 @@ service.interceptors.response.use(
+       ElMessage.error({
+         offset: 300,
+         dangerouslyUseHTMLString: true,
+-        message:
+-          '<div>' +
+-          t('sys.api.errMsg901') +
+-          '</div>' +
+-          '<div> &nbsp; </div>' +
+-          '<div>参考 https://doc.iocoder.cn/ 教程</div>' +
+-          '<div> &nbsp; </div>' +
+-          '<div>5 分钟搭建本地环境</div>'
++        // The banner used to end with a link into the vendor's tutorial and a "set up a local
++        // environment in 5 minutes" line. Neither is ours to point at, so the message is the error
++        // alone — the same choice the sweep makes for the doc-alert URLs, made readable here because
++        // this one is what the user actually sees.
++        // 这条提示原先以一条指向厂商教程的链接和一句「5 分钟搭建本地环境」收尾。两者都不是我们能指的，
++        // 故只留错误本身——与清扫对 doc-alert URL 的处置同一选择，只是这条是用户真看得见的，故写得体面些。
++        message: '<div>' + t('sys.api.errMsg901') + '</div>'
+       })
+       return Promise.reject(new Error(msg))
+     } else if (code !== 0 && code !== 200) {
 diff --git a/src/layout/components/Logo/src/Logo.vue b/src/layout/components/Logo/src/Logo.vue
 index c22c950..029a7e9 100644
 --- a/src/layout/components/Logo/src/Logo.vue

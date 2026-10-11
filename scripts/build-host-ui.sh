@@ -180,6 +180,20 @@ if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" || -f "$REMOVALS"
       echo "applied $(basename "$p")"
     done
   fi
+
+  # --- 1c. the hosts this product does not name -----------------------------------------------------
+  # A fourth thing the delta has to do, and it runs last because it has to see the tree the patch
+  # produced. Links into the platform this host was forked from survive in module pages that never
+  # render — the docs banner is off by a flag — so what is left is a string in a lazily-loaded chunk.
+  # There are hundreds of them and they cannot be patched one by one; the sweep blanks the URL on
+  # every listed host, and section 2b asserts none reached the artefact.
+  #
+  # 增量要做的第四件事，且它跑在最后——因为它必须看见补丁产出的那棵树。指向**被 fork 的那个平台**的
+  # 链接，活在从不渲染的模块页里——文档提示条由开关关掉——于是剩下的是懒加载分片里的一个字符串。它们有
+  # 几百处、没法逐个打补丁；清扫把清单上每个主机上的 URL 清空，2b 段再断言没有一条进产物。
+  if [[ -f "$REPO_ROOT/keelbase-ui/host-vendor-hosts.txt" ]]; then
+    node "$REPO_ROOT/scripts/sweep-vendor-hosts.mjs" "$UI_DIR"
+  fi
 fi
 
 # --- 2. build the app, from an untouched tree ------------------------------------------------------
@@ -296,6 +310,22 @@ if grep -rqsE "localhost:48080|127\.0\.0\.1:48080" "$DIST"; then
   grep -rlE "localhost:48080|127\.0\.0\.1:48080" "$DIST" | sed 's/^/  /' >&2
   echo "  leave VITE_BASE_URL empty (or set KEELBASE_YUDAO_UI_BASE_URL) and rebuild" >&2
   exit 1
+fi
+
+# --- 2c. the page must not name another product's host ---------------------------------------------
+# The sweep in 1c walks the sources; this is what makes the guarantee hold rather than depend on that
+# walk being complete. A vendor link is not a request — the pages that carry one never render — so it
+# shows up nowhere except in a chunk, which is precisely why it is asserted here instead of noticed.
+# 1c 的清扫走的是源码；**这一段**才是让保证成立的东西，而不是依赖那次遍历足够全。厂商链接不是请求——
+# 载着它的页面从不渲染——故它哪儿都不显形，只藏在某个分片里；这正是要在这里断言、而不是靠碰巧看见的原因。
+if [[ -f "$REPO_ROOT/keelbase-ui/host-vendor-hosts.txt" ]]; then
+  VENDOR_RE="$(grep -vE '^[[:space:]]*(#|$)' "$REPO_ROOT/keelbase-ui/host-vendor-hosts.txt" | sed 's/\./\\./g' | paste -sd'|' -)"
+  if [[ -n "$VENDOR_RE" ]] && grep -rqsE "$VENDOR_RE" "$DIST"; then
+    echo "the built page still names a vendor host:" >&2
+    grep -rlE "$VENDOR_RE" "$DIST" | sed 's/^/  /' >&2
+    echo "  a host added upstream reaches here — extend keelbase-ui/host-vendor-hosts.txt or the sweep" >&2
+    exit 1
+  fi
 fi
 
 # --- 3. find a sass to compile the tokens with -----------------------------------------------------
