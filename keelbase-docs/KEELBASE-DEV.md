@@ -226,6 +226,11 @@ git diff upstream/master-jdk25 HEAD --stat
    done
    ```
 
+   **That loop is now a script**: `node scripts/check-upstream-footprint.mjs`. Use it rather than the
+   two commands above — it diffs against **the pin tag this repository carries** (`upstream-pin-994605b`)
+   rather than the moving branch, so upstream's own progress is not added to this line's number, and it
+   reports against the boundary `D45` settled (`KEELBASE-UPSTREAM.md`).
+
 ## Where the line's records are
 
 | | |

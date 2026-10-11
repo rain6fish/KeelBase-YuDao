@@ -194,6 +194,10 @@ git diff upstream/master-jdk25 HEAD --stat
    done
    ```
 
+   **那条循环如今是一个脚本**：`node scripts/check-upstream-footprint.mjs`。用它，别用上面那两条命令——它对着
+   **本仓自己带着的那个 pin tag**（`upstream-pin-994605b`）比、而不是对着会漂的分支，故**上游自己的进度不会
+   被算进本线的数字**；而它报的读数，对着的是 `D45` 定下的那条边界（`KEELBASE-UPSTREAM.md`）。
+
 ## 本线的记录在哪
 
 | | |
