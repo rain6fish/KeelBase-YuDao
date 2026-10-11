@@ -67,18 +67,24 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>An unanswerable read narrows; it never widens — and it does not force a tenant to make itself
  * answerable.</b> Yudao's reads are tenant-scoped and the governed tool path does not always carry a
- * tenant (that is the other decision's unfinished half), so those reads can fail outright. Pinning a
- * tenant here would make them succeed and would also make this seam disagree with
- * {@link YudaoRowScope}, which reads the same table under whatever context it is given — two answers to
- * one question on exactly the path where they meet. So the failure is answered the way that one answers
- * it: narrow to the caller's own rows, and say so in the log rather than swallow it. Failing open would
- * turn "we could not tell" into "sees everything".
+ * tenant, so those reads can fail outright. Pinning a tenant here would make them succeed by answering
+ * **under a tenant this seam guessed**, and a guessed read errs in only one direction: somebody with no
+ * role in the tenant the caller actually belongs to, but a role under the guessed one, would be widened
+ * past — which is the one thing a row gate must never do. So a fallback stays a fallback rather than
+ * becoming an answer, which is the same discipline this host states where it resolves the tenant itself.
+ * Pinning would also make this seam disagree with {@link YudaoRowScope}, which reads the same table under
+ * whatever context it is given — two answers to one question on exactly the path where they meet. The
+ * failure is therefore answered the way that one answers it: narrow to the caller's own rows, and say so
+ * in the log rather than swallow it. Failing open would turn "we could not tell" into "sees everything".
  *
  * <p><b>读不出来只会收窄，永不放宽 —— 而且它不会去钉一个租户让自己读得出来。</b> 芋道的读法是**按租户**的，
- * 而受治理的工具路径**不总带租户**（那是另一条决定尚未落的半），故那些读**会整条失败**。在这里钉一个租户会让
- * 它们成功，**也会让这条缝与 {@link YudaoRowScope} 给出不同答案**——后者在它拿到的上下文下读同一张表，而这
- * 正是两者相遇的那条路上「一个问题两个答案」。所以失败按**它**的方式回答：**收窄到调用方本人的行**，并且
- * **记进日志**而不是静静吞掉。**失败即放行**会把「我们说不出来」变成「看得见全部」。
+ * 而受治理的工具路径**不总带租户**，故那些读**会整条失败**。在这里钉一个租户会让它们成功，代价是**按这条缝
+ * 猜出来的一个租户**作答 —— 而**猜出来的读法只会朝一个方向错**：一个**在调用方真正所属的那个租户里没有角色、
+ * 却恰好在猜的那个租户下有角色**的人，会被**凭猜放过** —— 而那正是行闸绝不能做的事。所以**回落是回落、不是
+ * 答案**，与宿主自己解析租户的地方是同一条纪律。钉租户**也会**让这条缝与 {@link YudaoRowScope} 给出不同答案
+ * ——后者在它拿到的上下文下读同一张表，而这正是两者相遇的那条路上「一个问题两个答案」。所以失败按**它**的方式
+ * 回答：**收窄到调用方本人的行**，并且**记进日志**而不是静静吞掉。**失败即放行**会把「我们说不出来」变成
+ * 「看得见全部」。
  */
 @Component
 @Slf4j
