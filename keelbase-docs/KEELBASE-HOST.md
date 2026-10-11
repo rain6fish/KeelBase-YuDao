@@ -72,6 +72,12 @@ licence surface of upstream's module dependency tree are all unmeasured.
 
 ## The runtime's guarantee is unchanged
 
-Embedding it here changes none of it: **the model only proposes**. Identity, permission,
-confirmation, audit and revoke are applied downstream, unconditionally, on every path that executes
-an action — not on a separate console.
+Embedding it here changes none of it: **the model only proposes**. On the path KeelBase puts the model
+on, identity, permission, confirmation, audit and revoke are applied downstream, unconditionally — not
+on a separate console.
+
+**Two model paths, two depths.** That sentence is about **that** path, and this host has more than one.
+The module this host ships with for AI, and `yudao-module-ai`, both let a model call tools directly —
+**KeelBase does not stand in between**; they are upstream's own console features. Nothing here governs
+them; the governed path is the one the runtime drives. So the guarantee is a statement about **the
+governed path**, not about every AI action this host can perform.
