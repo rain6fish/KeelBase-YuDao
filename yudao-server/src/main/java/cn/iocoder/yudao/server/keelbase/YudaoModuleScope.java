@@ -16,31 +16,30 @@ import org.springframework.stereotype.Component;
  * question the same way. The seed-administrator exemption stays, as the RuoYi side also keeps it: it
  * does not depend on the role table being answerable.
  *
- * <p>The shortcut the identity resolver declares is unchanged: Yudao's role keys are not the contract's
- * vocabulary, so "administrator" still means user 1 there until a real mapping is decided.
+ * <p>Who counts as an administrator is {@link YudaoAdministrator}'s answer, the same one the identity seam
+ * takes: the host's own roles decide it, so the module face and the identity face cannot end up with two
+ * different ideas of who is exempt.
  *
  * 生成模块的切面共用的机器——RuoYi 宿主那份 {@code GeneratedModuleScope} 的芋道孪生；**行范围现在读自本宿主
  * 自己的角色**。
  *
  * <p>那个读法过去是一层**声明的收窄**：RuoYi 那台问自己的角色表「调用方是否覆盖全部行」，而这里没有这种读法，
  * 故只有**种子管理员**被放过。**它现在有了**（{@link YudaoRowScope}），于是两个宿主对同一个问题给出**同一种**回答。
- * **种子管理员**那条豁免留下——RuoYi 那侧同样保留——因为它**不依赖**角色表答得出来。
  *
- * <p>身份解析器声明的那条简化**未变**：芋道的 roleKey 不是契约的词表，故在真正定下映射之前，那一处的「管理员」
- * 仍指用户 1。
+ * <p>**谁算管理员**由 {@link YudaoAdministrator} 回答，与身份那条缝取的是**同一个**答案：**宿主自己的角色**说了算，
+ * 于是模块面与身份面**不会各自长出**一套「谁被豁免」。
  */
 @Component
 public class YudaoModuleScope {
 
-    /** Yudao's seed super administrator, until a role mapping is decided. / 芋道种子超管，映射定下前。 */
-    private static final long SEED_ADMIN_ID = 1L;
-
     private final YudaoCallerId callers;
     private final YudaoRowScope scopes;
+    private final YudaoAdministrator administrators;
 
-    public YudaoModuleScope(YudaoCallerId callers, YudaoRowScope scopes) {
+    public YudaoModuleScope(YudaoCallerId callers, YudaoRowScope scopes, YudaoAdministrator administrators) {
         this.callers = callers;
         this.scopes = scopes;
+        this.administrators = administrators;
     }
 
     /**
@@ -62,7 +61,7 @@ public class YudaoModuleScope {
      */
     public Long callerToEnforce() {
         Long caller = callers.current();
-        if (caller == null || isSeedAdmin(caller)) {
+        if (caller == null || administrators.isAdmin(caller)) {
             return null;
         }
         return YudaoRowScope.EVERY_ROW.equals(scopes.widestFor(caller)) ? null : caller;
@@ -103,7 +102,4 @@ public class YudaoModuleScope {
         return ids;
     }
 
-    private static boolean isSeedAdmin(Long caller) {
-        return caller == SEED_ADMIN_ID;
-    }
 }

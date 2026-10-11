@@ -25,8 +25,10 @@ import org.springframework.web.server.ResponseStatusException;
  *       departments and tenants, and manufacturing either into the contract's org scope would widen
  *       row visibility on a guess.</li>
  *   <li><b>Business roles collapse onto the contract's two.</b> Yudao's role keys are not the frozen
- *       role vocabulary, so the seed super administrator (id 1) maps to {@code admin} and every other
- *       user to {@code user}. A finer mapping is a decision about Yudao's roles, not a translation.</li>
+ *       role vocabulary, so a caller maps to {@code admin} or {@code user} and nothing finer. <b>Which
+ *       one</b> is no longer decided here by comparing ids: it is {@link YudaoAdministrator}'s answer, so
+ *       the identity seam and the module face give the same one. A finer mapping than two would still be a
+ *       decision about Yudao's roles, not a translation.</li>
  * </ul>
  *
  * 从芋道自己的管理端用户表回答「这个人在本地是谁」。
@@ -38,15 +40,13 @@ import org.springframework.web.server.ResponseStatusException;
  * <ul>
  *   <li><b>组织范围缺失。</b>{@code Principal} 不带组织：芋道有部门、也有租户，把任一个合成契约的组织范围
  *       等于凭猜测放宽行可见性。</li>
- *   <li><b>业务角色塌缩到契约的两个上。</b>芋道的 roleKey 不是冻结的角色词表，故种子超级管理员（id 1）映到
- *       {@code admin}、其余用户映到 {@code user}。更细的映射是对芋道角色的一个决定，不是翻译。</li>
+ *   <li><b>业务角色塌缩到契约的两个上。</b>芋道的 roleKey 不是冻结的角色词表，故调用方只映到 {@code admin}
+ *       或 {@code user}、没有更细的。**映哪一个**不再由这里比对 id 来决定：那是 {@link YudaoAdministrator}
+ *       的答案，于是**身份这条缝与模块面给出同一个**。比两个更细的映射，仍是对芋道角色的一个决定、不是翻译。</li>
  * </ul>
  */
 @Component
 public class YudaoIdentityResolver implements IdentityResolver {
-
-    /** Yudao's seed super administrator; the counterpart of RuoYi's {@code user.isAdmin()}. */
-    private static final long SEED_ADMIN_ID = 1L;
 
     /**
      * Which tenant a host-service call runs under is {@link YudaoCallerTenant}'s to answer now — the
@@ -60,9 +60,11 @@ public class YudaoIdentityResolver implements IdentityResolver {
      * 租户上、并把该决定记为未答；那个决定后来做了，而且做的方式与隔壁读 caller id 的方式相同。
      */
     private final AdminUserApi adminUsers;
+    private final YudaoAdministrator administrators;
 
-    public YudaoIdentityResolver(AdminUserApi adminUsers) {
+    public YudaoIdentityResolver(AdminUserApi adminUsers, YudaoAdministrator administrators) {
         this.adminUsers = adminUsers;
+        this.administrators = administrators;
     }
 
     @Override
@@ -89,7 +91,7 @@ public class YudaoIdentityResolver implements IdentityResolver {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN, "the authenticated caller is not a user here");
         }
-        String role = userId == SEED_ADMIN_ID ? Principal.ROLE_ADMIN : Principal.ROLE_USER;
+        String role = administrators.isAdmin(userId) ? Principal.ROLE_ADMIN : Principal.ROLE_USER;
         return new Principal(String.valueOf(user.getId()), role);
     }
 
