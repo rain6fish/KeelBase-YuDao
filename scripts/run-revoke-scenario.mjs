@@ -201,9 +201,20 @@ console.log('== 场景 3 · 试一次撤销，断言两种结局都成立的那�
     // The refusal has to be **honest**: it names what is missing, and it leaves no line saying a
     // withdrawal happened. Both halves are asserted — a refusal that left a row would be the escape the
     // contract's `effect_revoke` value was added to close.
+    //
+    // What is asserted about the *wording* is only the part that is stable: that it names **which type**
+    // has no path. Asserting the whole sentence would turn this gate red on the day the runtime improves
+    // it (D37's design §3 rewrites it to point at `SideEffectCompensator`) — a red caused by the
+    // assertion, not by the change. The type is read from the effect itself rather than hard-coded.
+    //
     // 拒绝必须**诚实**：它点名缺了什么，且**不留**任何「撤销发生过」的行。两半都断言 —— 留下行的拒绝，正是
     // 契约加 `effect_revoke` 这个取值要堵的那个逃逸口。
-    check(`被拒且理由点名缺失的本地路（HTTP ${r.status}）`, true, /no local revoke path/.test(body));
+    //
+    // 关于**文案**只断言**稳定**的那一点：它点名了**哪个类型**没有路。断言整句会让这道闸在运行时改善文案的那天
+    // 转红（`D37` 设计 §3 会把它改写成指向 `SideEffectCompensator`）—— 那是**断言**造成的红，不是改动造成的。
+    // 类型从 effect 自己读出来，不写死。
+    const refusedType = psql(`select result_type from side_effects where id = ${effectId}`);
+    check(`被拒且理由点名了没有路的那个类型（${refusedType}，HTTP ${r.status}）`, true, body.includes(`resultType=${refusedType}`));
     check('被拒时审计一行都不多', before, after);
     check('被拒时账本行未动', 'executed', status);
   }
