@@ -42,15 +42,14 @@ PG_URL="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
 # 上的模型版，而 `/ai/task` 也拿到那条受治理的多步循环。key 从环境读，**不写在这里**。
 AI_ARGS=()
 if [ -n "${KEELBASE_MODEL_API_KEY:-}" ]; then
-  # The host's own `application.yaml` switches `spring.ai.chat.client.enabled` **off** on purpose —
-  # its comment says the builder wants a single `ChatModel` and the project makes several. That switch
-  # is upstream's, and it stays untouched; what turns it back on is this parameter, and only together
-  # with a key. If the host does make more than one, the startup fails loudly here rather than the
-  # model loop quietly not existing.
-  # 宿主自己的 `application.yaml` **故意**关掉了 `spring.ai.chat.client.enabled`——它的注释说 builder 要唯一一个
-  # `ChatModel`、而项目会建多个。那个开关是上游的、**一字不动**；把它打开的正是这个参数，且只与 key 同时给。
-  # 宿主真建了不止一个的话，这里会**启动失败并说清楚**，而不是让模型回路静静不存在。
-  AI_ARGS+=("--spring.ai.chat.client.enabled=true")
+  # The builder the model loop needs is the host's **own** bean (`YudaoChatClientConfiguration`), not
+  # the autoconfiguration the host disables on purpose. That one wants a single `ChatModel` and this
+  # project makes several — its own AI module and the report module both contribute — so switching it
+  # back on fails startup, which is exactly what this parameter used to do.
+  # 模型回路要的那个 builder 是**宿主自己的** bean（`YudaoChatClientConfiguration`），不是宿主**故意关掉**的
+  # 那个自动配置——那个要唯一一个 `ChatModel`、而本项目会造多个（它自己的 AI 模块与 report 模块各出一份），
+  # 把它开回来就会启动失败，而这个参数从前正是那么干的。
+  AI_ARGS+=("--keelbase.ai.enabled=true")
   AI_ARGS+=("--spring.ai.openai.api-key=$KEELBASE_MODEL_API_KEY")
   AI_ARGS+=("--spring.ai.openai.base-url=${KEELBASE_MODEL_BASE_URL:-https://api.deepseek.com}")
   AI_ARGS+=("--spring.ai.openai.chat.options.model=${KEELBASE_MODEL_NAME:-deepseek-v4-flash}")
