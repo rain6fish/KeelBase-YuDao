@@ -975,6 +975,28 @@ index a1b2c3d..e4f5a6b 100644
 +    img: '/keelbase-social-wecom.svg'
    }
  }
+diff --git a/src/views/bpm/model/form/FormDesign.vue b/src/views/bpm/model/form/FormDesign.vue
+index 6a9d851..8d25cf8 100644
+--- a/src/views/bpm/model/form/FormDesign.vue
++++ b/src/views/bpm/model/form/FormDesign.vue
+@@ -36,7 +36,7 @@
+         effect="light"
+         placement="top"
+       >
+-        <Icon icon="ep:question" class="ml-5px" />
++        <Icon icon="ep:question-filled" class="ml-5px" />
+       </el-tooltip>
+     </el-form-item>
+     <el-form-item
+@@ -55,7 +55,7 @@
+         effect="light"
+         placement="top"
+       >
+-        <Icon icon="ep:question" class="ml-5px" />
++        <Icon icon="ep:question-filled" class="ml-5px" />
+       </el-tooltip>
+     </el-form-item>
+     <!-- 表单预览 -->
 diff --git a/src/views/infra/skywalking/index.vue b/src/views/infra/skywalking/index.vue
 index f5055d7..36dad8d 100644
 --- a/src/views/infra/skywalking/index.vue

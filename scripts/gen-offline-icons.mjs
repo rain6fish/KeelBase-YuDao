@@ -148,8 +148,17 @@ for (const prefix of [...wanted.keys()].sort()) {
   out.push(c)
 }
 if (problems.length) {
-  console.error('referenced icons that no collection carries (skipped):')
+  // Loud on purpose. A name the source references but no collection carries is not a missing
+  // registration — it is a name that will render blank wherever it is used, and with the offline
+  // component there is no CDN request left to betray it. `ep:question` sat in two upstream pages
+  // that way until this check existed.
+  // 刻意响亮。源码引用、而没有任何集合带的名字，**不是**漏注册——它是一个**在每处使用它的地方都渲染成
+  // 空白**的名字；换到离线组件之后，再没有一次 CDN 请求会把它暴露出来。`ep:question` 就这样在上游两个页面
+  // 里躺着，直到有了这道检查。
+  console.error('these names are referenced but no collection carries them — they render blank:')
   for (const p of problems) console.error('  ' + p)
+  console.error('fix the name at its use site (or the collection), rather than shipping a blank icon')
+  process.exit(1)
 }
 
 const body = out.map((c) => '  ' + JSON.stringify(c)).join(',\n')
