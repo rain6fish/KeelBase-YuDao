@@ -727,12 +727,12 @@ index 23ecc3a..9c8ca00 100644
        @change="handelUpload"
      />
 +    <!--
-+      The preset row: an avatar that needs no upload, and what gets stored is this path itself. A
-+      relative path resolves against whatever origin serves the console, so the same choice works on
-+      every deployment and survives a redeploy — which a stored absolute URL would not.
++      The preset row: an avatar that needs no upload. The API validates this field as a URL, so what
++      is stored is the absolute form — but the paths below stay site-relative, and the comparison is
++      on the path, so the same choice reads as "current" on every deployment.
 +
-+      预设行：不靠上传的头像，而存下来的就是这条路径本身。相对路径对**服务控制台的那个源**解析，所以同一个
-+      选择在每个部署上都成立、也挺得过重新部署——而存下来的绝对 URL 挺不过。
++      预设行：不靠上传的头像。接口把该字段按 URL 校验，故**存下来的是绝对形式**——但下面这些路径保持
++      站点相对，而比对的是那条路径，于是同一个选择在每个部署上都读作「当前在用」。
 +    -->
 +    <div class="keelbase-avatar-presets">
 +      <img
@@ -741,7 +741,7 @@ index 23ecc3a..9c8ca00 100644
 +        :src="preset"
 +        :alt="preset"
 +        :title="preset"
-+        :class="{ 'is-current': img === preset }"
++        :class="{ 'is-current': (img || '').endsWith(preset) }"
 +        @click="choosePreset(preset)"
 +      />
 +    </div>
