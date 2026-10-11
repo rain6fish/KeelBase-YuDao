@@ -1,0 +1,11 @@
+<!--
+  The social-binding list's icon for 企业微信, kept locally — the same reason as its sibling
+  `keelbase-social-dingtalk.svg`, and the same rule: ours, not the provider's logo.
+
+  社交绑定列表里「企业微信」的图标，放在本地——理由与它旁边那个 `keelbase-social-dingtalk.svg` 相同，
+  规矩也相同：**我方的**，不是厂商的商标。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" role="img" aria-label="WeCom">
+  <rect width="20" height="20" rx="4" fill="#07c160"/>
+  <text x="10" y="14.5" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff" font-family="system-ui, sans-serif">W</text>
+</svg>

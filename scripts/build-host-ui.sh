@@ -234,6 +234,15 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   # 这正是它要与 `sql/keelbase-brand-names.sql` **一起**改、而不能单独改的原因。
   export VITE_APP_DEFAULT_LOGIN_TENANT="${KEELBASE_YUDAO_UI_TENANT:-KeelBase}"
 
+  # Upstream's base `.env` carries a Baidu analytics id and `main.ts` loads that script
+  # unconditionally, so every page view of this console is reported to Baidu — under *their* account.
+  # Empty means the plugin returns early and no request is made. Set
+  # KEELBASE_YUDAO_UI_BAIDU_CODE to use an account of our own.
+  # 上游的基础 `.env` 里带着一个百度统计 id，而 `main.ts` 无条件加载那段脚本，故这个控制台的**每次浏览**
+  # 都会报到百度——**记在它们的账号**上。留空即插件早退、不发任何请求；要用自己的账号就设
+  # KEELBASE_YUDAO_UI_BAIDU_CODE。
+  export VITE_APP_BAIDU_CODE="${KEELBASE_YUDAO_UI_BAIDU_CODE:-}"
+
   # Where the built page sends its API calls. Upstream's own `.env.prod` pins this to
   # `http://localhost:48080`, which is right for the machine that builds it and wrong for every
   # machine that serves it: the page would ask the *visitor's* own machine for the API, and every

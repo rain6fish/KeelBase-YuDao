@@ -872,3 +872,24 @@ index 76e7a16..8112fca 100644
 +  }
  ]
 
+diff --git a/src/utils/constants.ts b/src/utils/constants.ts
+index a1b2c3d..e4f5a6b 100644
+--- a/src/utils/constants.ts
++++ b/src/utils/constants.ts
+@@ -52,14 +52,14 @@ export const SystemUserSocialTypeEnum = {
+ export const SystemUserSocialTypeEnum = {
+   DINGTALK: {
+     title: '钉钉',
+     type: 20,
+     source: 'dingtalk',
+-    img: 'https://s1.ax1x.com/2022/05/22/OzMDRs.png'
++    img: '/keelbase-social-dingtalk.svg'
+   },
+   WECHAT_ENTERPRISE: {
+     title: '企业微信',
+     type: 30,
+     source: 'wechat_enterprise',
+-    img: 'https://s1.ax1x.com/2022/05/22/OzMrzn.png'
++    img: '/keelbase-social-wecom.svg'
+   }
+ }

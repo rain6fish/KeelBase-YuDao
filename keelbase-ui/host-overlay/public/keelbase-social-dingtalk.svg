@@ -1,0 +1,18 @@
+<!--
+  The social-binding list's icon for 钉钉, kept locally.
+
+  Upstream points this at an image host (`s1.ax1x.com`), so the console's profile page reaches
+  outside for a 20px icon — a request the visitor did not ask for, to a host the deployment does not
+  control, and one that fails on any network that cannot reach it. This is drawn here instead, and it
+  is our own mark rather than the provider's: a letter in the provider's colour, not their logo.
+
+  社交绑定列表里「钉钉」的图标，放在本地。
+
+  上游把它指向一个图床（`s1.ax1x.com`），于是控制台的资料页为了一个 20px 的图标去访问外部——那是访问者
+  没有要求的请求、指向本部署并不控制的主机，且在够不到它的网络里失败。这里换成自己画的，而且**是我方的**
+  标记、不是厂商的：厂商配色下的一个字母，不是它的商标。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" role="img" aria-label="DingTalk">
+  <rect width="20" height="20" rx="4" fill="#1677ff"/>
+  <text x="10" y="14.5" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff" font-family="system-ui, sans-serif">D</text>
+</svg>
