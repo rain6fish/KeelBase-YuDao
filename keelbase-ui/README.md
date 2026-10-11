@@ -199,30 +199,24 @@ degradation rather than a wrong image. `host-overlay/src/assets/imgs/keelbase-av
 bytes for the components that import a default from source.
 
 The ten avatars a person picks from are
-`host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`, also DiceBear — the **`personas`** style,
-"Personas by Draftbit", **CC BY 4.0**. Each file carries that provenance in its own metadata, and the
-attribution the licence asks for is in `NOTICE`. They are fetched once and vendored rather than
-linked: a preset served from a generator's API would put every visitor's browser in touch with a host
-this deployment does not control, which is the same trace the icons and the analytics tag were
-removed for.
+`host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`, also DiceBear — the **`shapes`** style,
+**CC0 1.0**, DiceBear's own. Each file carries that provenance in its own metadata. They are fetched
+once and vendored rather than linked: a preset served from a generator's API would put every
+visitor's browser in touch with a host this deployment does not control, which is the same trace the
+icons and the analytics tag were removed for.
 
-    curl -s 'https://api.dicebear.com/9.x/personas/svg?seed=<seed>&size=256&backgroundColor=<hex>' \
-      '&skinColor=f2d3b3,ebc8a0,e5b98f,f7dcc0,d9a97f&hairColor=1b1b1b,2b2118,121212,3a2a20' \
-      '&eyes=open,happy,wink&mouth=smile,bigSmile,smirk&nose=smallRound,mediumRound' \
-      '&hair=long,bobCut,bobBangs,straightBun,extraLong,shortCombover,sideShave,bunUndercut' \
-      '&facialHairProbability=0' \
+    curl -s 'https://api.dicebear.com/9.x/shapes/svg?seed=<seed>&size=256' \
       -o host-overlay/public/keelbase-avatar-01.svg
 
-**Those parameters are the point, not decoration.** Left alone, `personas` draws from its whole
-palette and its whole library of parts, and the result is a set of Western-looking strangers with
-beards and faces ranging from annoyed to startled. Pinned as above the ten read as one set of
-East-Asian office colleagues: warm skin tones, black hair, straight or bunned hair, friendly mouths,
-no facial hair. `hair` and `nose` are given as lists because a fully pinned part would make all ten
-identical — each seed picks from the list.
+There are no parameters to pin, which is the reason this style was chosen over the drawn ones: it
+composes abstract geometry, so there are no expressions to keep friendly and no facial features to
+keep coherent, and the ten differ from each other in silhouette rather than in mood. Its palette is
+also the one the default mark already uses — `assets/keelbase-avatar.svg` is the same style in the
+brand blue — so the console's own avatars are one family, and what a person can pick is that family
+in other colours.
 
-The seeds are `cn-01`, `cn-03`, `cn-05`, `cn-08`, `cn-10`, `cn-11`, `cn-14`, `cn-15`, `cn-18`, `cn-19`
-in that order, with backgrounds `dbeafe e0e7ff d1fae5 fef3c7 cffafe fce7f3 f3e8ff e5e7eb ccfbf1
-ffe4e6`; they are recorded here because neither is recoverable from the file's name.
+The seeds are `keelbase-01` … `keelbase-10`, in that order; recorded here because they are not
+recoverable from the file's name.
 
 Four earlier presets — `-blue` `-teal` `-graphite` `-warm` — are **retired but still shipped**, and
 still recognised. They are no longer offered, but an avatar stored while they were can name one:

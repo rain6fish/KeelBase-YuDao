@@ -8,11 +8,10 @@
 // 组件，是因为弹窗与个人页都要用，且两者必须对「怎么认出一个预置」与「上传记在哪」保持一致。
 
 // Site-relative on purpose: these ship with the console, so the same choice has to read as "current"
-// on whatever origin serves it. DiceBear's "personas" style, "Personas by Draftbit", CC BY 4.0 —
-// each file carries that provenance in its own metadata, and `NOTICE` carries the attribution.
+// on whatever origin serves it. DiceBear's "shapes" style, CC0 1.0 — abstract geometry, the same
+// family as the default mark, and each file carries that provenance in its own metadata.
 // 刻意写成站点相对：它们随控制台一起发出，故同一个选择在任何来源下都得读作「当前用的」。DiceBear 的
-// `personas` 风格「Personas by Draftbit」，CC BY 4.0——每个文件自带这层出处，该许可要求的署名叫在
-// `NOTICE` 里。
+// `shapes` 风格，CC0 1.0——抽象几何，与默认标记同一族；每个文件自带这层出处。
 export const AVATAR_PRESETS = [
   '/keelbase-avatar-01.svg',
   '/keelbase-avatar-02.svg',
