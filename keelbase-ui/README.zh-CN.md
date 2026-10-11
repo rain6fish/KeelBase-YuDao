@@ -145,17 +145,26 @@ IM 模块照样会被构建、被部署出去；两条路都够不到它，这�
 Plus 的占位图标，那是**降级**而不是显示错图。`host-overlay/src/assets/imgs/keelbase-avatar.svg` 是同一
 份字节，给那些从源码 import 默认头像的组件用。
 
-用户可以挑的十个头像是 `host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`，同样是 DiceBear、
-同样 **CC0 1.0**——`notionists` 风格，Notionists by Zoish 的再混合。每个文件都自带这层出处。它们是
-**取一次、入库**，而不是外链：一个由生成器的 API 现供的预置，会让每位访客的浏览器都去访问一个本部署
-控制不了的主机——那正是当初清掉图标 CDN 与统计脚本的同一种痕迹。
+用户可以挑的十个头像是 `host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`，同样是 DiceBear 的
+**`personas`** 风格——"Personas by Draftbit"，**CC BY 4.0**。每个文件自带这层出处，该许可要求的署名
+叫在 `NOTICE` 里。它们是**取一次、入库**，而不是外链：一个由生成器的 API 现供的预置，会让每位访客的
+浏览器都去访问一个本部署控制不了的主机——那正是当初清掉图标 CDN 与统计脚本的同一种痕迹。
 
-    curl -s 'https://api.dicebear.com/9.x/notionists/svg?seed=<seed>&size=256&backgroundColor=<hex>' \
+    curl -s 'https://api.dicebear.com/9.x/personas/svg?seed=<seed>&size=256&backgroundColor=<hex>' \
+      '&skinColor=f2d3b3,ebc8a0,e5b98f,f7dcc0,d9a97f&hairColor=1b1b1b,2b2118,121212,3a2a20' \
+      '&eyes=open,happy,wink&mouth=smile,bigSmile,smirk&nose=smallRound,mediumRound' \
+      '&hair=long,bobCut,bobBangs,straightBun,extraLong,shortCombover,sideShave,bunUndercut' \
+      '&facialHairProbability=0' \
       -o host-overlay/public/keelbase-avatar-01.svg
 
-种子依次是 `keelbase-01`、`-06`、`-07`、`-08`、`-09`、`-11`、`-12`、`-13`、`-14`、`-15`，底色依次是
-`dbeafe e0e7ff d1fae5 fef3c7 cffafe fce7f3 f3e8ff e5e7eb ccfbf1 ffe4e6`；两者都记在这里，因为从文件名
-里一个也还原不出来。
+**这些参数才是重点，不是装饰。** 不管它们时，`personas` 从整套色板与整套部件里抽，出来是一帮西方面孔
+的陌生人、留着胡子、表情从恼火到受惊都有。按上面钉住之后，十个才开始读起来像**同一间办公室里的一批
+东亚同事**：暖色肤色、黑发、直发或盘发、友好嘴型、不留胡须。`hair` 与 `nose` 给的是**列表**——真钉死
+成一个，十张脸就完全一样了；列表是让每个种子从里面挑。
+
+种子依次是 `cn-01`、`cn-03`、`cn-05`、`cn-08`、`cn-10`、`cn-11`、`cn-14`、`cn-15`、`cn-18`、`cn-19`，
+底色依次是 `dbeafe e0e7ff d1fae5 fef3c7 cffafe fce7f3 f3e8ff e5e7eb ccfbf1 ffe4e6`；两者都记在这里，
+因为从文件名里一个也还原不出来。
 
 先前那四个预置——`-blue` `-teal` `-graphite` `-warm`——**已撤下但仍在发**，也仍被认得出。它们不再被
 提供，而在这之前存下的头像可能指着一个：删掉文件会让那个人的头像解析不出来，删掉名字则会让弹窗把他自己
