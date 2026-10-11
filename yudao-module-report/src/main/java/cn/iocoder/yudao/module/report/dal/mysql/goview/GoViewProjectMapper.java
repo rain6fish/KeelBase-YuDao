@@ -12,7 +12,8 @@ public interface GoViewProjectMapper extends BaseMapperX<GoViewProjectDO> {
 
     default PageResult<GoViewProjectDO> selectPage(PageParam reqVO, Long userId) {
         return selectPage(reqVO, new LambdaQueryWrapperX<GoViewProjectDO>()
-                .eq(GoViewProjectDO::getCreator, userId)
+                // `creator` is varchar — MySQL coerces the Long, PostgreSQL refuses it. / creator 是 varchar，MySQL 隐式转换、PostgreSQL 直接拒绝。
+                .eq(GoViewProjectDO::getCreator, String.valueOf(userId))
                 .orderByDesc(GoViewProjectDO::getId));
     }
 
