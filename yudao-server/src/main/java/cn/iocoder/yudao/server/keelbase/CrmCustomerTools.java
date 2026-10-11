@@ -55,9 +55,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CrmCustomerTools {
 
-    /** The tenant a host-service call runs under; Yudao's data layer refuses without one (spike Y4). */
-    private static final long SPIKE_TENANT_ID = 1L;
-
     @Bean
     AiTool listCrmCustomers(CrmCustomerService service) {
         return new ListTool(service);
@@ -122,7 +119,7 @@ public class CrmCustomerTools {
             // the page itself rather than being post-filtered here.
             // 身份以**上游自己的查询所取的那个入参**传递，于是分页由模块自己收束，而不是在这里事后过滤。
             List<Map<String, Object>> rows = ActingCaller.as(principal.userId(),
-                            () -> TenantUtils.execute(SPIKE_TENANT_ID,
+                            () -> TenantUtils.execute(YudaoCallerTenant.current(),
                                     () -> service.getCustomerPage(query, caller))).getList().stream()
                     .map(ListTool::project)
                     .toList();
@@ -215,7 +212,7 @@ public class CrmCustomerTools {
             // 这里就算写了，也会被它覆盖——而那正是被断言的性质。
             Long caller = asId(principal.userId());
             Long id = ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(SPIKE_TENANT_ID, () -> service.createCustomer(row, caller)));
+                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> service.createCustomer(row, caller)));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", id);
             return ToolResult.ok(out);
@@ -307,7 +304,7 @@ public class CrmCustomerTools {
             row.setLevel(asInt(args.get("level")));
             row.setSource(asInt(args.get("source")));
             ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(SPIKE_TENANT_ID, () -> {
+                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> {
                         service.updateCustomer(row);
                         return null;
                     }));

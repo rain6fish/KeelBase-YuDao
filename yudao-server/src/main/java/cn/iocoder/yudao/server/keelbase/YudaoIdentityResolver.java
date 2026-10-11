@@ -49,19 +49,16 @@ public class YudaoIdentityResolver implements IdentityResolver {
     private static final long SEED_ADMIN_ID = 1L;
 
     /**
-     * The tenant the directory lookup runs under. Yudao's tenant interceptor adds a {@code tenant_id}
-     * predicate to every statement and refuses to run without a tenant in context, and a KeelBase
-     * request arrives with none — the runtime's contract has no tenant concept. So the adapter must
-     * establish one. <b>Which</b> tenant a KeelBase caller belongs to is a decision the runtime cannot
-     * make and this host has never been asked to make; the spike fixes it at the seed tenant to get
-     * past the wall, and records the decision as outstanding rather than answered.
+     * Which tenant a host-service call runs under is {@link YudaoCallerTenant}'s to answer now — the
+     * tenant the host authenticated the caller under, read from the framework's own context, with the
+     * seed tenant as a <b>declared fallback</b> for the paths that carry none. This adapter used to fix
+     * it at the seed tenant itself and record the decision as outstanding; the decision has since been
+     * made, and it was made the same way the caller id next door is read.
      *
-     * 目录查询所运行的租户。芋道的租户拦截器给每条语句加 {@code tenant_id} 谓词，且上下文中没有租户就拒跑；
-     * 而 KeelBase 请求到达时没有租户——运行时契约里根本没有租户概念。故适配器必须自己建立。**哪个**租户，
-     * 运行时决定不了，这个宿主也从没被问过；Spike 把它钉在种子租户上以越过这堵墙，并把该决定记为**未答**而非已答。
+     * 宿主服务调用运行在哪个租户下，现在由 {@link YudaoCallerTenant} 回答——宿主据以认证调用方的那个租户，
+     * 读自框架自己的上下文；而**种子租户**是不带上文的那几条路的**声明式回落**。本适配器过去自己把它钉在种子
+     * 租户上、并把该决定记为未答；那个决定后来做了，而且做的方式与隔壁读 caller id 的方式相同。
      */
-    private static final long SPIKE_TENANT_ID = 1L;
-
     private final AdminUserApi adminUsers;
 
     public YudaoIdentityResolver(AdminUserApi adminUsers) {
@@ -75,9 +72,10 @@ public class YudaoIdentityResolver implements IdentityResolver {
         AdminUserRespDTO user = null;
         if (userId != null) {
             try {
-                // Yudao's data layer needs a tenant in context; a KeelBase request brings none.
-                // 芋道的数据层要求上下文里有租户；KeelBase 请求不带。
-                user = TenantUtils.execute(SPIKE_TENANT_ID, () -> adminUsers.getUser(userId));
+                // Yudao's data layer needs a tenant in context; this reads the host's own answer and
+                // falls back only where there is none.
+                // 芋道的数据层要求上下文里有租户；这里读的是**宿主自己的答案**，只在没有的时候才回落。
+                user = TenantUtils.execute(YudaoCallerTenant.current(), () -> adminUsers.getUser(userId));
             } catch (RuntimeException lookupFailed) {
                 user = null;
             } catch (Exception unexpected) {

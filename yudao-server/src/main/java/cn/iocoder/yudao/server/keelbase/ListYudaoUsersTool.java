@@ -41,8 +41,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ListYudaoUsersTool implements AiTool {
 
-    private static final long SPIKE_TENANT_ID = 1L;
-
     private final AdminUserApi adminUsers;
     private final OwnershipGuard guard;
 
@@ -77,10 +75,11 @@ public class ListYudaoUsersTool implements AiTool {
         guard.requireAction(principal, "YudaoUser", PermissionAuthorizer.ACTION_READ);
         Object raw = args.get("nickname");
         String nickname = raw == null ? "" : String.valueOf(raw);
-        // Yudao's data layer needs a tenant in context; a KeelBase request brings none (spike Y4).
-        // 芋道的数据层要求上下文里有租户；KeelBase 请求不带（Spike Y4）。
+        // Yudao's data layer needs a tenant in context; this reads the host's own answer and falls back
+        // only where there is none.
+        // 芋道的数据层要求上下文里有租户；这里读的是宿主自己的答案，只在没有的时候才回落。
         List<Map<String, Object>> rows = ActingCaller.as(principal.userId(),
-                () -> TenantUtils.execute(SPIKE_TENANT_ID, () -> adminUsers.getUserListByNickname(nickname))).stream()
+                () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> adminUsers.getUserListByNickname(nickname))).stream()
                 .map(ListYudaoUsersTool::project)
                 .toList();
         return ToolResult.ok(rows);
