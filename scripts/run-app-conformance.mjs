@@ -188,6 +188,14 @@ console.log(`== application conformance · ${basename(ROOT)} @ ${SHA} ==`);
 // 3–5 · the application's own gates, driven rather than quoted.
 gate('Permission', 'run-crm-customer-scenarios.mjs', "a module upstream wrote, governed end to end");
 gate('Tool Governance', 'run-generated-module-scenarios.mjs', "the generated module, same governance");
+// The other half of the same column, and the one `YD-T14` (D42) is about: the governance is only as good
+// as what the model can reach. A tool of ours registered as a bean `ToolCallback` would be reachable by a
+// model through Spring AI's own resolver, which KeelBase's aspect does not see — so the boundary is
+// asserted here rather than left to be noticed.
+// 同一栏的另一半，也是 `YD-T14`（`D42`）讲的那一件：治理有多好，取决于**模型够得到什么**。我们的工具一旦以
+// bean `ToolCallback` 的形式注册，模型就能经 Spring AI 自己的解析器够到它，而 KeelBase 的切面看不见——所以这条
+// 边界在这里断言，而不是留着等人发现。
+gate('Tool Governance', 'check-ungoverned-tool-beans.mjs', 'no bean hands our tools to Spring AI');
 gate('Tool path (MCP)', 'run-mcp-governance-scenarios.mjs', "the host's own tool path, two real model steps");
 
 // 6 · Audit — rows exist, every row but the first is chained to the one before it.
