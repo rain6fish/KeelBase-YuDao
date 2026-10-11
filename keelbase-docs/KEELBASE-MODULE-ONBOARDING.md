@@ -110,7 +110,10 @@ not a naming preference.
 A new module gets its own scenario script, and `scripts/run-crm-customer-scenarios.mjs` is the shape
 to copy. It asserts the four things `D28 ④` calls the first acceptance gate — reachable under an
 explicit identity, out-of-scope access refused, a high-risk write held for a human, the side effect
-auditable. **Scope every assertion by a name unique to this run, never by a count of the whole
+auditable. **The last of the four is best-effort, not a guarantee**: the host writes to its own
+database and the audit row to another, so a write that lands and an audit append that fails leave the
+write unrecorded (`D36` ①, 2026-10-11). Claim it as "in principle recorded", never as "every write is
+on the chain". **Scope every assertion by a name unique to this run, never by a count of the whole
 table**, so the gate holds on a database it has already been run against and alongside another run of
 itself.
 
