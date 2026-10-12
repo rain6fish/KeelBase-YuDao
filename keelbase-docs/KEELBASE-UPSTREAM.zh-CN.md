@@ -9,7 +9,7 @@
 ## 边界
 
 RuoYi 线那条 `D15`——*绝不碰上游的生成物与 `vm/`*——**不平移到本线**（`D45`）。它也没法平移：本线的生成器
-**就在仓里**，而本线**已经改了 7 个上游文件**。取代它的是：
+**就在仓里**，而本线**已经改了上游的 9 个文件**（活读数由下面的巡检给出）。取代它的是：
 
 | | |
 |---|---|
@@ -28,9 +28,14 @@ RuoYi 线那条 `D15`——*绝不碰上游的生成物与 `vm/`*——**不平�
 | `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | 上游在自己线程上设置的安全上下文 | `D32`——调用方必须到达工具那条线程 |
 | `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | 工具被**装配**时捕获调用方 | `D32`——同一条缝，在装配那一侧 |
 | `yudao-module-report/.../goview/GoViewProjectMapper.java` | `creator` 按字符串绑 | MySQL 隐式转换、PostgreSQL 直接拒绝 |
+| `yudao-framework/.../swagger/config/YudaoSwaggerWebConfiguration.java` + 它在那个 starter 的 `AutoConfiguration.imports` 里的那一行注册 | 一个**加进上游自己包里**的自动配置，以及打开它的那一行 | springdoc 3.0.3 与 Boot 4.x 对 `api-docs` 端点**声明的返回类型**谈不拢，没有这一处它就抛（`dcd9c6b548`） |
 
 改动面的其余部分是接线、文档与上表中一条的测试：`README.md` · 两个 `pom.xml` · `AuthController.java` ·
 `Ai1McpToolFactoryTest.java` · 以及新增的树（本线的接缝、生成器、控制台层、部署、脚本、SQL、文档）。
+
+⚠ 上表有一条落在边界第三行的措辞**之外**，这里选择**写下来**而不是抹平：Swagger 那一条不是「**治理**的缝
+需要」，而是**这棵树否则跑不起来**。第三行写的是「当治理的那条缝需要时」，比这张登记表**窄**；要不要把那一行
+放宽到覆盖这一类改动，归决策者——故此处只**写明**，不擅自定。
 
 ## 量它，而不是拿它当门禁
 

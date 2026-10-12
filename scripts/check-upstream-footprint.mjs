@@ -57,7 +57,7 @@ const gitOk = (args) => {
 // statement, and one that fails is one nobody reads — this sits in between on purpose.
 // 前一次有人手工量下的读数，以及量它的日子。**超过它**才是信号；数字本身不是目标。一道没有可比对象的巡检
 // 就只是一句 print，而一失败就红的那道没人看——这里刻意取中间。
-const BASELINE = { deleted: 0, added: 108, modified: 8, takenOn: '2026-10-11' }
+const BASELINE = { deleted: 0, added: 126, modified: 9, takenOn: '2026-10-12' }
 
 let pin
 try {

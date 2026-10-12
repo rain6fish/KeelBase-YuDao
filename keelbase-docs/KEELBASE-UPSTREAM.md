@@ -11,7 +11,8 @@ what it is allowed to change, and where those changes are written down.
 
 The RuoYi line's rule `D15` — *upstream's generated artefacts and `vm/` are never touched* — is **not
 transplanted here**（`D45`). It could not be: this line's generator lives in the repository, and this
-line has already modified seven upstream files. What replaces it:
+line has already changed nine of upstream's files (the patrol below reports the live number). What
+replaces it:
 
 | | |
 |---|---|
@@ -31,10 +32,17 @@ says how many such places exist; without the test, nothing says the change still
 | `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | the security context upstream sets on its own threads | `D32` — the caller has to reach the tool's thread |
 | `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | the caller captured where the tool is assembled | `D32` — the same seam, at assembly |
 | `yudao-module-report/.../goview/GoViewProjectMapper.java` | the creator is bound as a string | PostgreSQL refuses the coercion MySQL performs |
+| `yudao-framework/.../swagger/config/YudaoSwaggerWebConfiguration.java` + its registration in that starter's `AutoConfiguration.imports` | a new auto-configuration inside upstream's own package, and the one line that switches it on | springdoc 3.0.3 and Boot 4.x disagree about the `api-docs` endpoint's declared return type, and it throws without this（`dcd9c6b548`） |
 
 The rest of the footprint is wiring, documents and the test that covers one of the entries above:
 `README.md` · both `pom.xml` · `AuthController.java` · `Ai1McpToolFactoryTest.java` · and the added tree
 (this line's seams, generator, console layer, deployment, scripts, SQL, docs).
+
+⚠ One entry above sits **just outside** the boundary's third row, and it is written down rather than
+smoothed over: the Swagger one is not there because a **governance** seam needed it — it is there
+because the tree does not otherwise work. The third row says "when a governance seam needs it", which
+is narrower than this register; whether to widen the row to cover a change like this one is the
+decision-maker's, so it is left stated and not settled here.
 
 ## Measuring, rather than gate-keeping
 
