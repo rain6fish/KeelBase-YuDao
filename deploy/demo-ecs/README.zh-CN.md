@@ -26,6 +26,16 @@ bash scripts/jdk25.sh mvn -q -DskipTests package -pl yudao-server -am
 # ⇒ yudao-server/target/yudao-server.jar   （胖 jar，约 300 MB）
 ```
 
+**那份 jar 带哪几个模块，是这个部署的决定，而且它不在仓库里。** 本宿主跑**五个**：`system`、`infra`、
+`bpm`、`crm`、`ai1-springai`。仓库自己的构建开得比这多，而这个差别不是外观问题——2026-10-12 拿一份开
+**十五个**模块、580MB 的 jar 在这台 **1.6 GB** 的机器上试过，**它始终没起完**；而五模块那份是 308MB、
+约三分钟起来。要产出它，得在构建前把两处裁到这五个（根 `pom.xml` 的 `<modules>` 与 `yudao-server/pom.xml`
+的模块依赖），**两处都算数**：只从 reactor 拿掉、不从服务端依赖里拿掉的模块**不会**被打包；而只从服务端依赖
+里拿掉、reactor 里还在的会——**从本机 maven 仓里被拉进来，悄无声息**；第一次尝试之后审计那份 jar，正是这样
+发现 `report`/`hrm`/`fms`/`pms`/`oa` 还在里面。
+
+**模块集是这个部署的，所以它属于这里、不属于仓库自己的构建。** 改这个宿主跑哪几个模块，就是改这个文件。
+
 > ⚠ **正在跑**的实例会锁住这个 jar ⇒ `mvn package` 的 repackage 会失败，且**可能把胖 jar 覆盖成瘦 jar**。
 > 重建前先停掉那个实例，或在一个独立 worktree 里构建。
 

@@ -30,6 +30,20 @@ bash scripts/jdk25.sh mvn -q -DskipTests package -pl yudao-server -am
 # ⇒ yudao-server/target/yudao-server.jar   (a fat jar, ~300 MB)
 ```
 
+**Which modules that jar carries is a deployment decision, and it is not in the repository.** This
+host runs **five**: `system`, `infra`, `bpm`, `crm`, `ai1-springai`. The repository's own build turns
+on more than that, and the difference is not cosmetic — a 580 MB jar built with fifteen of them was
+tried here on 2026-10-12 and **never finished starting** on a 1.6 GB host, while the five-module one is
+308 MB and starts in about three minutes. Producing it means trimming two files (the root `pom.xml`'s
+`<modules>` and `yudao-server/pom.xml`'s module dependencies) to those five before building, and
+**both files also matter**: a module left in the reactor but not in the server's dependencies is not
+packaged, and one left in the server's dependencies but not in the reactor is — pulled from the local
+Maven repository, silently, which is how an audit of the first attempt found `report`/`hrm`/`fms`/
+`pms`/`oa` still inside a jar that had "excluded" them.
+
+**The module set is the deployment's, so it belongs here rather than in the repository's own build.**
+A change to which modules this host runs is a change to this file.
+
 > ⚠ A **running** instance holds a lock on this jar, so `mvn package`'s repackage step fails and can
 > leave the fat jar replaced by a thin one. Stop the instance first, or build in a separate worktree.
 
