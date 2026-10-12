@@ -19,8 +19,8 @@
 // **The columns are this application's, not a copy of the previous line's.** Where this line has no
 // gate, the column says so rather than disappearing:
 //
-//   Build · Schema · Permission · Tool Governance · Tool path (MCP) · Audit · Confirmation · Revoke
-//   · Rates
+//   Build · Schema · Permission · Tool Governance · Tool path (MCP) · Tenant · Audit · Confirmation
+//   · Revoke · Rates
 //
 // The previous line's record carried a **RAG permission** column; this line wires no memory/knowledge
 // gate yet, so there is no column for it here — that is a difference in the application, stated here
@@ -197,6 +197,14 @@ gate('Tool Governance', 'run-generated-module-scenarios.mjs', "the generated mod
 // 边界在这里断言，而不是留着等人发现。
 gate('Tool Governance', 'check-ungoverned-tool-beans.mjs', 'no bean hands our tools to Spring AI');
 gate('Tool path (MCP)', 'run-mcp-governance-scenarios.mjs', "the host's own tool path, two real model steps");
+// 5b · Tenant — `YD-10`'s half. Until `D39`/`D40` landed the adapter ran every host-service call under
+// one hard-coded tenant, so this column's question could not be asked: a governed write made by a caller
+// on another tenant landed in tenant 1. The gate answers it by comparison — two callers, two tenants,
+// two rows — rather than by asserting one row's value, because a constant satisfies any single reading.
+// 5b · 租户 —— `YD-10` 的那半。在 `D39`/`D40` 落地之前，适配器把所有宿主服务调用都跑在一个写死的租户下，
+// 于是这一栏的问题根本问不出来：另一个租户的调用方做的受治理写会落在 1 号租户。这道闸用**比较**回答它——
+// 两个调用方、两个租户、两行——而不是断言某一行的值，因为**任何单个读数**常量都能满足。
+gate('Tenant', 'run-tenant-scenarios.mjs', "a governed write lands in the caller's tenant, not a constant");
 
 // 6 · Audit — rows exist, every row but the first is chained to the one before it.
 {
