@@ -59,7 +59,7 @@ import org.springframework.stereotype.Component;
  */
 @Aspect
 @Component
-public class BpmOALeaveGovernance {
+public class BpmOALeaveGovernance implements GovernedModule {
 
     private final YudaoModuleScope scope;
     private final BpmOALeaveMapper mapper;
@@ -67,6 +67,17 @@ public class BpmOALeaveGovernance {
     public BpmOALeaveGovernance(YudaoModuleScope scope, BpmOALeaveMapper mapper) {
         this.scope = scope;
         this.mapper = mapper;
+    }
+
+    /** Declares this module governed, so the set is countable — see {@link GovernedModuleRegistry}. */
+    @Override
+    public String module() {
+        return "bpm";
+    }
+
+    @Override
+    public String ownerField() {
+        return "user_id";
     }
 
     /**

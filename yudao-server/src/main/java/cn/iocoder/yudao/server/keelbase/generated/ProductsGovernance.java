@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.products.controller.admin.products.vo.ProductsPag
 import cn.iocoder.yudao.module.products.controller.admin.products.vo.ProductsSaveReqVO;
 import cn.iocoder.yudao.module.products.dal.dataobject.products.ProductsDO;
 import cn.iocoder.yudao.module.products.dal.mysql.products.ProductsMapper;
+import cn.iocoder.yudao.server.keelbase.GovernedModule;
 import cn.iocoder.yudao.server.keelbase.YudaoModuleScope;
 import java.util.List;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -47,7 +48,7 @@ import org.springframework.stereotype.Component;
  */
 @Aspect
 @Component
-public class ProductsGovernance {
+public class ProductsGovernance implements GovernedModule {
 
     private final YudaoModuleScope scope;
     private final ProductsMapper mapper;
@@ -117,5 +118,22 @@ public class ProductsGovernance {
             return row.getId() == null ? List.of() : List.of(row.getId());
         }
         return scope.asIds(args[0]);
+    }
+
+    /**
+     * Declares this module governed, so the set this host holds is countable rather than only readable
+     * in a pointcut (`YD-13`). The name is the segment the check reads out of the pointcuts above.
+     *
+     * 声明本模块受治理，使本宿主持有的那个集合**数得出来**，而不是只能在上面的 pointcut 里读（`YD-13`）。
+     * 这个名字就是那道检查从上面那些 pointcut 里读出来的那一段。
+     */
+    @Override
+    public String module() {
+        return "products";
+    }
+
+    @Override
+    public String ownerField() {
+        return "owner_user_id";
     }
 }

@@ -67,7 +67,7 @@ import org.springframework.stereotype.Component;
  */
 @Aspect
 @Component
-public class CrmCustomerGovernance {
+public class CrmCustomerGovernance implements GovernedModule {
 
     private final YudaoModuleScope scope;
     private final CrmCustomerMapper mapper;
@@ -75,6 +75,17 @@ public class CrmCustomerGovernance {
     public CrmCustomerGovernance(YudaoModuleScope scope, CrmCustomerMapper mapper) {
         this.scope = scope;
         this.mapper = mapper;
+    }
+
+    /** Declares this module governed, so the set is countable — see {@link GovernedModuleRegistry}. */
+    @Override
+    public String module() {
+        return "crm";
+    }
+
+    @Override
+    public String ownerField() {
+        return "owner_user_id";
     }
 
     /**

@@ -6,37 +6,41 @@
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
 # what we *have* touched is `YD-T4`).
 #
-# Three jobs, and each answers a question the others cannot:
+# Four jobs, and each answers a question the others cannot:
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
 #   governance-boundary  no bean of ours hands a tool to Spring AI, which is the fact `D42`'s
 #                        boundary rests on and is one `@Bean` away from no longer being true;
+#   governance-registry  every module this host governs declares itself, and the name it declares is
+#                        the one its own pointcuts point at — the set `YD-13` made countable;
 #   generator            the committed generated files are still a Spec's output (`--check-boundary`)
 #                        and still what that Spec says (`--check`).
 #
-# `path-refs` and `governance-boundary` are pure Node and finish in seconds. `generator` wants a
-# JDK 25 toolchain and a Maven build, so it is the one job here that costs minutes — and it is kept
-# to those two **offline** checks. The conformance suite and the four governance rates need a
-# running stack (PostgreSQL + Redis + the server); they are deliberately **not** run here, because
-# calling those scripts without a host would not be running them.
+# All but `generator` are pure Node and finish in seconds. `generator` wants a JDK 25 toolchain and a
+# Maven build, so it is the one job here that costs minutes — and it is kept to those two **offline**
+# checks. The conformance suite and the four governance rates need a running stack (PostgreSQL + Redis
+# + the server); they are deliberately **not** run here, because calling those scripts without a host
+# would not be running them.
 #
 # 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
 # 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
 #
-# 三个 job，各答一个别的 job 答不了的问题：
+# 四个 job，各答一个别的 job 答不了的问题：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
 #   governance-boundary  我们自己没有任何 bean 把工具交给 Spring AI —— `D42` 那条边界所倚的**事实**，
 #                        而它离「不再成立」只差一个 `@Bean`；
+#   governance-registry  本宿主治理的每个模块都**自报**，而它报的名字**就是**它自己 pointcut 所指的那一个
+#                        —— `YD-13` 让它**数得出来**的那个集合；
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
 #                        东西（`--check`）。
 #
-# 前两个是 pure Node、几秒完事。`generator` 要一套 JDK 25 工具链与一次 Maven 构建，是本文件里唯一按
-# 分钟计的 job —— 它只跑那两道**离线**检查。符合性套件与四个治理率要一套**跑着的栈**（PostgreSQL +
-# Redis + 宿主），**刻意不在这里跑**：不起宿主直接调那些脚本，那不叫跑过它。
+# 除 `generator` 外都是 pure Node、几秒完事。`generator` 要一套 JDK 25 工具链与一次 Maven 构建，是本文件里唯一
+# 按分钟计的 job —— 它只跑那两道**离线**检查。符合性套件与四个治理率要一套**跑着的栈**（PostgreSQL + Redis +
+# 宿主），**刻意不在这里跑**：不起宿主直接调那些脚本，那不叫跑过它。
 name: CI
 
 on:
@@ -79,6 +83,22 @@ jobs:
       # 新加的 `@Bean` 会打破的那一条；也正因如此，它不该取决于「谁记得跑」。
       - name: Our tools must not be reachable by a model without KeelBase
         run: node scripts/check-ungoverned-tool-beans.mjs
+
+  governance-registry:
+    name: Every governed module declares itself
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # Pure Node. The registry collects the declarations Spring can see, so a running host can be
+      # asked what is governed — but it cannot tell "not governed" from "forgotten". This check reads
+      # the sources for the shape a governed module has and refuses one that never declared itself.
+      # 纯 Node。登记处收的是 Spring 看得见的那些声明，故跑着的宿主可以被问到「管住了什么」——但它分不出
+      # 「不受治理」与「被忘了」。这道检查在源码里读「受治理模块」的形状，拒掉一个从没自报的。
+      - name: A governed module must declare itself, and under its own name
+        run: node scripts/check-governance-registry.mjs
 
   generator:
     name: The generated files are still a Spec's output

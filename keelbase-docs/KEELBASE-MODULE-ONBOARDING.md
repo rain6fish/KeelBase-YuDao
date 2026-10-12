@@ -24,6 +24,10 @@ corrected against (the owner here is `user_id`, not `owner_user_id`) and what tu
 first **runtime-side** cost: the chat request declares one structured slot, and it is named `customerId`
 (§4.5).
 
+**Revised 2026-10-12 (b)**: the same day the host gained **the place to count them** — `GovernedModule`
++ `GovernedModuleRegistry`, and `scripts/check-governance-registry.mjs` to keep the count honest — so
+§4.2's "nothing enumerates the governed modules" is answered and §2.4 has a third check.
+
 ## 1. Which half is which
 
 | Half | Where it lives | A new module touches it? |
@@ -99,7 +103,7 @@ triggers and then falls back to the runtime's `RuleBasedPlanner` for everything 
 about — and the fallback is load-bearing, because supplying any `ToolCallPlanner` makes the runtime's
 own auto-configuration back off.
 
-### 2.4 The two places the build checks you
+### 2.4 The three places the build checks you
 
 **Hand-written SQL is declared.** An upstream module whose schema upstream does not publish gets a
 `sql/keelbase-<module>.sql` we derive. Add it to `HAND_WRITTEN` in
@@ -111,6 +115,12 @@ own auto-configuration back off.
 `*Governance` and `*Tools` in the **parent** package `cn.iocoder.yudao.server.keelbase`, not in
 `…server.keelbase.generated`. Putting them under `generated/` turns the check red — it is enforced,
 not a naming preference.
+
+**You declare yourself governed.** A module's `*Governance` aspect has to `implements GovernedModule`
+and return, from `module()`, the very segment its own pointcuts point at — `CrmCustomerGovernance` says
+`crm`, `BpmOALeaveGovernance` says `bpm`, and the generated one says whatever its Spec's module is.
+Miss it, or name a module you do not point at, and `node scripts/check-governance-registry.mjs` prints
+`UNDECLARED` and exits 1. The Spec's template carries it, so a generated module is born declared.
 
 ### 2.5 The gate
 
@@ -154,6 +164,14 @@ wrote, there is no Spec to write — see §2.
    YuDao's `CrmCustomerGovernance`, `BpmOALeaveGovernance` and `ProductsGovernance` are bare
    `@Component`s. There is no single place that lists what is governed — so there is nowhere to read
    that a module was forgotten.
+   **⚠ Corrected 2026-10-12 (`YD-13`)**: this host now carries the same pair — `GovernedModule` +
+   `GovernedModuleRegistry`, host-local exactly as RuoYi's is, which was checked rather than assumed —
+   and the three aspects declare themselves. A running host says the set in its own log, and
+   `scripts/check-governance-registry.mjs` refuses a `*Governance` that names a module's own service
+   without declaring itself. The paragraph above was true when it was written. What is still open is
+   what this bullet was really about: the registry **counts**, and the check keeps the count honest,
+   but neither can tell you that a module *should* have been governed and was not — that remains a
+   person's reading.
 3. **Each module owes a narrowing decision** (§2.1): owner-only, or aligned with the module's own
    permission table.
 4. **The abstraction boundary is not settled.** `YD-T7` is open, and the cross-host evidence note

@@ -769,6 +769,7 @@ import %s.controller.admin.%s.vo.%sPageReqVO;
 import %s.controller.admin.%s.vo.%sSaveReqVO;
 import %s.dal.dataobject.%s.%sDO;
 import %s.dal.mysql.%s.%sMapper;
+import cn.iocoder.yudao.server.keelbase.GovernedModule;
 import cn.iocoder.yudao.server.keelbase.YudaoModuleScope;
 import java.util.List;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -805,7 +806,7 @@ import org.springframework.stereotype.Component;
  */
 @Aspect
 @Component
-public class %sGovernance {
+public class %sGovernance implements GovernedModule {
 
     private final YudaoModuleScope scope;
     private final %sMapper mapper;
@@ -876,6 +877,23 @@ public class %sGovernance {
         }
         return scope.asIds(args[0]);
     }
+
+    /**
+     * Declares this module governed, so the set this host holds is countable rather than only readable
+     * in a pointcut (`YD-13`). The name is the segment the check reads out of the pointcuts above.
+     *
+     * 声明本模块受治理，使本宿主持有的那个集合**数得出来**，而不是只能在上面的 pointcut 里读（`YD-13`）。
+     * 这个名字就是那道检查从上面那些 pointcut 里读出来的那一段。
+     */
+    @Override
+    public String module() {
+        return "%s";
+    }
+
+    @Override
+    public String ownerField() {
+        return "owner_user_id";
+    }
 }
 """.formatted(module, module, pkg,
                 modulePkg, module, entity, modulePkg, module, entity, modulePkg, module, entity, modulePkg, module, entity,
@@ -884,6 +902,6 @@ public class %sGovernance {
                 svc, entity, entity,
                 svc, entity, entity,
                 svc, entity, svc, entity, svc, entity,
-                entity, entity);
+                entity, entity, module);
     }
 }
