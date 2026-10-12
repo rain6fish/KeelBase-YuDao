@@ -18,7 +18,7 @@ replaces it:
 |---|---|
 | **Allowed without ceremony** | wiring (a dependency, an explicit bean name) · the build shape (which modules are in the reactor) |
 | **Allowed, as its own increment** | the console's visual layer, `keelbase-ui/host-patches/` — that is **a different upstream** (`yudao-ui-admin-vue3`) |
-| **Allowed, and registered below** | changing **what upstream does**, when a governance seam needs it |
+| **Allowed, and registered below** | changing **what upstream does** — either because a governance seam needs it, or because the tree does not otherwise work (an upstream dependency moving under it, and the like) |
 
 A change in that third row carries **three things**, and all three are the point: a **marker in the
 comment** saying the change is ours, an **entry in the register below**, and a **test**. Without the
@@ -38,11 +38,10 @@ The rest of the footprint is wiring, documents and the test that covers one of t
 `README.md` · both `pom.xml` · `AuthController.java` · `Ai1McpToolFactoryTest.java` · and the added tree
 (this line's seams, generator, console layer, deployment, scripts, SQL, docs).
 
-⚠ One entry above sits **just outside** the boundary's third row, and it is written down rather than
-smoothed over: the Swagger one is not there because a **governance** seam needed it — it is there
-because the tree does not otherwise work. The third row says "when a governance seam needs it", which
-is narrower than this register; whether to widen the row to cover a change like this one is the
-decision-maker's, so it is left stated and not settled here.
+⚠ The third row was **widened on 2026-10-12**, and that is why the Swagger entry above belongs there:
+it is not a governance seam, it is a change the tree needs in order to work at all. Until then the row
+read "when a governance seam needs it", which was narrower than this register — the gap was found by
+taking the patrol's own advice and looking, not by reading the register and trusting it.
 
 ## Measuring, rather than gate-keeping
 
