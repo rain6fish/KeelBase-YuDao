@@ -24,6 +24,29 @@ const baseURL = (import.meta.env.VITE_BASE_URL as string | undefined) ?? ''
 
 export const runtime: AxiosInstance = axios.create({ baseURL, timeout: 20000 })
 
+/**
+ * The runtime's answers arrive inside the host's envelope — `{code, message, data}` — because the
+ * runtime carries an advice of its own that wraps them so an embedded deployment answers like its
+ * host. Callers here want the object, not the envelope around it. A bare object is passed through
+ * unchanged, so the client does not depend on which of the two it is talking to; the test for "is
+ * this an envelope" is the numeric `code`, which is what the host's own interceptor tests too.
+ *
+ * 运行时的答复是包在**宿主的信封**里的——`{code, message, data}`——因为运行时自带一条 advice 把它们
+ * 包起来，好让嵌入部署答得像它的宿主。这里的调用方要的是那个对象，不是它外面那层信封。裸对象原样
+ * 放行，故客户端不依赖自己在跟哪一个说话；判「是不是信封」看的是那个**数字** `code`——宿主自己的
+ * 拦截器判的也是它。
+ */
+function unwrapEnvelope(payload: unknown): unknown {
+  const p = payload as { code?: unknown; data?: unknown } | null | undefined
+  if (p && typeof p === 'object' && typeof p.code === 'number' && 'data' in p) return p.data
+  return payload
+}
+
+runtime.interceptors.response.use((response) => {
+  response.data = unwrapEnvelope(response.data)
+  return response
+})
+
 runtime.interceptors.request.use((config) => {
   // The same bearer token the host's own calls carry: in this deployment the runtime reads the
   // caller from the host's security context, so there is nothing else to send.

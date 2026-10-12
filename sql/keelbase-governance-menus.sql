@@ -14,11 +14,17 @@
 -- Idempotent: each statement inserts only when its own component path is absent, so a second run
 -- changes nothing and a re-run after upstream moves its ids still finds the same four rows.
 --
--- No permission string is attached. The pages' authority is enforced by the runtime, not by menu
--- visibility: the audit and ledger routes answer only an administrator, and a caller who is not one
--- gets a refusal from the API rather than a hidden menu item. That keeps the boundary where it can
--- be tested — and it means an operator who is not an administrator may see a menu that answers with
--- a refusal, which is the honest rendering of "this deployment will not show you that".
+-- No permission string is attached, and no role grant is added either — so what a caller sees is
+-- decided by the host's own rule, not by this file. `super_admin` sees every menu; anyone else sees
+-- only what their roles were granted, and no role was granted these. Measured on the running host:
+-- an administrator gets the 治理 group and the pages answer; a caller with no roles sees neither the
+-- group nor the route (a direct navigation lands on the host's 404), and the runtime refuses the
+-- audit chain to them with 403 if they call it anyway. Two layers, two refusals; the enforceable one
+-- is the API's.
+--
+-- Whether these pages should be granted to a role is a separate question and is left open. Two of
+-- them are scoped to the caller by the server and would be harmless to hand out; the audit chain is
+-- administrator-only by the runtime's own rule.
 --
 -- 治理控制台的四条菜单行：一个目录，与它下面的三页。
 --
@@ -32,9 +38,13 @@
 -- 幂等：每条语句只在自己的组件路径不存在时插入，故重跑不改动任何东西，上游挪了 id 之后重跑仍找到
 -- 同样这四行。
 --
--- **不挂权限串**。这几页的权由**运行时**强制，不由菜单可见性强制：审计与台账那两条路由只答管理员，
--- 不是管理员的人拿到的是 API 的**拒绝**，而不是一个被藏起来的菜单项。边界因此留在**可被测**的地方
--- ——代价是：非管理员的操作者可能看见一个点开只有拒绝的菜单，而那就是「本部署不给你看这个」的诚实写法。
+-- **不挂权限串，也不加角色授予**——故谁能看见由**宿主自己的规矩**决定，不由本文件决定。`super_admin`
+-- 看得见每一条菜单；其余人只看得见角色被授予的那些，而**没有任何角色**被授予这几条。在跑起来的宿主上
+-- 实测：管理员拿到「治理」组、页面能答；无角色的调用方既看不到那个组、也**没有那条路由**（直接导航落到
+-- 宿主的 404），而万一他直接调审计链，运行时以 403 回绝。两层、两种拒绝；能强制的那个是 API 的。
+--
+-- 这几页该不该授予某个角色，是另一个问题，**留待决定**：其中两页由服务端按调用方限定范围、发出去并无害；
+-- 审计链则按运行时自己的规矩只给管理员。
 
 -- 1) The directory. `path` is absolute because it is a top-level entry.
 -- 1) 目录。`path` 是绝对路径，因为它是顶层项。
