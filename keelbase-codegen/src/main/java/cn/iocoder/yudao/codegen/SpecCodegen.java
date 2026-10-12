@@ -158,6 +158,22 @@ public final class SpecCodegen {
             // 一条种子菜单路由到一个**从来不是页面**的东西上；它那四个 `type = 3` 子行是旁边那个弹窗要检查的
             // 按钮权限，故先把它们改挂到真正使用它们的页面上，再把那行关掉。
             "sql/keelbase-menus-without-pages.sql",
+            // The governance console's own menu rows: one directory and the three pages under it.
+            // Inserts only, because this host builds its tree from `system_menu` and a .vue file nobody
+            // lists is a page nobody can reach. No permission string and no role grant, so who sees them
+            // stays the host's own rule rather than this file's.
+            // 治理控制台自己的菜单行：一个目录与它下面那三页。**只有插入**，因为本宿主的树是从 `system_menu`
+            // 建的，而一个没人登记的 .vue 就是一个没人到得了的页面。不挂权限串、也不授角色，故谁能看到它们由
+            // **宿主自己的规则**决定、不由本文件决定。
+            "sql/keelbase-governance-menus.sql",
+            // ...and who may see them. The directory and two of the three pages go to the ordinary
+            // role, because the server already scopes each of those to its caller — so handing them out
+            // adds no reach. The audit chain is granted to nobody: the runtime refuses it to anyone who
+            // is not an administrator, and a menu is not a permission.
+            // ……以及**谁看得到它们**。那个目录与三页里的两页交给普通角色，因为服务端**本来就**把这两页按调用方
+            // 限了范围 —— 于是把它们发出去**一点射程也没加**。审计链不授给任何人：运行时把它拒给任何不是管理员的
+            // 人，而**菜单不是权限**。
+            "sql/keelbase-governance-menu-grants.sql",
             // Where a deployment's uploads go. Upstream's seed makes an *example* store master with
             // the vendor's own domain in it, so uploads belong on a server we do not control. Takes
             // the origin as a parameter, so one file serves every host running this stack.
