@@ -198,25 +198,43 @@ parse it the rule is dropped and Element Plus's placeholder icon shows instead, 
 degradation rather than a wrong image. `host-overlay/src/assets/imgs/keelbase-avatar.svg` is the same
 bytes for the components that import a default from source.
 
-The ten avatars a person picks from are
-`host-overlay/public/keelbase-avatar-01.svg` … `-10.svg`, also DiceBear — the **`shapes`** style,
-**CC0 1.0**, DiceBear's own. Each file carries that provenance in its own metadata. They are fetched
-once and vendored rather than linked: a preset served from a generator's API would put every
-visitor's browser in touch with a host this deployment does not control, which is the same trace the
-icons and the analytics tag were removed for.
+The twenty avatars a person picks from are
+`host-overlay/public/keelbase-avatar-01.png` … `-20.png`. They were exported from DiceBear's own site
+and dropped in as they came — byte for byte, nothing re-encoded — so each one still carries, in the
+IPTC and XMP blocks an image editor writes, the style it is and who made it:
 
-    curl -s 'https://api.dicebear.com/9.x/shapes/svg?seed=<seed>&size=256' \
-      -o host-overlay/public/keelbase-avatar-01.svg
+| files | style | creator | licence |
+|---|---|---|---|
+| 01–09 | `adventurer-neutral` | Lisa Wischofsky | **CC BY 4.0** |
+| 10–13 | `identicon` | DiceBear | CC0 1.0 |
+| 14–16 | `rings` | DiceBear | CC0 1.0 |
+| 17–18 | `shapes` | DiceBear | CC0 1.0 |
+| 19–20 | `weave` | DiceBear | CC0 1.0 |
 
-There are no parameters to pin, which is the reason this style was chosen over the drawn ones: it
-composes abstract geometry, so there are no expressions to keep friendly and no facial features to
-keep coherent, and the ten differ from each other in silhouette rather than in mood. Its palette is
-also the one the default mark already uses — `assets/keelbase-avatar.svg` is the same style in the
-brand blue — so the console's own avatars are one family, and what a person can pick is that family
-in other colours.
+The CC BY 4.0 ones are nine of the twenty, and that licence asks for attribution — `NOTICE` gives it,
+and it is why that paragraph is not the one-line CC0 statement it was.
 
-The seeds are `keelbase-01` … `keelbase-10`, in that order; recorded here because they are not
-recoverable from the file's name.
+**These cannot be regenerated.** An export from the site keeps no seed, so there is no request that
+produces these twenty again; a replacement has to be re-picked or re-exported. That is worth knowing
+before editing this set, and it is also why they are committed rather than fetched by a script the
+way the icons are.
+
+**They are 128×128.** DiceBear's site exports at that size. It is right for the picker's tiles and for
+the top bar; the profile page draws its own avatar at 120 px, so on a high-density display that one is
+drawn from a source barely larger than itself. Raising it means re-exporting larger and re-picking.
+
+The correspondence, since the numbers below are ours and not the export's:
+
+| ours | came in as |
+|---|---|
+| 01–09 | `adventurer-neutral-1791777303819` … `-1791777373338` |
+| 10–13 | `identicon-1791777520456` … `-1791777540266` |
+| 14–16 | `rings-1791777552055` … `-1791777562189` |
+| 17–18 | `shapes-1791777573171`, `-1791777578637` |
+| 19–20 | `weave-1791777598081`, `-1791777604422` |
+
+The set mixes drawn faces with abstract marks, because that is what the export holds. Nine of the
+twenty are faces; the other eleven are geometry. It is not one family, and it was not chosen to be.
 
 Four earlier presets — `-blue` `-teal` `-graphite` `-warm` — are **retired but still shipped**, and
 still recognised. They are no longer offered, but an avatar stored while they were can name one:

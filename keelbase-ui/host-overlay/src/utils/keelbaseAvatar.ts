@@ -8,21 +8,31 @@
 // 组件，是因为弹窗与个人页都要用，且两者必须对「怎么认出一个预置」与「上传记在哪」保持一致。
 
 // Site-relative on purpose: these ship with the console, so the same choice has to read as "current"
-// on whatever origin serves it. DiceBear's "shapes" style, CC0 1.0 — abstract geometry, the same
-// family as the default mark, and each file carries that provenance in its own metadata.
-// 刻意写成站点相对：它们随控制台一起发出，故同一个选择在任何来源下都得读作「当前用的」。DiceBear 的
-// `shapes` 风格，CC0 1.0——抽象几何，与默认标记同一族；每个文件自带这层出处。
+// on whatever origin serves it. They are DiceBear's, across five of its styles — each file carries
+// its own style, author and licence in the metadata an image editor writes, and `NOTICE` names them.
+// 刻意写成站点相对：它们随控制台一起发出，故同一个选择在任何来源下都得读作「当前用的」。它们是
+// DiceBear 的，跨它的五个风格——每个文件的作者与许可写在图像元数据里，`NOTICE` 里也点名列了。
 export const AVATAR_PRESETS = [
-  '/keelbase-avatar-01.svg',
-  '/keelbase-avatar-02.svg',
-  '/keelbase-avatar-03.svg',
-  '/keelbase-avatar-04.svg',
-  '/keelbase-avatar-05.svg',
-  '/keelbase-avatar-06.svg',
-  '/keelbase-avatar-07.svg',
-  '/keelbase-avatar-08.svg',
-  '/keelbase-avatar-09.svg',
-  '/keelbase-avatar-10.svg'
+  '/keelbase-avatar-01.png',
+  '/keelbase-avatar-02.png',
+  '/keelbase-avatar-03.png',
+  '/keelbase-avatar-04.png',
+  '/keelbase-avatar-05.png',
+  '/keelbase-avatar-06.png',
+  '/keelbase-avatar-07.png',
+  '/keelbase-avatar-08.png',
+  '/keelbase-avatar-09.png',
+  '/keelbase-avatar-10.png',
+  '/keelbase-avatar-11.png',
+  '/keelbase-avatar-12.png',
+  '/keelbase-avatar-13.png',
+  '/keelbase-avatar-14.png',
+  '/keelbase-avatar-15.png',
+  '/keelbase-avatar-16.png',
+  '/keelbase-avatar-17.png',
+  '/keelbase-avatar-18.png',
+  '/keelbase-avatar-19.png',
+  '/keelbase-avatar-20.png'
 ]
 
 // The mark an avatar with no image of its own falls back to — the stylesheet points at this file,
@@ -36,11 +46,25 @@ export const DEFAULT_AVATAR = '/keelbase-avatar.svg'
 // deleting it.
 // 本弹窗存在之前提供过、现在不再提供的那些。已存的头像仍可能指着一个，故文件继续发、名字继续被认出——
 // 否则那个人的头像就不再解析得出来，弹窗还会把它说成是对方自己上传的。**撤下一个选择，不等于删掉它。**
+//
+// The ten `.svg` shapes are retired rather than deleted because of exactly that: the administrator of
+// this deployment had one stored before the set was replaced.
+// 那十个 `.svg` 的 shapes 是**撤下而非删掉**，正是因为这个：本部署的管理员在这套被换掉之前就存着一个。
 export const RETIRED_PRESETS = [
   '/keelbase-avatar-blue.svg',
   '/keelbase-avatar-teal.svg',
   '/keelbase-avatar-graphite.svg',
-  '/keelbase-avatar-warm.svg'
+  '/keelbase-avatar-warm.svg',
+  '/keelbase-avatar-01.svg',
+  '/keelbase-avatar-02.svg',
+  '/keelbase-avatar-03.svg',
+  '/keelbase-avatar-04.svg',
+  '/keelbase-avatar-05.svg',
+  '/keelbase-avatar-06.svg',
+  '/keelbase-avatar-07.svg',
+  '/keelbase-avatar-08.svg',
+  '/keelbase-avatar-09.svg',
+  '/keelbase-avatar-10.svg'
 ]
 
 const STORAGE_PREFIX = 'keelbase.avatar.lastUpload'

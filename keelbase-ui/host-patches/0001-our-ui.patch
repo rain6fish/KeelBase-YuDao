@@ -40,7 +40,7 @@ index 8cfcbef..0e113ff 100644
            </div>
            <div class="app-loading-item">
 diff --git a/src/components/Cropper/src/CopperModal.vue b/src/components/Cropper/src/CopperModal.vue
-index c69c967..0926597 100644
+index c69c967..6a70e25 100644
 --- a/src/components/Cropper/src/CopperModal.vue
 +++ b/src/components/Cropper/src/CopperModal.vue
 @@ -116,6 +116,43 @@
@@ -156,7 +156,7 @@ index c69c967..0926597 100644
    dialogVisible.value = true
  }
  
-@@ -278,5 +354,59 @@ $prefix-cls: #{$namespace}-cropper-am;
+@@ -278,5 +354,65 @@ $prefix-cls: #{$namespace}-cropper-am;
      justify-content: space-around;
      align-items: center;
    }
@@ -187,12 +187,18 @@ index c69c967..0926597 100644
 +    color: var(--el-text-color-secondary);
 +  }
 +
++  // Ten to a row, not "as many as fit". With twenty choices a wrapping flex row breaks 11 + 9, which
++  // reads as one row that ran out rather than as two rows — and the count is not a detail that should
++  // decide the shape of the dialog. Ten columns keep it at two rows whatever the tiles are.
++  // 一行十个，而不是「排得下几个算几个」。有二十个选择时，换行的 flex 会断成 11 + 9，读起来像一行没排完、
++  // 不像两行——而「有几个」不该决定弹窗长什么样。固定十列，不管格子多大都是两行。
 +  &-picker-items {
-+    display: flex;
-+    flex-wrap: wrap;
++    display: grid;
++    grid-template-columns: repeat(10, minmax(0, 1fr));
 +    gap: 10px;
 +
 +    img {
++      justify-self: center;
 +      width: 46px;
 +      height: 46px;
 +      cursor: pointer;
