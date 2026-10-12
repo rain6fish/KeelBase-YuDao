@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# What this deployment is, in the runtime's own words.
+#
+# The runtime asks two questions its Java defaults cannot answer for a host: which business modules a
+# deployment actually enables, and what they are called. Its defaults describe the repository's own
+# demo (`crm`), so a host that says nothing about itself is described as a CRM-only system — which is
+# false here, and is exactly the kind of falsehood an assistant that answers "what modules does this
+# system have" would repeat to a user.
+#
+# It is a YAML file of ours rather than command-line arguments because the labels and descriptions are
+# UI strings and therefore non-ASCII, and arguments reach the JVM through argv, where a Chinese string
+# is at the mercy of the platform's argument encoding. A profile file is read as UTF-8, so the text is
+# the text.
+#
+# It is a file of ours rather than a line in upstream's `application.yaml` for the reason this whole
+# line runs on: upstream's files stay untouched, and the deployment's own settings live in the
+# deployment's own files. `scripts/run-server.sh` activates the profile; nothing else has to know.
+#
+# 本部署**是什么**，用运行时自己的说法。
+#
+# 运行时问两个它的 Java 默认值替宿主答不了的问题：一个部署**实际启用**了哪些业务模块，以及它们**叫什么**。它的
+# 默认值描述的是本仓自己的演示（`crm`），于是一个**关于自己什么都不说**的宿主，会被描述成一个只有 CRM 的系统 ——
+# 在这里这是**假**的，而这正是「一个回答『这个系统有哪些模块』的助手」会转述给用户的假话。
+#
+# 它是一份**我们自己的 YAML 文件**、不是命令行参数，因为 label 与 description 是 UI 字符串、因而是非 ASCII 的，
+# 而参数经 argv 到达 JVM，中文在那里**听凭平台参数编码摆布**。profile 文件按 UTF-8 读，故文字就是文字。
+#
+# 它是**我们自己的文件**、不是上游 `application.yaml` 里的一行，理由是本线赖以运行的那一条：上游的文件保持
+# 一字未动，部署自己的设置住在部署自己的文件里。`scripts/run-server.sh` 激活该 profile，别的什么都不必知道。
+keelbase:
+  app:
+    preset: full
+    features:
+      crm: true
+      bpm: true
+      oa: true
+      hrm: true
+      fms: true
+      report: true
+      products: true
+    businessModules:
+      - id: crm
+        label: CRM 系统
+        description: 线索、客户、商机与合同
+      - id: bpm
+        label: 工作流程
+        description: 流程定义与待我审批的任务
+      - id: oa
+        label: OA 办公协同
+        description: 工作台、笔记、通讯录与企业云盘
+      - id: hrm
+        label: HRM 人力资源
+        description: 组织、员工、考勤与薪酬
+      - id: fms
+        label: FMS 财务管理
+        description: 财务基础资料与账务
+      - id: report
+        label: 报表管理
+        description: 积木报表与大屏设计器
+      - id: products
+        label: 产品目录
+        description: 销售维护的产品目录，只有属主能改自己的产品

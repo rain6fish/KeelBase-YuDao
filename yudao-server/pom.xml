@@ -36,7 +36,7 @@
         <dependency>
             <groupId>cn.com.keelbase</groupId>
             <artifactId>keelbase4j-core</artifactId>
-            <version>0.1.6</version>
+            <version>0.1.7</version>
         </dependency>
 
         <!-- KeelBase's Spring AI adapter — the model loop on KeelBase's **own** path. It implements the
@@ -52,7 +52,7 @@
         <dependency>
             <groupId>cn.com.keelbase</groupId>
             <artifactId>keelbase4j-springai</artifactId>
-            <version>0.1.6</version>
+            <version>0.1.7</version>
         </dependency>
 
         <!-- The model that seam talks to, when it is switched on. KeelBase's adapter activates off a
@@ -93,11 +93,11 @@
         <!-- 数据报表。默认注释，保证编译速度 -->
         <!-- Enabled for this line: the demo's menu ships the report pages, so they have to answer. /
              本线打开：demo 的菜单里带着报表页，它们得能作答。 -->
-        <dependency>
-            <groupId>cn.iocoder.boot</groupId>
-            <artifactId>yudao-module-report</artifactId>
-            <version>${revision}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.iocoder.boot</groupId>-->
+<!--            <artifactId>yudao-module-report</artifactId>-->
+<!--            <version>${revision}</version>-->
+<!--        </dependency>-->
         <!-- 工作流 -->
         <!-- Enabled for this line. / 本线打开。 -->
         <dependency>
@@ -194,35 +194,35 @@
 
         <!-- HRM 人力资源管理模块。默认注释，保证编译速度 -->
         <!-- Enabled for this line. / 本线打开。 -->
-        <dependency>
-            <groupId>cn.iocoder.boot</groupId>
-            <artifactId>yudao-module-hrm</artifactId>
-            <version>${revision}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.iocoder.boot</groupId>-->
+<!--            <artifactId>yudao-module-hrm</artifactId>-->
+<!--            <version>${revision}</version>-->
+<!--        </dependency>-->
 
         <!-- FMS 财务管理模块。默认注释，保证编译速度 -->
         <!-- Enabled for this line. / 本线打开。 -->
-        <dependency>
-            <groupId>cn.iocoder.boot</groupId>
-            <artifactId>yudao-module-fms</artifactId>
-            <version>${revision}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.iocoder.boot</groupId>-->
+<!--            <artifactId>yudao-module-fms</artifactId>-->
+<!--            <version>${revision}</version>-->
+<!--        </dependency>-->
 
         <!-- PMS 项目管理模块。默认注释，保证编译速度 -->
         <!-- Enabled for this line. / 本线打开。 -->
-        <dependency>
-            <groupId>cn.iocoder.boot</groupId>
-            <artifactId>yudao-module-pms</artifactId>
-            <version>${revision}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.iocoder.boot</groupId>-->
+<!--            <artifactId>yudao-module-pms</artifactId>-->
+<!--            <version>${revision}</version>-->
+<!--        </dependency>-->
 
         <!-- OA 办公自动化模块。默认注释，保证编译速度 -->
         <!-- Enabled for this line. / 本线打开。 -->
-        <dependency>
-            <groupId>cn.iocoder.boot</groupId>
-            <artifactId>yudao-module-oa</artifactId>
-            <version>${revision}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.iocoder.boot</groupId>-->
+<!--            <artifactId>yudao-module-oa</artifactId>-->
+<!--            <version>${revision}</version>-->
+<!--        </dependency>-->
 
         <!-- IM 相关模块。默认注释，保证编译速度 -->
 <!--        <dependency>-->

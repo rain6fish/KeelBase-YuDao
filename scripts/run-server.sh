@@ -55,8 +55,15 @@ if [ -n "${KEELBASE_MODEL_API_KEY:-}" ]; then
   AI_ARGS+=("--spring.ai.openai.chat.options.model=${KEELBASE_MODEL_NAME:-deepseek-v4-flash}")
 fi
 
+# The `keelbase` profile carries what this deployment *is* — its business modules and their names —
+# and it is a file of ours rather than a value here for one reason: those labels are Chinese, and argv
+# is where a Chinese string stops being the string (the platform's argument encoding decides).
+# 那个 `keelbase` profile 带着**本部署是什么** —— 它的业务模块与它们的名字 —— 而它是一份**我们自己的文件**、
+# 不是这里的一个取值，理由只有一条：那些 label 是中文，而 argv 正是中文串**不再是那个串**的地方
+# （平台参数编码说了算）。
 exec bash "$HERE/jdk25.sh" java -jar "$ROOT/yudao-server/target/yudao-server.jar" \
   --server.port="$PORT" \
+  --spring.profiles.active=local,keelbase \
   --spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=0 \
   --spring.datasource.dynamic.datasource.master.type=com.zaxxer.hikari.HikariDataSource \
   --spring.datasource.dynamic.datasource.master.url="$PG_URL" \

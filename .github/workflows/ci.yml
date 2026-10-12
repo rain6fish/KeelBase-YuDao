@@ -14,6 +14,8 @@
 #                        boundary rests on and is one `@Bean` away from no longer being true;
 #   governance-registry  every module this host governs declares itself, and the name it declares is
 #                        the one its own pointcuts point at — the set `YD-13` made countable;
+#   console-pages        every page the assistant offers is a route the menus we ship compose, so a
+#                        curated list cannot quietly point at a page that moved;
 #   generator            the committed generated files are still a Spec's output (`--check-boundary`)
 #                        and still what that Spec says (`--check`).
 #
@@ -35,6 +37,8 @@
 #                        而它离「不再成立」只差一个 `@Bean`；
 #   governance-registry  本宿主治理的每个模块都**自报**，而它报的名字**就是**它自己 pointcut 所指的那一个
 #                        —— `YD-13` 让它**数得出来**的那个集合；
+#   console-pages        助手提供的每一页，都是**我们发布的菜单**解得出来的一条路径 —— 策展清单因而不会
+#                        悄悄指向一个已经挪走的页面；
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
 #                        东西（`--check`）。
 #
@@ -99,6 +103,14 @@ jobs:
       # 「不受治理」与「被忘了」。这道检查在源码里读「受治理模块」的形状，拒掉一个从没自报的。
       - name: A governed module must declare itself, and under its own name
         run: node scripts/check-governance-registry.mjs
+
+      # The assistant's page list is curated, and a curated list is a second place to forget: each
+      # route it names is looked up in the menu tree the SQL we ship defines, composed the way the
+      # console's router composes it. Pure Node.
+      # 助手的页面清单是策展的，而策展清单就是第二个可以忘的地方：它点名的每条路径，都在**我们发布的 SQL**
+      # 所定义的菜单树里查一遍，且按控制台路由的拼法拼。纯 Node。
+      - name: Every page the assistant offers must be one the menus compose
+        run: node scripts/check-console-pages.mjs
 
   generator:
     name: The generated files are still a Spec's output
