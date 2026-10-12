@@ -8,31 +8,40 @@
 // 组件，是因为弹窗与个人页都要用，且两者必须对「怎么认出一个预置」与「上传记在哪」保持一致。
 
 // Site-relative on purpose: these ship with the console, so the same choice has to read as "current"
-// on whatever origin serves it. They are DiceBear's, across five of its styles — each file carries
-// its own style, author and licence in the metadata an image editor writes, and `NOTICE` names them.
+// on whatever origin serves it. They are DiceBear's, five of each across four abstract styles —
+// `identicon`, `rings`, `shapes`, `weave` — and all four are CC0 1.0, so `NOTICE` owes no
+// attribution for any of them. Each file carries its own style and licence in its metadata.
+//
+// The `preset-` prefix is not decoration. The ten `keelbase-avatar-NN.svg` these replaced are still
+// shipped (see below), and reusing their names would have made a stored avatar that names one
+// resolve to a different picture — silently, since it would still render.
 // 刻意写成站点相对：它们随控制台一起发出，故同一个选择在任何来源下都得读作「当前用的」。它们是
-// DiceBear 的，跨它的五个风格——每个文件的作者与许可写在图像元数据里，`NOTICE` 里也点名列了。
+// DiceBear 的，四个抽象风格各五张——`identicon`、`rings`、`shapes`、`weave`——四个都是 CC0 1.0，
+// 故 `NOTICE` 对它们一个都不欠署名。每个文件自带风格与许可。
+//
+// `preset-` 这个前缀不是装饰。它们替下的那十个 `keelbase-avatar-NN.svg` **仍在发**（见下），复用那些
+// 名字会让一个指着其中一个的**已存头像**解析成另一张图——而且是**静默**的，因为它照样渲染。
 export const AVATAR_PRESETS = [
-  '/keelbase-avatar-01.png',
-  '/keelbase-avatar-02.png',
-  '/keelbase-avatar-03.png',
-  '/keelbase-avatar-04.png',
-  '/keelbase-avatar-05.png',
-  '/keelbase-avatar-06.png',
-  '/keelbase-avatar-07.png',
-  '/keelbase-avatar-08.png',
-  '/keelbase-avatar-09.png',
-  '/keelbase-avatar-10.png',
-  '/keelbase-avatar-11.png',
-  '/keelbase-avatar-12.png',
-  '/keelbase-avatar-13.png',
-  '/keelbase-avatar-14.png',
-  '/keelbase-avatar-15.png',
-  '/keelbase-avatar-16.png',
-  '/keelbase-avatar-17.png',
-  '/keelbase-avatar-18.png',
-  '/keelbase-avatar-19.png',
-  '/keelbase-avatar-20.png'
+  '/keelbase-preset-01.svg',
+  '/keelbase-preset-02.svg',
+  '/keelbase-preset-03.svg',
+  '/keelbase-preset-04.svg',
+  '/keelbase-preset-05.svg',
+  '/keelbase-preset-06.svg',
+  '/keelbase-preset-07.svg',
+  '/keelbase-preset-08.svg',
+  '/keelbase-preset-09.svg',
+  '/keelbase-preset-10.svg',
+  '/keelbase-preset-11.svg',
+  '/keelbase-preset-12.svg',
+  '/keelbase-preset-13.svg',
+  '/keelbase-preset-14.svg',
+  '/keelbase-preset-15.svg',
+  '/keelbase-preset-16.svg',
+  '/keelbase-preset-17.svg',
+  '/keelbase-preset-18.svg',
+  '/keelbase-preset-19.svg',
+  '/keelbase-preset-20.svg'
 ]
 
 // The mark an avatar with no image of its own falls back to — the stylesheet points at this file,
@@ -50,6 +59,12 @@ export const DEFAULT_AVATAR = '/keelbase-avatar.svg'
 // The ten `.svg` shapes are retired rather than deleted because of exactly that: the administrator of
 // this deployment had one stored before the set was replaced.
 // 那十个 `.svg` 的 shapes 是**撤下而非删掉**，正是因为这个：本部署的管理员在这套被换掉之前就存着一个。
+//
+// The twenty `.png` presets that came between them are not listed here: they were offered for a few
+// hours and the deployment's database was checked before they were dropped — nothing stored names
+// one. Had anything, they would belong on this list rather than in the bin.
+// 中间那二十个 `.png` 预置不在这张清单里：它们只提供了几个小时，且丢弃**之前查过**部署库——没有任何
+// 已存值指着其中一个。有的话它们该进这张清单，而不是进回收站。
 export const RETIRED_PRESETS = [
   '/keelbase-avatar-blue.svg',
   '/keelbase-avatar-teal.svg',

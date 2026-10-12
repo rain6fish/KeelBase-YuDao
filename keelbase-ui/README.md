@@ -199,42 +199,33 @@ degradation rather than a wrong image. `host-overlay/src/assets/imgs/keelbase-av
 bytes for the components that import a default from source.
 
 The twenty avatars a person picks from are
-`host-overlay/public/keelbase-avatar-01.png` … `-20.png`. They were exported from DiceBear's own site
-and dropped in as they came — byte for byte, nothing re-encoded — so each one still carries, in the
-IPTC and XMP blocks an image editor writes, the style it is and who made it:
+`host-overlay/public/keelbase-preset-01.svg` … `-20.svg`: five each of four DiceBear styles —
+`identicon`, `rings`, `shapes`, `weave`. All four are **CC0 1.0**, so no attribution is owed and
+`NOTICE` says one line. Each file carries its own style and licence in its metadata.
 
-| files | style | creator | licence |
-|---|---|---|---|
-| 01–09 | `adventurer-neutral` | Lisa Wischofsky | **CC BY 4.0** |
-| 10–13 | `identicon` | DiceBear | CC0 1.0 |
-| 14–16 | `rings` | DiceBear | CC0 1.0 |
-| 17–18 | `shapes` | DiceBear | CC0 1.0 |
-| 19–20 | `weave` | DiceBear | CC0 1.0 |
+    curl -s 'https://api.dicebear.com/10.x/<style>/svg?seed=keelbase-<style>-<nn>&size=256' \
+      -o host-overlay/public/keelbase-preset-<nn>.svg
 
-The CC BY 4.0 ones are nine of the twenty, and that licence asks for attribution — `NOTICE` gives it,
-and it is why that paragraph is not the one-line CC0 statement it was.
+The seeds are `keelbase-identicon-01`…`-05`, `keelbase-rings-01`…`-05`, `keelbase-shapes-01`…`-05`,
+`keelbase-weave-01`…`-05`, in that order — so unlike the sets before them these can be regenerated,
+and the set is reproducible from this file alone.
 
-**These cannot be regenerated.** An export from the site keeps no seed, so there is no request that
-produces these twenty again; a replacement has to be re-picked or re-exported. That is worth knowing
-before editing this set, and it is also why they are committed rather than fetched by a script the
-way the icons are.
+**They are on `10.x`, not `9.x`.** `weave` does not exist on the 9.x API — the request 404s — so the
+whole set is generated from one version rather than mixing them.
 
-**They are 128×128.** DiceBear's site exports at that size. It is right for the picker's tiles and for
-the top bar; the profile page draws its own avatar at 120 px, so on a high-density display that one is
-drawn from a source barely larger than itself. Raising it means re-exporting larger and re-picking.
+**The `preset-` prefix is not decoration.** The ten `keelbase-avatar-NN.svg` these replaced are still
+shipped (retired, below), and reusing their names would have made a stored avatar that names one
+resolve to a different picture — silently, because it would still render.
 
-The correspondence, since the numbers below are ours and not the export's:
+**The 128 px caveat is gone.** These are SVG, so the profile page's 120 px circle no longer draws from
+a source barely larger than itself. That is the one thing the raster set before them could not do,
+since an export from DiceBear's site keeps no seed and so could not be re-exported larger.
 
-| ours | came in as |
-|---|---|
-| 01–09 | `adventurer-neutral-1791777303819` … `-1791777373338` |
-| 10–13 | `identicon-1791777520456` … `-1791777540266` |
-| 14–16 | `rings-1791777552055` … `-1791777562189` |
-| 17–18 | `shapes-1791777573171`, `-1791777578637` |
-| 19–20 | `weave-1791777598081`, `-1791777604422` |
-
-The set mixes drawn faces with abstract marks, because that is what the export holds. Nine of the
-twenty are faces; the other eleven are geometry. It is not one family, and it was not chosen to be.
+Between this set and the one before there were twenty **PNG** presets, taken from an export the user
+supplied and dropped in byte for byte. They are not shipped. They were offered for a few hours, and
+the deployment's database was checked before they were dropped — nothing stored names one. Had
+anything, they would be on the retired list rather than in the bin; the names could not be reused for
+these, for the reason in the paragraph above.
 
 Four earlier presets — `-blue` `-teal` `-graphite` `-warm` — are **retired but still shipped**, and
 still recognised. They are no longer offered, but an avatar stored while they were can name one:
