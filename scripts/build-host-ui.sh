@@ -163,7 +163,20 @@ if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" || -f "$REMOVALS"
   if [[ -d "$OVERLAY" ]]; then
     while IFS= read -r -d '' f; do
       rel="${f#"$OVERLAY"/}"
-      cp "$f" "$UI_DIR/$rel"
+      # The directory has to exist first. Upstream has no `src/keelbase/` and no
+      # `src/views/keelbase/governance/`, so a plain `cp` into either fails — and until this line
+      # existed it failed *quietly*: the loop's status is the trailing `echo`'s, so the build went on
+      # without the files and reported success. An overlay entry that cannot be placed is the same
+      # class of error the patch and the removal list get, so it fails the same way.
+      # 目录得先存在。上游没有 `src/keelbase/`、也没有 `src/views/keelbase/governance/`，故直接 `cp`
+      # 进去会失败——而在这一行存在之前，它失败得**悄无声息**：循环的退出码取的是末尾那个 `echo` 的，
+      # 于是构建在没有这些文件的情况下继续跑，并报成功。放不进去的覆盖项，与补丁、删除清单是同一类错误，
+      # 故让它以同样的方式失败。
+      mkdir -p "$(dirname "$UI_DIR/$rel")"
+      if ! cp "$f" "$UI_DIR/$rel"; then
+        echo "could not place overlay file: $rel" >&2
+        exit 1
+      fi
       echo "added $rel"
     done < <(find "$OVERLAY" -type f -print0)
   fi
