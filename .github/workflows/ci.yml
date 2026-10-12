@@ -6,18 +6,37 @@
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
 # what we *have* touched is `YD-T4`).
 #
-# The job below proves one thing: every path this repository writes about itself — in a comment, a
-# doc, a script — points at a file it actually holds. `--check-boundary` and `--check` prove other
-# things and are deliberately not run here: both want a JDK 25 toolchain and a Maven build, and a job
-# that takes minutes to answer a question about file names gets run less often, not more.
+# Three jobs, and each answers a question the others cannot:
+#
+#   path-refs            every path this repository writes about itself — in a comment, a doc, a
+#                        script — points at a file it actually holds;
+#   governance-boundary  no bean of ours hands a tool to Spring AI, which is the fact `D42`'s
+#                        boundary rests on and is one `@Bean` away from no longer being true;
+#   generator            the committed generated files are still a Spec's output (`--check-boundary`)
+#                        and still what that Spec says (`--check`).
+#
+# `path-refs` and `governance-boundary` are pure Node and finish in seconds. `generator` wants a
+# JDK 25 toolchain and a Maven build, so it is the one job here that costs minutes — and it is kept
+# to those two **offline** checks. The conformance suite and the four governance rates need a
+# running stack (PostgreSQL + Redis + the server); they are deliberately **not** run here, because
+# calling those scripts without a host would not be running them.
 #
 # 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
 # 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
 #
-# 下面这个 job 只证明一件事：本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个
-# 它确实持有的文件。`--check-boundary` 与 `--check` 证明别的事，**刻意不在这里跑**：两者都要一套 JDK 25
-# 工具链与一次 Maven 构建，而一个要跑上几分钟才回答一个文件名问题的 job，只会被跑得更少，不会更多。
+# 三个 job，各答一个别的 job 答不了的问题：
+#
+#   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
+#                        确实持有的文件；
+#   governance-boundary  我们自己没有任何 bean 把工具交给 Spring AI —— `D42` 那条边界所倚的**事实**，
+#                        而它离「不再成立」只差一个 `@Bean`；
+#   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
+#                        东西（`--check`）。
+#
+# 前两个是 pure Node、几秒完事。`generator` 要一套 JDK 25 工具链与一次 Maven 构建，是本文件里唯一按
+# 分钟计的 job —— 它只跑那两道**离线**检查。符合性套件与四个治理率要一套**跑着的栈**（PostgreSQL +
+# Redis + 宿主），**刻意不在这里跑**：不起宿主直接调那些脚本，那不叫跑过它。
 name: CI
 
 on:
@@ -44,3 +63,42 @@ jobs:
       # same note, for the same reason, is in the sibling repositories' workflows.
       - name: Cited paths must exist
         run: node scripts/check-path-refs.mjs
+
+  governance-boundary:
+    name: No bean of ours hands a tool to Spring AI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # Pure Node: it reads the source and there is no toolchain to set up. This is `D42`'s boundary
+      # made continuous — what it reads is the invariant a single new `@Bean` would break, and that is
+      # exactly why it must not be left to whoever remembers to run it.
+      # 纯 Node：读源码、无需工具链。这是把 `D42` 的边界变成**持续**控制 —— 它读的那条不变量，正是一个
+      # 新加的 `@Bean` 会打破的那一条；也正因如此，它不该取决于「谁记得跑」。
+      - name: Our tools must not be reachable by a model without KeelBase
+        run: node scripts/check-ungoverned-tool-beans.mjs
+
+  generator:
+    name: The generated files are still a Spec's output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # `gen-from-spec.sh` resolves a JDK 25 for the one command; on a runner the toolchain is already
+      # 25, so it is handed that home explicitly rather than letting its own resolver fall through to
+      # its last option (which fetches a Windows build). Both checks are **offline**: `--check`
+      # compares what the generator would write against what is committed, and `--check-boundary`
+      # proves the two generated namespaces hold generated files and nothing else.
+      # `gen-from-spec.sh` 为那一条命令解析一个 JDK 25；runner 上工具链本就是 25，故**显式**把这个 home 交给它，
+      # 免得它自己的解析器落到最后一档（那一档取的是 **Windows** 构建）。两道检查都是**离线**的：`--check`
+      # 拿「生成器会写的」比对已提交的，`--check-boundary` 证明两个生成命名空间里只有生成物、没有别的。
+      - name: A Spec's output must match what is committed
+        run: KEELBASE_JDK25="$JAVA_HOME" bash scripts/gen-from-spec.sh specs/products.json --check
+      - name: Only a Spec may write into the generated namespaces
+        run: KEELBASE_JDK25="$JAVA_HOME" bash scripts/gen-from-spec.sh --check-boundary
