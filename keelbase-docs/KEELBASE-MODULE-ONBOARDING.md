@@ -17,6 +17,13 @@ enough to freeze a contract.
 **Revised 2026-10-11**: `YudaoRowScope` replaced the scope machine's declared narrowing with a read of
 this host's own roles (§4.1 and §5, which is where the two sentences it changed are).
 
+**Revised 2026-10-12**: a **third** module was onboarded — `yudao-module-bpm`'s leave request
+(`bpm_oa_leave`), the second module upstream wrote, with its gate at
+`scripts/run-bpm-oa-leave-scenarios.mjs`. It is what §4.1's owner-machine sentence could then be
+corrected against (the owner here is `user_id`, not `owner_user_id`) and what turned up this line's
+first **runtime-side** cost: the chat request declares one structured slot, and it is named `customerId`
+(§4.5).
+
 ## 1. Which half is which
 
 | Half | Where it lives | A new module touches it? |
@@ -130,29 +137,41 @@ call — with the total narrowed too, so no page's total disagrees with its rows
 This is the half that does not repeat by hand **only for modules we generate**. For a module upstream
 wrote, there is no Spec to write — see §2.
 
-## 4. Four things that decide whether the per-module work is cheap
+## 4. Five things that decide whether the per-module work is cheap
 
-1. **The scope machine is an owner-column machine.** `YudaoModuleScope.belongsToCaller` compares an
-   `ownerUserId`. A module whose row range is a department, a permission table, or the tenant will not
-   fit it and will need a second machine. This is the line between "the same every time" and
+1. **The scope machine is an owner-machine, and the owner is whatever field the module names.**
+   `YudaoModuleScope.belongsToCaller` takes the owner as a string — `owner_user_id` for CRM, `user_id`
+   for BPM's leave request — so nothing in the machine changes with the column's name; what changes is
+   **which field an advice reads**, and that reading does not compress. A module whose row range is a
+   department, a permission table, the tenant, or **the engine's own tables** (BPM's task and
+   process-instance surfaces take their ownership from `assignee` / `startUserId`, not from a column)
+   will not fit it and will need a second machine. This is the line between "the same every time" and
    "different every time". A second machine now **partly** exists — `YudaoRowScope` reads *this host's
    own* role table — but it answers a different question: whether the caller ranges over every row and
    is therefore exempt from narrowing at all, and not "which rows does this caller see". The narrowing
-   itself is still the ownership column.
+   itself is still the ownership field.
 2. **Nothing enumerates the governed modules.** RuoYi has a `GovernedModule` interface and a registry;
-   YuDao's `CrmCustomerGovernance` and `ProductsGovernance` are bare `@Component`s. There is no single
-   place that lists what is governed — so there is nowhere to read that a module was forgotten.
+   YuDao's `CrmCustomerGovernance`, `BpmOALeaveGovernance` and `ProductsGovernance` are bare
+   `@Component`s. There is no single place that lists what is governed — so there is nowhere to read
+   that a module was forgotten.
 3. **Each module owes a narrowing decision** (§2.1): owner-only, or aligned with the module's own
    permission table.
 4. **The abstraction boundary is not settled.** `YD-T7` is open, and the cross-host evidence note
    nominates `ActingCaller`, `ModuleRoute` and the fallback planner as promotion candidates. Seams
    written now may later move package, because the sample is still two hosts.
+5. **The runtime's request shape names one module's field.** The chat request
+   (`cn.com.keelbase.runtime.web.ChatRequest`) declares `message`, `conversationId` and **`customerId`**
+   — one structured slot, and it is named for CRM. A second module's rows have no slot of their own, so
+   BPM's route puts the leave id into `customerId`. It works, it is recorded in the tool face's class
+   comment rather than dressed up, and it is the first cost this line has found that lives **outside**
+   the module. Generalising the slot is a runtime change and lands on the platform line, not here.
 
 ## 5. What this file does not claim
 
-- Two modules is two samples. Everything above describes the shape those two repeated, not a contract.
-- **Only CRM has been run end to end** (the `YD-2` gate). `products` has been generated and built, not
-  put through the same gate.
+- Three modules is three samples — two upstream (`crm`, and BPM's leave request) and one generated
+  (`products`). Everything above describes the shape they repeated, not a contract.
+- **CRM and the BPM leave slice have been run end to end** (`YD-2`'s gate, `YD-14`'s gate). `products`
+  has been generated and built, not put through the same gate.
 - The scope machine's administrator test is still a **placeholder**: "administrator" means user 1
   until a role mapping is decided. That half is unchanged. What changed on **2026-10-11** is the other
   half — the host's role table *is* read now (`YudaoRowScope`), for the every-row exemption only.
