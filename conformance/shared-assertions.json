@@ -1,0 +1,44 @@
+{
+  "what": "The assertions the two hosts' application records both carry, named the same way. This is the first step of D43 ('do the cheap half first'): it does not require both hosts to be alive, and it does not touch the frozen RuoYi line — each host still runs on its own and writes its own record. What it adds is that the two records are read against one shared list instead of being two documents nobody compares.",
+  "为什么": "两个宿主的应用记录都带着的断言，用同一套名字说出来。这是 D43 的「先做那一半」：不要求两宿主同时活，也不动冻结的 RuoYi 线——两边各自跑、各自写自己的记录。它加的是：两份记录对着**同一张清单**读，而不是两份没人比对的文档。",
+  "shape": "Each entry names a host-agnostic assertion and, per host, which column of that host's record carries it. A host is expected to answer the assertion; leaving it out is a failure of the comparison, not a silent absence.",
+  "形态": "每条给一个宿主无关的断言，并按宿主指出**它那份记录的哪一栏**承载它。宿主**应当**回答这条断言；缺了是比对的失败，不是静默的缺席。",
+  "finding": "On both hosts, identity resolution and out-of-scope refusal are carried by the SAME row — the scenario gate that drives the host's own module reports both in one line ('26 ok, 0 failed' / '25 ok / 0 failed'). They are listed separately because they are separate claims, not because either record separates them. That is a property of both records, and it is stated here so nobody reads the shared list as promising four separate rows.",
+  "发现": "在两个宿主上，**身份解析**与**越权拒绝**由**同一行**承载——那条驱动宿主自己模块的场景门禁把它们报在一行里（`26 ok, 0 failed` / `25 ok / 0 failed`）。这里把它们分开列，是因为它们是**两条不同的主张**，不是因为哪份记录把它们分开了。这是两份记录共同的性质，写在这里，免得有人把这份共享清单读成「承诺有四行」。",
+  "verdictRule": "An assertion's verdict for a host is PASS only when every matching case in that host's record is PASS. Several cases matching means all of them, and a host that has no matching case is 'missing' — which the comparison reports as a failure rather than as PASS.",
+  "判定规则": "某宿主某条断言的判定：只有该宿主记录里**所有**匹配的 case 都是 `PASS` 才算 `PASS`。匹配到多条就是**全部**；一条都匹配不到的宿主记为 `missing`——比对把它报成失败，而不是 `PASS`。",
+  "assertions": [
+    {
+      "id": "identity-resolution",
+      "name": "身份解析 / the caller is resolved to this host's own user",
+      "carriedBy": {
+        "KeelBase-RuoYi": { "column": "Permission" },
+        "KeelBase-YuDao": { "column": "Permission" }
+      }
+    },
+    {
+      "id": "out-of-scope-refused",
+      "name": "越权拒绝 / access outside the caller's rows is refused",
+      "carriedBy": {
+        "KeelBase-RuoYi": { "column": "Permission" },
+        "KeelBase-YuDao": { "column": "Permission" }
+      }
+    },
+    {
+      "id": "high-risk-write-held",
+      "name": "高风险写被扣下 / a high-risk write is held for a human",
+      "carriedBy": {
+        "KeelBase-RuoYi": { "column": "Confirmation" },
+        "KeelBase-YuDao": { "column": "Confirmation" }
+      }
+    },
+    {
+      "id": "audit-chain-verifies",
+      "name": "审计链校验 / the audit chain verifies over its own rows",
+      "carriedBy": {
+        "KeelBase-RuoYi": { "column": "Audit" },
+        "KeelBase-YuDao": { "column": "Audit" }
+      }
+    }
+  ]
+}
