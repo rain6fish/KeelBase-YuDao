@@ -128,11 +128,13 @@ public class SystemNotifyMessageGovernance implements GovernedModule {
     /**
      * The same pair at {@code args[0..1]}: the unread count, the unread list, and the "mark everything
      * read" write. A second advice rather than a shared one, because upstream put the pair in a
-     * different place — read by the gate only on the two above, and written down here as unexercised
-     * rather than left as a hole.
+     * different place. The write is the one the gate can observe — a caller's unread rows all flip and
+     * another subject's do not — and it is the reason the face declares a tool for it: without one,
+     * this advice was code no test had run.
      *
      * 同一对在 {@code args[0..1]} 上：未读计数、未读列表、以及「全部标记已读」那个写。**另立一条**通知、而不共用，
-     * 因为上游把这一对放在**另一个位置**——门禁只跑了上面那两条，而这一条在此记为**未跑过**，而不是留成一个洞。
+     * 因为上游把这一对放在**另一个位置**。那个写正是门禁能观测的那一个——调用方的未读行全部翻转、另一个主体的不动——
+     * 也是本面为它声明一个工具的原因：没有那个工具，这条通知曾是**没有测试跑过的代码**。
      */
     @Around("execution(* cn.iocoder.yudao.module.system.service.notify.NotifyMessageService.getUnreadNotifyMessageList(..))"
             + " || execution(* cn.iocoder.yudao.module.system.service.notify.NotifyMessageService.getUnreadNotifyMessageCount(..))"
@@ -154,8 +156,17 @@ public class SystemNotifyMessageGovernance implements GovernedModule {
      * nothing — the pair is checked, not just the id, because the id alone is shared between an
      * administrator and a member.
      *
+     * <p>This is the advice whose effect the gate can see, because the tool over it turns that nothing
+     * into a failure rather than an empty success: the caller's own row reads {@code -> ok} and another
+     * subject's does not. The refusal is not distinguishable from "not there", on purpose — saying
+     * which would leak that the row exists.
+     *
      * 唯一真正不收束的那条路：按 id 读。**另一个主体**的信什么都不交回——查的是**那一对**、不只是 id，因为 id 本身
      * 在管理员与会员之间是**共用的**。
+     *
+     * <p>**这一条的效果门禁看得见**，因为在它之上的工具把那个「什么都不」变成失败、而不是一个空的成功：调用方自己
+     * 那一行读作 {@code -> ok}，另一个主体的不是。那**不是**拒绝、与「不存在」不可分，且刻意如此——说出是哪一个，
+     * 就泄漏了那一行存在。
      */
     @Around("execution(* cn.iocoder.yudao.module.system.service.notify.NotifyMessageService.getNotifyMessage(..))")
     public Object withholdOthersRow(ProceedingJoinPoint call) throws Throwable {

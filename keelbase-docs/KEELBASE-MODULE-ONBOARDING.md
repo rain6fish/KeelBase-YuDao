@@ -96,6 +96,17 @@ A `@Configuration` with `@Bean AiTool` methods: one read (R1) and one write (R3)
 `parameters()` on a write — a proposal that names an argument the tool does not read is refused at
 the gate with `invalid_arguments`, before it reaches a human.
 
+**A write's result must carry an `id`.** The engine records one side effect per result, and
+`side_effects.result_id` is `NOT NULL` — so a write that returns no id does not merely report badly,
+it **fails after the write has already landed** (`Updates: 1`, then the ledger insert throws and the
+caller gets an error). Found the hard way on the system module's bulk write, whose result row is
+`{"id": …, "changed": …}`. **A bulk write has no per-row result**, so the shape to copy there is the
+one that module uses: name the result type after what actually changed (a mailbox, not a message) and
+let its id be the thing that owns it. A parameterless write then has a second consequence worth
+knowing: its call signature never varies, so a **failed approval leaves its claim `claimed` in
+`write_claims`** and the engine refuses that same call from then on (`409 … the same call is not run
+twice`). Both are runtime behaviour, not module bugs; both are recorded on the project's list.
+
 **Carry the caller.** Upstream's own page query takes the user id **as an argument**, so identity has
 to travel rather than merely be available: `ActingCaller.as(principal.userId(), …)`, plus the host's
 tenant (`TenantUtils.execute(...)`) — a host-service call is refused without one.

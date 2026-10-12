@@ -20,7 +20,11 @@
 //     update filters on the caller's pair, so the row simply does not match. On CRM and BPM the advice
 //     raises a denial and that denial lands in the audit; here there is none to land. So what is
 //     asserted is that **the other subject's row is untouched**, and the outcome is *noted* rather
-//     than assumed to be a refusal.
+//     than assumed to be a refusal;
+//   * a **read by id** — the one path upstream leaves unscoped — is asserted as a **positive and a
+//     negative together**: the caller's own row reads `-> ok`, another subject's reads as a failure.
+//     All four advices at the seam are therefore exercised by this script, each on a path that can be
+//     observed on this module.
 //
 // That difference is the finding, not a gap in the gate: it says the per-module work here collapses
 // onto the identity bridge, because upstream's code already had the shape.
@@ -40,7 +44,9 @@
 //   * **对调用方自己的消息的写**端到端断言：扣下、批准、那一行翻转；
 //   * **对别人消息的写**收在**静默 no-op、不是拒绝**——模块自己的更新按调用方那一对过滤，故那一行**根本匹配不上**。
 //     在 CRM 与 BPM 上切面会抛拒绝、那次拒绝会落进审计；这里**没有可落的**。故断言的是**另一个主体的那一行没动**，而
-//     结局是**记下来**的、不是假定为拒绝。
+//     结局是**记下来**的、不是假定为拒绝；
+//   * **按 id 读**——上游唯一留着不收束的那条路——**正反一起**断言：调用方自己那一行读作 `-> ok`，另一个主体的读作
+//     失败。故本接缝上的**四条通知全部**被本脚本跑到，且各自跑在**本模块上可观测**的一条路上。
 //
 // 那个差别**就是发现本身**、不是门禁的缺口：它说这里的逐模块活**塌到了身份桥上**，因为上游的代码本来就有那个形状。
 import { execFileSync } from 'node:child_process';
@@ -142,6 +148,20 @@ if (!secondId) {
 const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
 
+// The gate clears its own stale write claims, and says why rather than hiding it. A write is **claimed**
+// before it runs and **settled** after; when an approval fails between the two — which is what the
+// first run of the bulk scenario did, before its result id was fixed — the claim stays `claimed` and
+// the engine then refuses that same call: `409 … the same call is not run twice`. For a
+// **parameterless** write the call signature never changes, so a single failed run blocks it for good.
+// Clearing this gate's own residue is the same discipline as truncating the audit trail above; the
+// behaviour itself is recorded as a finding rather than worked around silently.
+// 本门禁先清**自己**残留的写声明，并说出理由、而不是藏着。一个写**先被 claim、跑完再 settle**；当一次批准在两者之间
+// 失败——批量那一段的**第一次**运行就是这样（在它的 result id 修好之前）——那条声明就停在 `claimed`，此后引擎拒绝同一个
+// 调用：`409 … the same call is not run twice`。而对一个**无参数**的写，调用签名永不变化，故**一次失败的运行就把它永久锁死**。
+// 清本门禁自己的残留，与上面 truncate 审计轨是同一条纪律；那条行为本身作为**发现**记下，而不是被默默绕开。
+psql(`delete from write_claims where user_id = '${secondId}'`
+  + ` and tool_name in ('mark_notify_message_read', 'mark_all_notify_messages_read')`);
+
 // ── the rows, written straight into the module's own table ─────────────────────────────────────────
 console.log('== 场景 1 · 上游模块自己的表 ==');
 const marker = `gate-${Date.now()}`;
@@ -213,16 +233,70 @@ console.log('== 场景 4 · 越权写：这里没有拒绝可挣 ==');
   check('别人的消息一字未动', false, readStatusOf(adminRowId));
 }
 
-console.log('== 场景 5 · 审计链 ==');
+console.log('== 场景 5 · 第二种实参形状的那条通知：全部标记已读 ==');
+{
+  // The pair at `args[0..1]` — a *second* advice, because upstream put it in a different place than
+  // the one scenario 3 exercises. It is reachable at all only because this face declares a tool for
+  // it; before that it was code no test had run. The write is visible in the table, which is what
+  // makes the advice observable: the caller's unread rows all flip, and the administrator's do not.
+  // `args[0..1]` 上那一对——**第二条**通知，因为上游把它放在与情境 3 所跑的那条**不同的位置**。它之所以够得到，
+  // 只因本面为它声明了一个工具；在那之前，它是**没有测试跑过的代码**。这个写**在表里看得见**，那正是让这条通知可观测
+  // 的东西：调用方的未读行全部翻转，而管理员的不动。
+  const unreadOf = (userId) => Number(psql(`select count(*) from ${MESSAGE}`
+    + ` where user_id = ${userId} and user_type = ${ADMIN_USER_TYPE} and read_status = false and deleted = 0`));
+  seed(Number(secondId), `${marker}-sales2`); // so "all" has a row to flip on its own
+  const beforeSecond = unreadOf(secondId);
+  const beforeAdmin = unreadOf(1);
+  check('调用方此刻有未读可翻', true, beforeSecond >= 1);
+
+  const held = pendingCount(secondId);
+  await chat(second, '全部标记为已读');
+  check('写被扣下', held + 1, pendingCount(secondId));
+  const done = await confirm(second, pendingToken(secondId), 'approve');
+  check('批准后执行', 'executed', done.status);
+  check('调用方的未读清零', 0, unreadOf(secondId));
+  check('管理员的未读未动', beforeAdmin, unreadOf(1));
+}
+
+console.log('== 场景 6 · 按 id 读：自己的读得到，别人的读不到 ==');
+{
+  // The pair of assertions the withhold can actually be shown by: the same tool, the same caller, one
+  // row that is the caller's and one that is not. "Readable" is read from the trail as `-> ok`, and
+  // "not readable" as a failure, because `get_notify_message` turns the withheld nothing into
+  // `ToolResult.fail` — the only form of it the platform puts where a test can read it.
+  // 收束**真正能被显示出来**的那一对断言：同一个工具、同一个调用方，一行是它的、一行不是。「读得到」从审计轨读作
+  // `-> ok`，「读不到」读作失败——因为 `get_notify_message` 把被扣下的那个「什么都不」变成了 `ToolResult.fail`，
+  // 那是平台**唯一**会放到测试读得到的地方的那个形式。
+  const okCount = () => ranAs('get_notify_message');
+  // The engine's spelling, read off the trail rather than assumed: a `ToolResult.fail` lands as
+  // `<tool> -> fail: <error>`, not as `-> failed`.
+  // 引擎的拼法，从审计轨上读来的、不是假定的：`ToolResult.fail` 落成 `<tool> -> fail: <error>`，不是 `-> failed`。
+  const failedCount = () =>
+    Number(psql("select count(*) from ai_audit_logs where detail like '%get_notify_message -> fail%'"));
+
+  const okBefore = okCount();
+  await chat(second, '打开消息', { customerId: Number(salesRowId) });
+  check('读自己的那一行 -> ok', okBefore + 1, okCount());
+
+  const failedBefore = failedCount();
+  await chat(second, '打开消息', { customerId: Number(adminRowId) });
+  check('读别人的那一行读不到（记录在案）', failedBefore + 1, failedCount());
+  check('读别人的那一次没有记成 ok', okBefore + 1, okCount());
+}
+
+console.log('== 场景 7 · 审计链 ==');
 {
   const rows = Number(psql('select count(*) from ai_audit_logs'));
   check('审计行在（>0）', true, rows > 0);
   const verify = await (await fetch(`${HOST}/audit/verify`, { headers: { Authorization: `Bearer ${admin}` } })).json();
   check('链校验通过', true, verify.data && verify.data.valid);
-  // No refusal is asserted, and that is the point: this module answers the row question itself, so a
-  // cross-subject write is a no-op rather than a denial on the record.
-  // **不**断言拒绝，而那正是要点：本模块自己回答了行范围那一问，故跨主体的写是**静默 no-op**、不是一条拒绝记录。
-  note('本门禁不断言拒绝', `refusals on record = ${psql("select count(*) from ai_audit_logs where detail like '%mark_notify_message_read refused%'")}`);
+  // No **refusal** is asserted, and that is the point: this module answers the row question itself, so
+  // a cross-subject write is a no-op rather than a denial on the record. What the withhold on the
+  // by-id read leaves behind is a *failure*, not a refusal — asserted in scenario 6, and counted here.
+  // **不**断言**拒绝**，而那正是要点：本模块自己回答了行范围那一问，故跨主体的写是**静默 no-op**、不是一条拒绝记录。
+  // 按 id 读的收束留下的是**失败**、不是拒绝——它在情境 6 被断言，在这里被计数。
+  note('写路径上没有拒绝可记', `refusals on record = ${psql("select count(*) from ai_audit_logs where detail like '%mark_notify_message_read refused%'")}`);
+  note('按 id 读的收束在案', `get_notify_message -> fail = ${psql("select count(*) from ai_audit_logs where detail like '%get_notify_message -> fail%'")}`);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);
