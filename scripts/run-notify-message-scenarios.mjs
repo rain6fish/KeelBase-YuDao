@@ -117,7 +117,7 @@ const pendingCount = (operatorId) =>
   Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
 
 const ranAs = (tool) =>
-  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+  Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
@@ -272,7 +272,7 @@ console.log('== 场景 6 · 按 id 读：自己的读得到，别人的读不到
   // `<tool> -> fail: <error>`, not as `-> failed`.
   // 引擎的拼法，从审计轨上读来的、不是假定的：`ToolResult.fail` 落成 `<tool> -> fail: <error>`，不是 `-> failed`。
   const failedCount = () =>
-    Number(psql("select count(*) from ai_audit_logs where detail like '%get_notify_message -> fail%'"));
+    Number(psql("select count(*) from ai_audit_logs where tool = 'get_notify_message' and outcome = 'failed'"));
 
   const okBefore = okCount();
   await chat(second, '打开消息', { customerId: Number(salesRowId) });
@@ -295,8 +295,8 @@ console.log('== 场景 7 · 审计链 ==');
   // by-id read leaves behind is a *failure*, not a refusal — asserted in scenario 6, and counted here.
   // **不**断言**拒绝**，而那正是要点：本模块自己回答了行范围那一问，故跨主体的写是**静默 no-op**、不是一条拒绝记录。
   // 按 id 读的收束留下的是**失败**、不是拒绝——它在情境 6 被断言，在这里被计数。
-  note('写路径上没有拒绝可记', `refusals on record = ${psql("select count(*) from ai_audit_logs where detail like '%mark_notify_message_read refused%'")}`);
-  note('按 id 读的收束在案', `get_notify_message -> fail = ${psql("select count(*) from ai_audit_logs where detail like '%get_notify_message -> fail%'")}`);
+  note('写路径上没有拒绝可记', `refusals on record = ${psql("select count(*) from ai_audit_logs where tool = 'mark_notify_message_read' and outcome = 'refused'")}`);
+  note('按 id 读的收束在案', `get_notify_message -> fail = ${psql("select count(*) from ai_audit_logs where tool = 'get_notify_message' and outcome = 'failed'")}`);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);

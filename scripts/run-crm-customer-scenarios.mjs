@@ -119,7 +119,7 @@ const pendingCount = (operatorId) =>
 // 一个回合**有没有真跑**，从**审计轨**读、不从答案读 —— 同一个理由：答案不再报结果，而**审计行**才是运行时
 // 说「这次调用发生过」的地方。
 const ranAs = (tool) =>
-  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+  Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
@@ -263,7 +263,7 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
   // first version of this assertion looked in the wrong column and read a pass as a failure.
   // 菜单列表那一侧永远产生不了的那一半：**被拒本身**在案。工具名在 `detail` 里、不在 `action` 里——`action`
   // 说的是这是哪一类事件（`tool_call`）；本断言的**第一版**查错了列，把一次通过读成了失败。
-  const refusals = Number(psql(`select count(*) from ai_audit_logs where detail like '%update_crm_customer refused%'`));
+  const refusals = Number(psql(`select count(*) from ai_audit_logs where tool = 'update_crm_customer' and outcome = 'refused'`));
   check('被拒的那次写在案', true, refusals > 0);
 }
 

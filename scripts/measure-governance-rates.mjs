@@ -26,9 +26,14 @@
 //   node scripts/measure-governance-rates.mjs
 //   PG_CONTAINER=keelbase-yudao-pg PG_DB=ruoyi-vue-pro node scripts/measure-governance-rates.mjs
 //
-// **One place still reads text.** A unit is folded per tool, and a tool's name is the first word of
-// `detail` — the contract has no column for it yet. Everything else counts by `action`. When the
-// contract gains that column, the sentence to delete is the one in `SPLIT_TOOL`.
+// **Nothing here reads text any more.** A unit is folded per tool and each row's outcome is a word, and
+// both are **columns** now (`ai-audit-log-row` v5) — so the fold and every bucket are answered by
+// lookups rather than by matching a sentence. The sentence that used to say "one place still reads
+// `detail`" is gone with `SPLIT_TOOL`.
+//
+// **本文件不再有任何一处读文本。** 单位按工具折叠、每行的结局是一个词，而两者**现在都是列**
+// （`ai-audit-log-row` v5）——故折叠与每一个桶都由查表回答，而不是去匹配一句话。那句「仍有一处读
+// `detail`」随 `SPLIT_TOOL` 一起没了。
 //
 // ── 中文 ────────────────────────────────────────────────────────────────────────
 //
@@ -74,15 +79,34 @@ function psql(sql) {
 
 // Fold the audit rows into units, then count each bucket. `pending` opens a unit; the row that follows
 // it for the same tool closes it and is not itself a unit.
-const SPLIT_TOOL = "split_part(detail,' ',1)"; // the one place this file reads text — see the header
+//
+// The three words map onto `executed` / `refused` / `pending`; everything else (`blocked`, `failed`,
+// `declined`) is `other`, which is what it was before as well — none of those matched the three
+// patterns either.
+//
+// **`attempted` is excluded, and it has to be.** That row is written before the tool runs (so that
+// "who tried" is never missing) and it is not a conclusion — but it sits between `pending` and the row
+// that concludes it, and that adjacency is exactly what the window below reads. Left in, a `pending`
+// row's `next_kind` becomes `attempted` and every approved write stops being counted as one.
+//
+// 把审计行折成单位、再按桶计数。`pending` 开一个单位；同一工具下紧随它的那一行把它收掉，且自己不算一个
+// 单位。
+//
+// 三个词映到 `executed` / `refused` / `pending`；其余（`blocked` / `failed` / `declined`）是 `other`，
+// 与先前一致——它们本来也三个模式都不匹配。
+//
+// **`attempted` 必须排除。** 那一行写在工具跑之前（为的是「谁试过永不缺行」）、不是一次结论——但它**正好
+// 插在 `pending` 与收掉它的那一行之间**，而下面的窗口读的就是这个相邻关系。留着它，`pending` 的
+// `next_kind` 会变成 `attempted`，于是**每一次被批准的写都不再被计上**。
 const FOLD_SQL = `
 with t as (
-  select id, ${SPLIT_TOOL} as tool,
-         case when detail like '% -> ok%'               then 'ok'
-              when detail like '%refused%'              then 'refused'
-              when detail like '%pending confirmation%' then 'pending'
-              else 'other' end as kind
-  from ai_audit_logs where action='tool_call'
+  select id, tool,
+         case outcome when 'executed' then 'ok'
+                       when 'refused'  then 'refused'
+                       when 'pending'  then 'pending'
+                       else 'other' end as kind
+  from ai_audit_logs
+  where action='tool_call' and outcome is distinct from 'attempted'
 ), u as (
   select tool, kind,
          lag(kind)  over (partition by tool order by id) as prev_kind,

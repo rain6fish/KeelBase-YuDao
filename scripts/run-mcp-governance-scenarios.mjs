@@ -212,7 +212,7 @@ if (fail === 0) {
   // 那一行里写着 MCP 服务的名字，而本轮的服务带着**本轮的标记** ⇒ 该查询**不可能**被更早某次运行留下的行满足。
   // （第一版写死了一个服务名、把一行旧行读成了通过：一个假绿，回读时逮住。）
   const server = `probe-${marker}`;
-  const auditOf = (tool) => psql(`select count(*) from ai_audit_logs where user_id = '1' and detail like '${server}:${tool} -> ok'`);
+  const auditOf = (tool) => psql(`select count(*) from ai_audit_logs where user_id = '1' and tool = '${server}:${tool}' and outcome = 'executed'`);
   check('回显那一步有审计行且属主是登录用户', true, Number(auditOf('probe_echo')) > 0);
   check('记笔记那一步同样', true, Number(auditOf('probe_note')) > 0);
 }

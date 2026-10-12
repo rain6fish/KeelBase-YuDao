@@ -95,7 +95,7 @@ ok('admin 登录');
 // 只算本门禁自己那个工具的行，且按**运行前后**两次计数、不按整表：表活得比一次运行长，故整表计数会让门禁取决于
 // 它已被跑过多少次，而时间窗会把**跑它那个人的时区**一并算进来。
 const navigations = () =>
-  Number(psql(`select count(*) from ai_audit_logs where detail like '%navigate_console_page -> ok%'`));
+  Number(psql(`select count(*) from ai_audit_logs where tool = 'navigate_console_page' and outcome = 'executed'`));
 
 const ranBefore = navigations();
 

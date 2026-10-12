@@ -112,7 +112,7 @@ const pendingCount = (operatorId) =>
   Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
 
 const ranAs = (tool) =>
-  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+  Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
@@ -219,7 +219,7 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
   check('审计行在（>0）', true, rows > 0);
   const verify = await (await fetch(`${HOST}/audit/verify`, { headers: { Authorization: `Bearer ${admin}` } })).json();
   check('链校验通过', true, verify.data && verify.data.valid);
-  const refusals = Number(psql(`select count(*) from ai_audit_logs where detail like '%approve_oa_leave refused%'`));
+  const refusals = Number(psql(`select count(*) from ai_audit_logs where tool = 'approve_oa_leave' and outcome = 'refused'`));
   check('被拒的那次写在案', true, refusals > 0);
 }
 

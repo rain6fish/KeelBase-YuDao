@@ -87,7 +87,7 @@ const pendingCount = (operatorId) =>
 // Whether a turn actually ran, from the trail rather than from the answer.
 // 一个回合**有没有真跑**，从审计轨读、不从答案读。
 const ranAs = (tool) =>
-  Number(psql(`select count(*) from ai_audit_logs where detail like '%${tool} -> ok%'`));
+  Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
