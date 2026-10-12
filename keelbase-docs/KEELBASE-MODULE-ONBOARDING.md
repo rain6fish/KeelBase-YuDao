@@ -28,6 +28,13 @@ first **runtime-side** cost: the chat request declares one structured slot, and 
 + `GovernedModuleRegistry`, and `scripts/check-governance-registry.mjs` to keep the count honest — so
 §4.2's "nothing enumerates the governed modules" is answered and §2.4 has a third check.
 
+**Revised 2026-10-12 (c)**: a **fourth** module followed — `yudao-module-system`'s in-app messages
+(`system_notify_message`), the third module upstream wrote. It cost the same as the second (647 lines
+against 642) and needed **no framework change at all**, which is the answer this file was written to
+get: the per-module work is a **constant**, and it stays a constant, because the reading is of
+upstream's code and upstream does not converge. It also produced the first **pair** owner
+(`user_id + user_type`, §4.1) and the first module that already narrows itself (§4.3).
+
 ## 1. Which half is which
 
 | Half | Where it lives | A new module touches it? |
@@ -160,6 +167,12 @@ wrote, there is no Spec to write — see §2.
    own* role table — but it answers a different question: whether the caller ranges over every row and
    is therefore exempt from narrowing at all, and not "which rows does this caller see". The narrowing
    itself is still the ownership field.
+   **⚠ Extended 2026-10-12 (`YD-15`)**: the owner is not always **one** field. The system module's
+   messages belong to `(user_id, user_type)` — pinning the id alone leaves the other half forgeable,
+   because an administrator and a member share the numeric id space. `ownerField()` assumes a single
+   field and is the first thing a fourth module has shown to be an assumption rather than a fact; it
+   is answered here by returning the pair as one string, and generalising it is a decision for when
+   the sample says so, not before.
 2. **Nothing enumerates the governed modules.** RuoYi has a `GovernedModule` interface and a registry;
    YuDao's `CrmCustomerGovernance`, `BpmOALeaveGovernance` and `ProductsGovernance` are bare
    `@Component`s. There is no single place that lists what is governed — so there is nowhere to read
@@ -173,7 +186,11 @@ wrote, there is no Spec to write — see §2.
    but neither can tell you that a module *should* have been governed and was not — that remains a
    person's reading.
 3. **Each module owes a narrowing decision** (§2.1): owner-only, or aligned with the module's own
-   permission table.
+   permission table — **or, a third answer the system module gave, the module already narrows and the
+   advice owes it only identity**. That last one is cheaper and it is worth reading *which* answer a
+   module gives before writing an advice: on `system_notify_message` the module's own "my" queries
+   filter on the caller's pair, so the cross-subject write is a **no-op** rather than a denial, and the
+   gate asserts the row is untouched instead of asserting a refusal.
 4. **The abstraction boundary is not settled.** `YD-T7` is open, and the cross-host evidence note
    nominates `ActingCaller`, `ModuleRoute` and the fallback planner as promotion candidates. Seams
    written now may later move package, because the sample is still two hosts.
@@ -186,10 +203,13 @@ wrote, there is no Spec to write — see §2.
 
 ## 5. What this file does not claim
 
-- Three modules is three samples — two upstream (`crm`, and BPM's leave request) and one generated
-  (`products`). Everything above describes the shape they repeated, not a contract.
-- **CRM and the BPM leave slice have been run end to end** (`YD-2`'s gate, `YD-14`'s gate). `products`
-  has been generated and built, not put through the same gate.
+- Four modules is four samples — three upstream (`crm`, BPM's leave request, and the system module's
+  messages) and one generated (`products`). Everything above describes the shape they repeated, not a
+  contract. What the four together say is a **number**: a second module cost 642 lines and a third
+  cost 647, so the per-module work is flat rather than falling.
+- **CRM, the BPM leave slice and the system message slice have been run end to end** (`YD-2`'s gate,
+  `YD-14`'s gate, `YD-15`'s gate). `products` has been generated and built, not put through the same
+  gate.
 - The scope machine's administrator test is still a **placeholder**: "administrator" means user 1
   until a role mapping is decided. That half is unchanged. What changed on **2026-10-11** is the other
   half — the host's role table *is* read now (`YudaoRowScope`), for the every-row exemption only.
