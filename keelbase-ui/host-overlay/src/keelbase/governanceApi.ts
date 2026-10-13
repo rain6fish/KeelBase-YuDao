@@ -262,3 +262,53 @@ export const effectApi = {
       .then((r) => r.data),
   revoke: (id: number) => runtime.delete(`/ai/tool-effects/${id}`).then((r) => r.data),
 }
+
+/**
+ * One row of `/audit/operations/logs` — a write to the business, including the ones no AI took part
+ * in. That is a different chain from the AI audit beside it, and nothing joins the two.
+ *
+ * The frozen object declares more than this runtime fills; what is absent — the request body, the
+ * field-level diff, the feature names, the two hash columns — is absent because nothing here
+ * produces it. The page draws the ten the runtime answers and says nothing about the rest.
+ *
+ * `/audit/operations/logs` 的一行 —— 对**业务**的一次写，含没有 AI 参与的那些。它读的是与旁边那条 AI
+ * 审计**不同**的链，且没有任何东西把两者连起来。
+ *
+ * 冻结对象声明的比本运行时填的多；缺的那些 —— 请求正文、字段级差异、功能名、两个哈希列 —— 之所以缺，
+ * 是因为这里没有东西产出它们。页面只画运行时答得出的那十个，其余一个字不说。
+ */
+export interface OperationAuditRow {
+  id: number
+  userId: string | null
+  /** `LOGIN` | `LOGOUT` | `UPLOAD` | `CREATE` | `UPDATE` | `DELETE` — the row's own word for the act. */
+  /** `LOGIN` | `LOGOUT` | `UPLOAD` | `CREATE` | `UPDATE` | `DELETE` —— 这一行对这次动作自己的叫法。 */
+  action: string | null
+  method: string | null
+  path: string | null
+  targetId: string | null
+  ip: string | null
+  userAgent: string | null
+  statusCode: number | null
+  createdAt: string
+}
+
+export interface OperationAuditPage {
+  total: number
+  page: number
+  limit: number
+  items: OperationAuditRow[]
+}
+
+export const operationAuditApi = {
+  /**
+   * The operations trail, newest first. This face takes a window and nothing else — no caller, no
+   * period, no outcome — so the page offers none: a filter that is accepted and not applied returns
+   * a list that looks filtered and is not, which is worse than a filter that is refused.
+   *
+   * 操作轨，最新的在前。这条面只收一个窗口、别的都不收 —— 没有调用方、没有时间段、没有结局 —— 故页面
+   * 一个都不提供：一个**被接受却没被施加**的筛选回出来的是一份**看着像筛过、其实没有**的列表，比一个
+   * **把话说出来**的拒绝更糟。
+   */
+  list: (page: number, limit: number) =>
+    runtime.get<OperationAuditPage>('/audit/operations/logs', { params: { page, limit } }).then((r) => r.data),
+}

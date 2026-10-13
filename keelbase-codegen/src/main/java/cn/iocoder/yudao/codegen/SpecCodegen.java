@@ -179,6 +179,17 @@ public final class SpecCodegen {
             // the origin as a parameter, so one file serves every host running this stack.
             // 一次部署的上传落到哪里。上游种子把一份**示例**存储设成 master、里面写着厂商自己的域名，
             // 于是上传属于一个我们并不控制的服务器。它把 origin 作参数收下，故一个文件伺候所有跑这套栈的机器。
+            // The console's per-page menu rows, one file each. Each is a hand-written addition to the
+            // host's own menu tree rather than a Spec's output, so each has to be declared here or the
+            // boundary check calls it UNDECLARED — which is what it did for the three added before this
+            // one, and the check had been red since.
+            // 控制台逐页的菜单行，一份一个文件。每一份都是对**宿主自己**菜单树的手写新增、不是 Spec 的产出，
+            // 故每一份都必须在此声明，否则边界检查会把它判成 UNDECLARED —— 在本次之前加的那三份正是如此，
+            // 而那道检查从那时起一直是红的。
+            "sql/keelbase-showcase-menu.sql",
+            "sql/keelbase-tool-inventory-menu.sql",
+            "sql/keelbase-trace-menu.sql",
+            "sql/keelbase-operation-audit-menu.sql",
             "sql/keelbase-file-storage.sql");
 
     private SpecCodegen() {

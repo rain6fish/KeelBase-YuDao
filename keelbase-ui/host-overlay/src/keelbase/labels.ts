@@ -57,6 +57,11 @@ const SHOWCASE_OUTCOMES: Record<string, string> = {
 // `trace-step` 的 `type`，按本运行时填的样子。
 const TRACE_STEPS = ['input', 'assistant', 'notice']
 
+// The operations audit's own word for the act — `operation-audit-log-row`'s `action` values, which
+// its interceptor derives from the method and the path.
+// 操作审计对动作自己的叫法 —— `operation-audit-log-row` 的 `action` 取值，由它的拦截器从方法与路径推出。
+const OP_ACTIONS = ['LOGIN', 'LOGOUT', 'UPLOAD', 'CREATE', 'UPDATE', 'DELETE']
+
 function inSet(set: readonly string[], code: string | null | undefined): string | null {
   return code && set.includes(code) ? code : null
 }
@@ -94,6 +99,25 @@ export function showcaseOutcomeLabelKey(outcome: string | null | undefined): str
 export function traceStepLabelKey(type: string | null | undefined): string | null {
   const code = inSet(TRACE_STEPS, type)
   return code ? `keelbase.vocab.traceStep.${code}` : null
+}
+
+/** The i18n key for an operations row's action, or null. */
+/** 操作审计行**动作**的 i18n key；否则 null。 */
+export function opActionLabelKey(action: string | null | undefined): string | null {
+  const code = inSet(OP_ACTIONS, action)
+  return code ? `keelbase.vocab.opAction.${code.toLowerCase()}` : null
+}
+
+/**
+ * What an operations row came to, from its status code: anything under 400 went through. A row with
+ * no code is neither — it gets the neutral colour rather than a guess.
+ *
+ * 操作审计行**结果**如何，按状态码：低于 400 就是过了。没有码的行两者都不是 —— 给它中性的颜色，
+ * 而不是猜一个。
+ */
+export function statusTagType(code: number | null | undefined): TagType {
+  if (code === null || code === undefined) return 'info'
+  return code >= 400 ? 'danger' : 'success'
 }
 
 /**

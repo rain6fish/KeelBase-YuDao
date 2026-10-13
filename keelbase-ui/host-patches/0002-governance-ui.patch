@@ -1,8 +1,8 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 96269a8..36071f1 100644
+index 96269a8..a1909a5 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,167 @@
+@@ -1,4 +1,185 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -106,6 +106,16 @@ index 96269a8..36071f1 100644
 +      stepsTitle: 'Trace',
 +      noticeTag: 'disclosure',
 +    },
++    opAudit: {
++      title: 'Operations audit',
++      total: '{n} rows',
++      noFilter:
++        'This face takes a window and nothing else — no caller, no period, no outcome — so no filter is offered. A filter that is accepted and not applied would return a list that looks filtered and is not.',
++      colTarget: 'Target',
++      colSource: 'Source',
++      ok: 'Succeeded',
++      failed: 'Failed',
++    },
 +    vocab: {
 +      action: {
 +        chat: 'Conversation',
@@ -152,6 +162,14 @@ index 96269a8..36071f1 100644
 +        assistant: 'Reply',
 +        notice: 'Disclosure',
 +      },
++      opAction: {
++        login: 'Sign-in',
++        logout: 'Sign-out',
++        upload: 'Upload',
++        create: 'Create',
++        update: 'Update',
++        delete: 'Delete',
++      },
 +    },
 +    showcase: {
 +      title: 'Adversarial demonstration',
@@ -171,10 +189,10 @@ index 96269a8..36071f1 100644
      inputText: 'Please input',
      selectText: 'Please select',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 35f1e1a..fc2877f 100644
+index 35f1e1a..f913966 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,167 @@
+@@ -1,4 +1,185 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -278,6 +296,16 @@ index 35f1e1a..fc2877f 100644
 +      stepsTitle: '轨迹',
 +      noticeTag: '披露',
 +    },
++    opAudit: {
++      title: '操作审计',
++      total: '{n} 行',
++      noFilter:
++        '这条面只收一个窗口、别的都不收 —— 没有调用方、没有时间段、没有结局 —— 故**不提供**任何筛选。一个**被接受却没被施加**的筛选，会回出一份**看着像筛过、其实没有**的列表。',
++      colTarget: '目标',
++      colSource: '来源',
++      ok: '成功',
++      failed: '失败',
++    },
 +    vocab: {
 +      action: {
 +        chat: '对话',
@@ -323,6 +351,14 @@ index 35f1e1a..fc2877f 100644
 +        input: '输入',
 +        assistant: '回复',
 +        notice: '披露',
++      },
++      opAction: {
++        login: '登录',
++        logout: '登出',
++        upload: '上传',
++        create: '新建',
++        update: '修改',
++        delete: '删除',
 +      },
 +    },
 +    showcase: {
