@@ -110,6 +110,28 @@ PATCHES="$REPO_ROOT/keelbase-ui/host-patches"
 REMOVALS="$REPO_ROOT/keelbase-ui/host-removals.txt"
 
 if [[ "$SKIP_BUILD" == "0" && ( -d "$OVERLAY" || -d "$PATCHES" || -f "$REMOVALS" ) ]]; then
+  # One writer at a time. Everything below resets, removes, copies and patches **the same checkout**,
+  # and two of these runs interleaved see each other's half-finished tree: the second then reads a
+  # reset-in-progress as "upstream moved" and sends its reader off to rebase a patch that is fine. That
+  # is a right-sounding sentence given for the wrong reason, and it costs whoever believes it a real
+  # detour — measured: two runs six seconds apart, the first exiting 0 and the second reporting the
+  # patch as inapplicable. The lock is a directory, because `mkdir` is atomic on every filesystem this
+  # runs on, and it is released by the EXIT trap below (which the later trap at §4 extends rather than
+  # replaces).
+  #
+  # 同一时刻只允许**一个写者**。下面每一步都在**同一个检出**上复位、删除、铺、打补丁；两次这样的运行
+  # 交错时，后一次读到前一次**做了一半**的树，于是把「复位进行中」读成「上游动了」，并让读者去重基一个
+  # **本来没问题**的补丁 —— 那是一句**听着对、理由错**的话，而信它的人要为它真绕一段路（实测：两次相隔
+  # 六秒的运行，前一次 exit 0、后一次报「补丁贴不上」）。锁用一个目录，因为 `mkdir` 在这个脚本会跑的
+  # 每种文件系统上都是原子的；释放交给下面的 EXIT trap（§4 那条 trap 是**扩展**它、不是替换它）。
+  LOCK="$UI_DIR/.keelbase-build.lock"
+  if ! mkdir "$LOCK" 2>/dev/null; then
+    echo "another build is laying our delta on $UI_DIR right now (lock: $LOCK)." >&2
+    echo "wait for it to finish; if it crashed, remove that directory and run again." >&2
+    exit 3
+  fi
+  trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
   if ! git -C "$UI_DIR" diff --quiet || ! git -C "$UI_DIR" diff --cached --quiet; then
     echo "resetting the checkout to upstream before laying our delta on it…"
     git -C "$UI_DIR" checkout -- .
@@ -370,7 +392,7 @@ fi
 # 产物里**的文件，又会（b）让样式表的字节每次构建都变——页面里的哈希随之变、缓存也就失效了。
 raw="$(mktemp)"
 tmp=""
-trap 'rm -f "$raw" ${tmp:+"$tmp"}' EXIT
+trap 'rm -f "$raw" ${tmp:+"$tmp"}; if [ -n "${LOCK:-}" ]; then rmdir "$LOCK" 2>/dev/null || true; fi' EXIT
 "$SASS" "$THEME_SCSS" "$raw"
 awk '
   /^\/\*# sourceMappingURL=/ { next }
