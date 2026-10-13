@@ -44,7 +44,9 @@
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
     <el-table v-loading="loading" :data="rows" stripe>
       <el-table-column :label="t('keelbase.effects.colId')" prop="id" width="90" align="center" />
-      <el-table-column :label="t('keelbase.effects.colTool')" prop="toolName" width="200" />
+      <el-table-column :label="t('keelbase.effects.colTool')" width="220">
+        <template #default="{ row }">{{ toolText(row.toolName) }}</template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
         <template #default="{ row }">{{ row.targetTitle || `#${row.resultId}` }}</template>
       </el-table-column>
@@ -83,10 +85,19 @@ import Pagination from '@/components/Pagination/index.vue'
 import { effectApi, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { resolveCallerNames } from '@/keelbase/callerNames'
+import { toolLabelKey } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
 const { t } = useI18n()
+
+/** The tool in the reader's language, falling back to the registered name. */
+/** 工具名，用读者的语言；不认识就保留注册名。 */
+function toolText(name: string | null | undefined): string {
+  if (!name) return '—'
+  const key = toolLabelKey(name)
+  return key ? t(key) : name
+}
 
 const rows = ref<EffectRow[]>([])
 const total = ref(0)

@@ -37,7 +37,7 @@
       <div v-for="c in pending" :key="c.token" class="row">
         <div class="row-main">
           <div class="row-head">
-            <span class="font-weight-medium">{{ c.toolName || '—' }}</span>
+            <span class="font-weight-medium">{{ toolText(c.toolName) }}</span>
             <el-tag v-if="c.riskLevel" size="small" effect="plain">{{ c.riskLevel }}</el-tag>
             <el-tag v-if="c.mode !== 'immediate'" size="small" type="info" effect="plain">{{ c.mode }}</el-tag>
           </div>
@@ -82,7 +82,9 @@
 
     <div v-if="effectsError" class="text-[var(--el-color-danger)] mb-10px">{{ effectsError }}</div>
     <el-table v-loading="effectsLoading" :data="effects" stripe>
-      <el-table-column :label="t('keelbase.effects.colTool')" prop="toolName" width="200" />
+      <el-table-column :label="t('keelbase.effects.colTool')" width="220">
+        <template #default="{ row }">{{ toolText(row.toolName) }}</template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
         <template #default="{ row }">{{ row.targetTitle || `#${row.resultId}` }}</template>
       </el-table-column>
@@ -125,10 +127,19 @@ import { ContentWrap } from '@/components/ContentWrap'
 import Pagination from '@/components/Pagination/index.vue'
 import { confirmationApi, effectApi, type ConfirmationItem, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
+import { toolLabelKey } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceActionCenter' })
 
 const { t } = useI18n()
+
+/** The tool in the reader's language, falling back to the registered name. */
+/** 工具名，用读者的语言；不认识就保留注册名。 */
+function toolText(name: string | null | undefined): string {
+  if (!name) return '—'
+  const key = toolLabelKey(name)
+  return key ? t(key) : name
+}
 
 const pending = ref<ConfirmationItem[]>([])
 const pendingLoading = ref(false)

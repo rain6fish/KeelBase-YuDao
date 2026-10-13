@@ -1,8 +1,8 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 96269a8..07e7fd9 100644
+index 96269a8..4498f8a 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,205 @@
+@@ -1,4 +1,239 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -38,6 +38,10 @@ index 96269a8..07e7fd9 100644
 +      colStatus: 'Status',
 +      colDetail: 'Detail',
 +      attemptedHint: 'records the attempt only — its outcome is on the adjacent row',
++      toolDeclared: 'The tool says',
++      meaning: 'What that means',
++      overviewRows: 'This page: {n} rows',
++      overviewScope: '{tools} tools, {callers} people',
 +      prev: 'Previous',
 +      next: 'Next',
 +      window: 'from row {from}, {n} fetched',
@@ -136,6 +140,36 @@ index 96269a8..07e7fd9 100644
 +      roleUser: 'User',
 +      revision: 'revision {r}',
 +    },
++    tool: {
++      list_yudao_users: 'List admin users',
++      analyze_customer_risk: 'Analyse a customer’s risk',
++      create_followup: 'Add a follow-up note',
++      escalate_customer: 'Escalate a customer',
++      list_my_oa_leaves: 'List my leave requests',
++      approve_oa_leave: 'Approve a leave request',
++      navigate_console_page: 'Open a console page',
++      list_crm_customers: 'List customers',
++      create_crm_customer: 'Create a customer',
++      update_crm_customer: 'Update a customer',
++      list_my_notify_messages: 'List my messages',
++      get_notify_message: 'Read a message',
++      mark_notify_message_read: 'Mark a message read',
++      mark_all_notify_messages_read: 'Mark all messages read',
++      list_generated_products: 'List products',
++      create_generated_products: 'Create a product',
++    },
++    meaning: {
++      attempted: 'Only the attempt is recorded — its outcome is the row next to it',
++      executed: 'It really happened; the write is in the system',
++      pending: 'Nothing is written yet — it is waiting for someone to approve',
++      blocked: 'A risk policy stopped it before anyone was asked',
++      refused: 'Governance or authorisation refused it',
++      declined: 'A person declined it, so it will not happen',
++      failed: 'It was attempted, and the execution itself failed',
++      approved: 'A person approved it; the write follows',
++      timeout: 'The waiting window ran out with nobody deciding',
++      revoked: 'That write has been undone',
++    },
 +    vocab: {
 +      action: {
 +        chat: 'Conversation',
@@ -209,10 +243,10 @@ index 96269a8..07e7fd9 100644
      inputText: 'Please input',
      selectText: 'Please select',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 35f1e1a..6f57241 100644
+index 35f1e1a..b59fa28 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,205 @@
+@@ -1,4 +1,239 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -248,6 +282,10 @@ index 35f1e1a..6f57241 100644
 +      colStatus: '状态',
 +      colDetail: '详情',
 +      attemptedHint: '只记「试过」——它的结局在相邻那一行',
++      toolDeclared: '工具自述',
++      meaning: '这意味着',
++      overviewRows: '本页 {n} 行',
++      overviewScope: '涉及 {tools} 个工具、{callers} 位同事',
 +      prev: '上一页',
 +      next: '下一页',
 +      window: '自第 {from} 行起，取到 {n} 行',
@@ -345,6 +383,36 @@ index 35f1e1a..6f57241 100644
 +      roleAdmin: '管理员',
 +      roleUser: '普通用户',
 +      revision: '版本 {r}',
++    },
++    tool: {
++      list_yudao_users: '查看管理员用户',
++      analyze_customer_risk: '分析客户风险',
++      create_followup: '记一条跟进',
++      escalate_customer: '升级客户到会审',
++      list_my_oa_leaves: '查看我的请假',
++      approve_oa_leave: '批准请假',
++      navigate_console_page: '打开控制台页面',
++      list_crm_customers: '查询客户',
++      create_crm_customer: '新建客户',
++      update_crm_customer: '修改客户',
++      list_my_notify_messages: '查看我的消息',
++      get_notify_message: '读一条消息',
++      mark_notify_message_read: '标记一条已读',
++      mark_all_notify_messages_read: '全部标记已读',
++      list_generated_products: '查询产品',
++      create_generated_products: '新建产品',
++    },
++    meaning: {
++      attempted: '只记「试过」—— 它的结局在相邻那一行',
++      executed: '真的执行了，写已经在系统里',
++      pending: '还没真的写入 —— 在等人批准',
++      blocked: '被风险策略挡下，根本没到裁决',
++      refused: '被治理或授权拒绝',
++      declined: '有人否决了它，所以不会发生',
++      failed: '尝试过了，执行本身失败',
++      approved: '有人批准了，接下来会执行',
++      timeout: '等待窗口走完、没人裁',
++      revoked: '那次写入已被撤销',
 +    },
 +    vocab: {
 +      action: {

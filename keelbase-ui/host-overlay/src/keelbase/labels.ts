@@ -120,6 +120,43 @@ export function statusTagType(code: number | null | undefined): TagType {
   return code >= 400 ? 'danger' : 'success'
 }
 
+// The tools this runtime registers, by the names it registers them under. The console names each in the
+// reader's language and keeps the registered name beside it: a business reader knows 「新建客户」, and an
+// engineer can still see which tool that is. Each name below is a **translation of what that tool
+// declares it does** — `/ai/tools` answers a description per tool — and not a guess from its spelling.
+// A tool this console does not know keeps its registered name, which is honest rather than invented.
+//
+// 本运行时注册的那些工具，按它注册的名字。控制台给每一个配**读者语言**的名字、并把注册名留在旁边：业务读者
+// 认得「新建客户」，工程师也看得出那是哪个工具。下面每个名字都是**那个工具自己声明的用途**（`/ai/tools`
+// 逐个答了描述）的**译文**，不是从拼写猜的。控制台不认识的工具**保留它的注册名** —— 那是诚实，不是编造。
+const TOOLS = [
+  'list_yudao_users', 'analyze_customer_risk', 'create_followup', 'escalate_customer',
+  'list_my_oa_leaves', 'approve_oa_leave', 'navigate_console_page',
+  'list_crm_customers', 'create_crm_customer', 'update_crm_customer',
+  'list_my_notify_messages', 'get_notify_message', 'mark_notify_message_read', 'mark_all_notify_messages_read',
+  'list_generated_products', 'create_generated_products',
+]
+
+/** The i18n key for a tool's name in the reader's language, or null when this console does not know it. */
+/** 工具**读者语言名字**的 i18n key；控制台不认识它时为 null。 */
+export function toolLabelKey(name: string | null | undefined): string | null {
+  const code = inSet(TOOLS, name)
+  return code ? `keelbase.tool.${code}` : null
+}
+
+/**
+ * The i18n key for **what an outcome means**, one line — the thing a reader who is not an engineer needs
+ * and a single word cannot carry. "Pending" is a state; 「还没真的写入，等有人批准」is what it means to
+ * the business.
+ *
+ * **一个结局意味着什么**的 i18n key，一句话 —— 那不是工程师的读者需要它，而**一个词**载不动它。「待决」
+ * 是一种状态；「还没真的写入，等有人批准」才是它对业务的意义。
+ */
+export function outcomeMeaningKey(outcome: string | null | undefined): string | null {
+  const code = inSet(OUTCOMES, outcome)
+  return code ? `keelbase.meaning.${code}` : null
+}
+
 /**
  * The colour an audit row's outcome reads as. `attempted` is deliberately *not* a verdict — the
  * engine writes it before the call has a result — so it takes the neutral colour rather than a

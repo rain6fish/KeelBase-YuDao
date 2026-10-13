@@ -60,6 +60,9 @@
     </el-form>
 
     <div v-if="rowsError" class="text-[var(--el-color-danger)] mb-10px">{{ rowsError }}</div>
+    <!-- A description of this page, said as such — the window is all the face gives. -->
+    <!-- **本页**的描述，并如实这么说 —— 这条面给的就是一个窗口。 -->
+    <div v-if="rows.length && !rowsError" class="overview">{{ overview }}</div>
     <el-table v-loading="rowsLoading" :data="rows" stripe>
       <!-- Opening a row lays out the whole of it in one place: the sentence the list compresses. -->
       <!-- 摊开一行，就是把列表压住的那句话一次摆全。 -->
@@ -76,7 +79,20 @@
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colWhat') }}</span>
-              <span>{{ actionText(row.action) }}<template v-if="row.tool"> · {{ row.tool }}</template></span>
+              <span>
+                {{ whatText(row) }}
+                <span class="muted">{{ actionText(row.action) }}<template v-if="row.tool"> · {{ row.tool }}</template></span>
+              </span>
+            </div>
+            <!-- What the tool says it does, in its own words — its declaration, not our summary of it. -->
+            <!-- 工具**自己**说它做什么 —— 是它的声明，不是我们对它的概括。 -->
+            <div v-if="toolDescription(row)" class="d-row">
+              <span class="d-key">{{ t('keelbase.audit.toolDeclared') }}</span>
+              <span>
+                {{ toolDescription(row) }}
+                <el-tag v-if="toolRisk(row)" size="small" effect="plain" class="ml-6px">{{ toolRisk(row) }}</el-tag>
+                <span v-if="toolGateOf(row)" class="muted ml-6px">{{ toolGateOf(row) }}</span>
+              </span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colResult') }}</span>
@@ -86,6 +102,12 @@
                 <!-- `attempted` 不是一个判定；在整行被读的地方把这一点说出来。 -->
                 <span v-if="row.outcome === 'attempted'" class="muted ml-8px">{{ t('keelbase.audit.attemptedHint') }}</span>
               </span>
+            </div>
+            <!-- What that means, in one line: the part a single word cannot carry. -->
+            <!-- 那**意味着**什么，一句话：一个词载不动的那部分。 -->
+            <div v-if="meaningText(row)" class="d-row">
+              <span class="d-key">{{ t('keelbase.audit.meaning') }}</span>
+              <span>{{ meaningText(row) }}</span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colDetail') }}</span>
@@ -107,10 +129,10 @@
           <div class="muted">#{{ row.userId ?? '—' }}</div>
         </template>
       </el-table-column>
-      <el-table-column :label="t('keelbase.audit.colWhat')" min-width="230">
+      <el-table-column :label="t('keelbase.audit.colWhat')" min-width="240">
         <template #default="{ row }">
-          <div>{{ actionText(row.action) }}</div>
-          <div v-if="row.tool" class="muted">{{ row.tool }}</div>
+          <div>{{ whatText(row) }}</div>
+          <div class="muted">{{ actionText(row.action) }}<template v-if="row.tool"> · {{ row.tool }}</template></div>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colResult')" width="150">
@@ -183,12 +205,19 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
-import { auditApi, type AuditRow, type ChainVerification } from '@/keelbase/governanceApi'
+import { auditApi, toolApi, type AuditRow, type ChainVerification, type ToolInventoryItem } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
-import { actionLabelKey, outcomeLabelKey, outcomeTagType } from '@/keelbase/labels'
+import {
+  actionLabelKey,
+  gateLabelKey,
+  outcomeLabelKey,
+  outcomeMeaningKey,
+  outcomeTagType,
+  toolLabelKey,
+} from '@/keelbase/labels'
 import { resolveCallerNames } from '@/keelbase/callerNames'
 
 defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
@@ -196,6 +225,12 @@ defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
 const { t } = useI18n()
 
 const LIMIT = 20
+
+/** The order a summary reads outcomes in: what happened first, what is waiting last. */
+/** 概览里结局的次序：先「已经发生的」，把「在等的」放在后面。 */
+const OVERVIEW_ORDER = [
+  'executed', 'approved', 'pending', 'attempted', 'blocked', 'refused', 'declined', 'failed', 'timeout', 'revoked',
+]
 
 const verify = ref<ChainVerification | null>(null)
 const verifyLoading = ref(false)
@@ -211,6 +246,16 @@ const since = ref<Date | null>(null)
 /** Caller names for the ids on screen, filled in after the rows land. */
 /** 屏幕上那些 id 的调用方姓名，在行落地之后补上。 */
 const names = ref<Record<string, string>>({})
+
+/**
+ * What each tool is, by the name it registers — read once from the inventory the runtime serves. A
+ * business reader needs this: the row's action says 「工具调用」 and its tool says `create_crm_customer`,
+ * and neither tells them it created a customer.
+ *
+ * 每个工具是什么，按它注册的名字 —— 从运行时那条清单读一次。业务读者**需要**它：行为那列写着「工具调用」、
+ * 工具那列写着 `create_crm_customer`，两者都没告诉他：它新建了一个客户。
+ */
+const inventory = ref<Record<string, ToolInventoryItem>>({})
 
 const query = reactive<{ userId: string; isError: string }>({ userId: '', isError: '' })
 
@@ -231,6 +276,72 @@ function resultText(row: AuditRow): string {
   if (key) return t(key)
   return row.isError ? t('keelbase.audit.statusError') : t('keelbase.audit.statusOk')
 }
+
+/** The row's outcome as a vocabulary word, falling back to the plain status for a non-tool row. */
+/** 这一行的**结局**，按词表取值；非工具行回落到朴素的状态词。 */
+function effectiveOutcome(row: AuditRow): string {
+  if (outcomeLabelKey(row.outcome)) return row.outcome as string
+  return row.isError ? 'failed' : 'executed'
+}
+
+/** The tool in the reader's language, falling back to the registered name. */
+/** 工具名，用读者的语言；不认识就保留注册名。 */
+function toolText(name: string | null | undefined): string {
+  if (!name) return '—'
+  const key = toolLabelKey(name)
+  return key ? t(key) : name
+}
+
+/** What this row did, in the reader's language: the tool if there is one, else the action. */
+/** 这一行**做了什么**，用读者的语言：有工具就用工具，没有就用动作。 */
+function whatText(row: AuditRow): string {
+  return row.tool ? toolText(row.tool) : actionText(row.action)
+}
+
+/** The tool's own declaration — what it says it does — when the inventory knows this tool. */
+/** 工具**自己声明的**用途 —— 清单认识这个工具时就用它。 */
+function toolDescription(row: AuditRow): string {
+  return (row.tool && inventory.value[row.tool]?.description) || ''
+}
+
+/** What this tool's gate does to it — the effective one, in the reader's language. */
+/** 这个工具的闸会把它怎么样 —— 生效的那道，用读者的语言。 */
+function toolGateOf(row: AuditRow): string {
+  const mode = row.tool ? inventory.value[row.tool]?.gateMode : ''
+  const key = gateLabelKey(mode)
+  return key ? t(key) : (mode || '')
+}
+
+/** What the outcome means, in one line — the part a single word cannot carry. */
+/** 这个结局**意味着什么**，一句话 —— 一个词载不动的那部分。 */
+function meaningText(row: AuditRow): string {
+  const key = outcomeMeaningKey(effectiveOutcome(row))
+  return key ? t(key) : ''
+}
+
+/**
+ * A summary of **this page**, said as such. The window is all this face gives — there is no total
+ * behind it to divide by — so it is drawn as a description of what is on screen rather than as a
+ * statistic, which would be a claim the runtime cannot back.
+ *
+ * **本页**的概览，并**如实这么说**。这条面给的就是一个窗口 —— 它背后没有总数可供去除 —— 故这一段画的是
+ * **屏幕上这些行**的描述，而不是一个统计量：后者是运行时**撑不住**的主张。
+ */
+const overview = computed(() => {
+  const counts = new Map<string, number>()
+  for (const row of rows.value) {
+    const key = effectiveOutcome(row)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const parts = OVERVIEW_ORDER.filter((o) => counts.has(o)).map(
+    (o) => `${t(`keelbase.vocab.outcome.${o}`)} ${counts.get(o)}`,
+  )
+  const tools = new Set(rows.value.map((r) => r.tool).filter(Boolean)).size
+  const callers = new Set(rows.value.map((r) => r.userId).filter(Boolean)).size
+  const head = t('keelbase.audit.overviewRows', { n: rows.value.length })
+  const scope = t('keelbase.audit.overviewScope', { tools, callers })
+  return `${head}${parts.length ? '：' + parts.join(' · ') : ''} ｜ ${scope}`
+})
 
 function timeFormatter(row: AuditRow): string {
   return row.createdAt ? row.createdAt.replace('T', ' ').slice(0, 19) : '—'
@@ -278,6 +389,13 @@ async function loadRows() {
     // 留下的就是那些 id。
     const resolved = await resolveCallerNames(data.map((r) => r.userId))
     names.value = { ...names.value, ...resolved }
+    // The inventory is read once and kept: it answers the same for every window, and it is what turns a
+    // tool's registered name into something a business reader can act on.
+    // 清单只读一次并留着：它对每个窗口都一样，而它正是把工具的注册名变成业务读者看得懂的东西的那一步。
+    if (!Object.keys(inventory.value).length) {
+      const tools = await toolApi.inventory()
+      inventory.value = Object.fromEntries(tools.map((toolItem) => [toolItem.name, toolItem]))
+    }
   } catch (e) {
     rows.value = []
     hasMore.value = false
@@ -307,6 +425,11 @@ onMounted(() => {
 .muted {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+.overview {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 .row-detail {
   display: flex;

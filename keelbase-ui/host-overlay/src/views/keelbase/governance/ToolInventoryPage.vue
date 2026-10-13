@@ -30,7 +30,12 @@
 
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
     <el-table v-loading="loading" :data="items" stripe>
-      <el-table-column :label="t('keelbase.toolInv.colTool')" prop="name" width="220" />
+      <el-table-column :label="t('keelbase.toolInv.colTool')" width="240">
+        <template #default="{ row }">
+          <div>{{ toolText(row.name) }}</div>
+          <div class="text-12px text-[var(--el-text-color-secondary)]">{{ row.name }}</div>
+        </template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.toolInv.colRisk')" width="150">
         <template #default="{ row }">
           <el-tag size="small" effect="plain">{{ row.riskLevel }}</el-tag>
@@ -82,7 +87,7 @@ import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 import { toolApi, type ToolInventoryItem, type ToolParameterRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
-import { gateLabelKey, gateTagType } from '@/keelbase/labels'
+import { gateLabelKey, gateTagType, toolLabelKey } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceToolInventory' })
 
@@ -97,6 +102,13 @@ const error = ref('')
 function gateText(gate: string): string {
   const key = gateLabelKey(gate)
   return key ? t(key) : gate
+}
+
+/** The tool in the reader's language, with its registered name kept under it. */
+/** 工具名，用读者的语言，注册名留在下面。 */
+function toolText(name: string): string {
+  const key = toolLabelKey(name)
+  return key ? t(key) : name
 }
 
 async function load() {
