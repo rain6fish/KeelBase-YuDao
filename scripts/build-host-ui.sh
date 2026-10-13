@@ -72,15 +72,57 @@ if [[ ! -f "$THEME_SCSS" ]]; then
 fi
 
 # --- 1. the checkout ------------------------------------------------------------------------------
-if [[ "$SKIP_BUILD" == "0" && ! -d "$UI_DIR" ]]; then
+# Remove a checkout directory even when an earlier run left it half-deleted. On Windows the nested
+# `node_modules` paths exceed MAX_PATH, so `rm -rf` stops partway; what remains is not empty, and
+# `git clone` refuses a non-empty destination. The `\\?\` route (robocopy in mirror mode, then `rd`)
+# lifts that limit; elsewhere `rm -rf` is already enough. It takes no view on whether the directory is
+# there — see the caller.
+#
+# 删掉一个检出目录，哪怕更早的一次运行只删了它一半。Windows 里嵌套的 `node_modules` 路径超过 MAX_PATH，
+# `rm -rf` 会中途停下；剩下的是**非空**的，而 `git clone` 拒绝非空的目标。`\\?\` 那条路（robocopy 镜像 +
+# `rd`）能绕开上限；别处 `rm -rf` 本就够。它**不对目录在不在作判断** —— 见调用处。
+wipe_checkout() {
+  local dir="$1" tmp win
+  rm -rf "$dir" 2>/dev/null || true
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      if command -v robocopy >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then
+        tmp="$(mktemp -d)"
+        robocopy "$(cygpath -w "$tmp")" "$(cygpath -w "$dir")" /MIR /NFL /NDL /NJH /NJS /NP >/dev/null 2>&1 || true
+        rm -rf "$tmp" 2>/dev/null || true
+      fi
+      win="$(cygpath -w "$dir" 2>/dev/null || printf '%s' "$dir")"
+      cmd //c "rd /s /q \"$win\"" >/dev/null 2>&1 || true
+      ;;
+  esac
+  return 0
+}
+
+if [[ "$SKIP_BUILD" == "0" && ! -d "$UI_DIR/.git" ]]; then
+  # Clear whatever is there before cloning, and do not gate that on a test of the directory. A
+  # half-deleted checkout is one that `[[ -e ]]` can report as absent while `git clone` still refuses it
+  # as "not empty" — and that disagreement is exactly how this step used to fail, reported as "no
+  # checkout at …" against a path that was, in git's view, occupied. `git clone` is the authority on
+  # whether the destination is usable, so its output is the signal, not the exit status of a wipe whose
+  # view of the filesystem is the thing that is unreliable.
+  #
+  # 克隆前先清掉那里的东西，且**不以目录测试为门**：一份删了一半的检出，`[[ -e ]]` 可能报「不在」，而
+  # `git clone` 仍以「非空」拒绝它 —— 这个不一致正是这一步曾经的失败方式，而且被报成对着一个（在 git 看来）
+  # 已被占用的路径说「no checkout at …」。目标能不能用**以 `git clone` 为准**，故信号是它的输出，而不是
+  # 一次清理的退出码 —— 那次清理对文件系统的看法恰恰是不可靠的那个。
+  wipe_checkout "$UI_DIR"
   echo "fetching the admin UI into $UI_DIR (upstream keeps it out of this repository)…"
   mkdir -p "$(dirname "$UI_DIR")"
   clone_args=(--depth 1)
   if [[ -n "$UI_REF" ]]; then clone_args+=(--branch "$UI_REF"); fi
-  git clone "${clone_args[@]}" "$UI_REPO" "$UI_DIR"
+  if ! git clone "${clone_args[@]}" "$UI_REPO" "$UI_DIR"; then
+    echo "cloning the admin UI failed: $UI_REPO -> $UI_DIR" >&2
+    echo "the checkout is fetched only when it is missing, so either retry, or point KEELBASE_YUDAO_UI at a checkout you already have" >&2
+    exit 2
+  fi
 fi
 
-if [[ ! -d "$UI_DIR" ]]; then
+if [[ ! -d "$UI_DIR/.git" ]]; then
   echo "no checkout at $UI_DIR — run without --skip-build, or set KEELBASE_YUDAO_UI" >&2
   exit 2
 fi
