@@ -81,14 +81,26 @@
     </template>
 
     <div v-if="effectsError" class="text-[var(--el-color-danger)] mb-10px">{{ effectsError }}</div>
-    <el-table v-loading="effectsLoading" :data="effects" stripe>
-      <!-- Opened, this row lays out the record the write landed on. This is the one place the two
-           trails agree without a guess, because here the row **is** the effect. The record's own text
-           is masked: what a record is about is the thing this console must not print (CLAUDE.md §5.5 ②).
-           -->
-      <!-- 摊开时，这一行把「这次写落在哪条记录上」摆出来。这是**两条轨无需猜测**就一致的地方 —— 因为
-           这里这一行**本身就是**那条副作用。记录自己的文字是**掩码的**：一条记录讲的是什么，正是本控制台
-           不得打印的东西（`CLAUDE.md` §5.5 ②）。 -->
+    <el-table v-loading="effectsLoading" :data="effects" stripe @expand-change="onExpand">
+      <!-- One panel, because the row is the evidence for both. Opened, it lays out the record the
+           write landed on — the one place the two trails agree without a guess, because here the row
+           **is** the effect; the record's own text is masked, since what a record is about is the thing
+           this console must not print (CLAUDE.md §5.5 ②). Below it, the business leg (YD-T18 / D50):
+           an AI write leaves a row here and a row in YuDao's own operate log, and both carry the same
+           business object id — so the second is shown beside the first. It is labelled a correlation
+           and not a link: nothing writes a shared id, every traceId in that log is empty, and the
+           AI-caused row carries no user at all. Whether a caller may read it is the host's own
+           decision — this host grants `system:operate-log:query` to its `common` role — so the leg's
+           scope is the host's, and a refusal is shown as it comes.
+
+           一个面板，因为这一行**同时**是这两件事的证据。摊开时先摆「这次写落在哪条记录上」—— 那是两条轨
+           **无需猜测**就一致的地方（这里这一行**本身就是**那条副作用）；记录自己的文字是**掩码的**，因为一条
+           记录讲的是什么，正是本控制台不得打印的东西（`CLAUDE.md` §5.5 ②）。它下面就是**业务那一腿**
+           （`YD-T18` / `D50`）：一次 AI 写在这边留一行、在芋道自己的操作日志里也留一行，两者握着同一个业务
+           对象 id —— 故把第二行摆在第一行旁边。它被标成**相关**、不是链接：没有任何东西写共享 id，那张日志里
+           每个 `traceId` 都是空的，而 AI 引起的那行根本不带用户。**谁能读是宿主的决定** —— 本宿主把
+           `system:operate-log:query` 授给了 `common` 角色 —— 故这一腿的范围是**宿主自己的**，被拒就照原样显示。
+      -->
       <el-table-column type="expand">
         <template #default="{ row }">
           <div class="row-detail">
@@ -108,6 +120,29 @@
             </div>
             <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colState') }}</span><span>{{ stateText(row) }}</span></div>
             <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTime') }}</span><span>{{ timeText(row.createdAt) }}</span></div>
+          </div>
+          <div class="biz">
+            <div class="biz-hint">{{ t('keelbase.effects.businessLogHint') }}</div>
+            <div v-if="!businessLogApi.mappedType(row.resultType)" class="biz-note">
+              {{ t('keelbase.effects.businessLogUnmapped') }}
+            </div>
+            <div v-else-if="bizError[row.id]" class="biz-note text-[var(--el-color-danger)]">{{ bizError[row.id] }}</div>
+            <div v-else-if="!bizLoaded[row.id]" class="biz-note">{{ t('keelbase.common.loading') }}</div>
+            <el-empty
+              v-else-if="!(bizRows[row.id]?.length)"
+              :description="t('keelbase.effects.businessLogEmpty')"
+              :image-size="48"
+            />
+            <el-table v-else :data="bizRows[row.id]" size="small" border>
+              <el-table-column :label="t('keelbase.effects.businessLogColWhen')" width="180">
+                <template #default="{ row: r }">{{ timeText(r.createTime) }}</template>
+              </el-table-column>
+              <el-table-column :label="t('keelbase.effects.businessLogColWhat')" prop="subType" width="140" />
+              <el-table-column :label="t('keelbase.effects.businessLogColWho')" width="110">
+                <template #default="{ row: r }">{{ r.userId ?? '—' }}</template>
+              </el-table-column>
+              <el-table-column :label="t('keelbase.effects.businessLogColAction')" prop="action" show-overflow-tooltip />
+            </el-table>
           </div>
         </template>
       </el-table-column>
@@ -156,7 +191,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import Pagination from '@/components/Pagination/index.vue'
-import { confirmationApi, effectApi, type ConfirmationItem, type EffectRow } from '@/keelbase/governanceApi'
+import { businessLogApi, confirmationApi, effectApi, type BusinessLogRow, type ConfirmationItem, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { toolLabelKey } from '@/keelbase/labels'
 import { maskTitle } from '@/keelbase/mask'
@@ -191,6 +226,11 @@ const page = ref(1)
 const limit = ref(20)
 const effectsLoading = ref(false)
 const effectsError = ref('')
+
+const bizRows = ref<Record<number, BusinessLogRow[]>>({})
+const bizLoaded = ref<Record<number, boolean>>({})
+const bizLoading = ref<Record<number, boolean>>({})
+const bizError = ref<Record<number, string>>({})
 
 function timeText(v: string | null | undefined): string {
   return v ? v.replace('T', ' ').slice(0, 19) : '—'
@@ -239,6 +279,30 @@ async function loadEffects() {
     effectsError.value = runtimeErrorMessage(e, t('keelbase.common.loadFailed'))
   } finally {
     effectsLoading.value = false
+  }
+}
+
+/**
+ * Load the host's business-log row(s) for a row whose module this page can name. Fetched when the row
+ * is expanded, not with the ledger: the call is the host's admin API and most rows are never opened.
+ *
+ * 为这一页认得出模块的那些行，取宿主那一侧的业务日志行。**展开时才取**、不随台账取：这个调用打的是宿主的
+ * admin API，而多数行根本不会被打开。
+ */
+async function onExpand(row: EffectRow, expandedRows: EffectRow[]) {
+  const isOpen = expandedRows.some((r) => r.id === row.id)
+  if (!isOpen || bizLoaded.value[row.id] || bizLoading.value[row.id]) return
+  const businessType = businessLogApi.mappedType(row.resultType)
+  if (!businessType || row.resultId === null || row.resultId === undefined) return
+  bizLoading.value = { ...bizLoading.value, [row.id]: true }
+  try {
+    const res = await businessLogApi.byObject(businessType, row.resultId)
+    bizRows.value = { ...bizRows.value, [row.id]: res.list ?? [] }
+  } catch (e) {
+    bizError.value = { ...bizError.value, [row.id]: runtimeErrorMessage(e, t('keelbase.common.loadFailed')) }
+  } finally {
+    bizLoaded.value = { ...bizLoaded.value, [row.id]: true }
+    bizLoading.value = { ...bizLoading.value, [row.id]: false }
   }
 }
 
@@ -349,5 +413,17 @@ onMounted(() => {
   word-break: break-all;
   max-height: 160px;
   overflow: auto;
+}
+.biz {
+  padding: 8px 12px;
+}
+.biz-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 8px;
+}
+.biz-note {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

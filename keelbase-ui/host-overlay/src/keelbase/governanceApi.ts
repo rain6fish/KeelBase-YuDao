@@ -264,6 +264,78 @@ export const effectApi = {
 }
 
 /**
+ * The host's own operate log, read for one business object (YD-T18 / `D50`).
+ *
+ * Two records exist for a write the AI caused: the runtime's side effect here, and YuDao's
+ * `system_operate_log` row, because `@LogRecord` sits on the CRM *service* and the tool calls that
+ * service as written. They already share a key — the runtime's `resultId` is the id YuDao logs as
+ * `bizId` — so they can be put side by side.
+ *
+ * What they are not is a link. Nothing writes a shared id, every `traceId` in that table is empty,
+ * and the AI-caused row carries no user at all — so this is a correlation by object id and time, and
+ * the page says that out loud rather than presenting it as an identifier.
+ *
+ * This reaches the host's admin API — `/admin-api/system/operate-log/page` — through the runtime
+ * client, which already carries the host's token and tenant and unwraps the host's envelope. Who may
+ * read it is the host's decision, not this console's: the endpoint is guarded by YuDao's own
+ * `system:operate-log:query`, and that permission is not admin-only here — this deployment grants it
+ * to the `common` role — so the leg's scope is the host's own. A refusal is shown as it comes rather
+ * than being decided here.
+ *
+ * 宿主自己的操作日志，按一个业务对象取（`YD-T18` / `D50`）。
+ *
+ * AI 引起的一次写，有**两条**记录：这边运行时那条副作用，以及芋道 `system_operate_log` 那一行 —— 因为
+ * `@LogRecord` 挂在 CRM 的 **service** 上，而工具照它的写法调那个 service。两者**已共有一个键** —— 运行时的
+ * `resultId` 就是芋道记成 `bizId` 的那个 id —— 故可以并排摆。
+ *
+ * 但它们**不是**一条链接：没有任何东西写下一个共享的 id，那张表里每个 `traceId` 都是空的，而 AI 引起的那行
+ * 根本**不带用户** —— 所以这是「对象 id + 时间」的**相关**，页面把这句话说出来，而不是把它摆成一个标识符。
+ *
+ * 它经**运行时客户端**够到宿主的 admin API（`/admin-api/system/operate-log/page`）—— 那个客户端本已带着宿主的
+ * token 与租户、并拆宿主的信封。**谁能读是宿主的决定、不是这个控制台的**：那个端点由芋道自己的
+ * `system:operate-log:query` 守着，而该权限在本部署**不是管理员专属** —— 它授给了 `common` 角色 —— 故这一腿的
+ * 范围就是**宿主自己的**。被拒就照原样显示，而不是在这里判。
+ */
+const BUSINESS_LOG_TYPE: Record<string, string> = {
+  // The runtime names a module its own way; the host names it in Chinese. One side has to translate,
+  // and the host is where its own modules are known.
+  // 运行时按自己的方式给模块起名，宿主用中文起名。总得有一侧翻译，而模块是在**宿主**那儿认识的。
+  crm_customer: 'CRM 客户',
+}
+
+export interface BusinessLogRow {
+  id: number
+  type: string | null
+  subType: string | null
+  bizId: number | null
+  action: string | null
+  userId: number | null
+  createTime: string
+}
+
+export const businessLogApi = {
+  /** The host-side type this result type maps to, or null when the two vocabularies do not meet. */
+  /** 这个结果类型对应的宿主侧类型；两套词表碰不上时给 null。 */
+  mappedType: (resultType: string | null | undefined): string | null =>
+    resultType ? (BUSINESS_LOG_TYPE[resultType] ?? null) : null,
+
+  /**
+   * The rows YuDao logged for this object. No time window is passed: the server returns newest-first
+   * and the page shows the few it can put beside the action, naming the correlation's limits instead
+   * of pretending a time bound would make it exact.
+   *
+   * 芋道为这个对象记下的行。**不传时间窗**：服务端按最新在前返回，页面只展示能摆到动作旁边的那几行，
+   * 并**写出这条相关的限度**，而不是假装加个时间界就精确了。
+   */
+  byObject: (businessType: string, bizId: number | string) =>
+    runtime
+      .get<{ list: BusinessLogRow[]; total: number }>('/admin-api/system/operate-log/page', {
+        params: { type: businessType, bizId, pageNo: 1, pageSize: 5 },
+      })
+      .then((r) => r.data),
+}
+
+/**
  * One row of `/audit/operations/logs` — a write to the business, including the ones no AI took part
  * in. That is a different chain from the AI audit beside it, and nothing joins the two.
  *
