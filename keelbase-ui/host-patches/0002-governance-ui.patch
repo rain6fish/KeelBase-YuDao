@@ -1,7 +1,7 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,3 +1,86 @@
+@@ -1,3 +1,100 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -72,6 +72,20 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 +      userId: 'Caller',
 +      userIdPlaceholder: 'Filter by caller id',
 +    },
++    toolInv: {
++      title: 'Tool inventory',
++      count: '{n} tools',
++      colTool: 'Tool',
++      colRisk: 'Risk',
++      colGate: 'Gate',
++      colRevoke: 'Revoke class',
++      colParams: 'Parameters',
++      colRoles: 'Allowed roles',
++      colDescription: 'Description',
++      none: 'none',
++      emptyNote:
++        '“Allowed roles” is empty and this runtime reports no permissions, because its gate decides on the risk level alone — it has no role allowlist and no policy toggles. An empty column here is a fact about this deployment, not something that failed to load.',
++    },
 +    showcase: {
 +      title: 'Adversarial demonstration',
 +      caveat:
@@ -91,7 +105,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,3 +1,86 @@
+@@ -1,3 +1,100 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -161,6 +175,20 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 +      ledgerTitle: 'AI 写入台账',
 +      userId: '调用方',
 +      userIdPlaceholder: '按调用方 id 筛选',
++    },
++    toolInv: {
++      title: '工具清单',
++      count: '{n} 个工具',
++      colTool: '工具',
++      colRisk: '风险级',
++      colGate: '门槛',
++      colRevoke: '可撤档位',
++      colParams: '参数',
++      colRoles: '允许角色',
++      colDescription: '说明',
++      none: '无',
++      emptyNote:
++        '「允许角色」是空的，本运行时也不报权限清单——因为它的门**只看风险级**：它没有角色白名单、也没有策略开关。这里一个空列是**本部署的一条事实**，不是有什么东西没加载出来。',
 +    },
 +    showcase: {
 +      title: '对抗证明',

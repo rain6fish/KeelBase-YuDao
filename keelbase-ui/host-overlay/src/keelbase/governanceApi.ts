@@ -163,6 +163,44 @@ export const showcaseApi = {
     runtime.post<ShowcaseResult>(`/ai/security-showcase/run/${encodeURIComponent(id)}`).then((r) => r.data),
 }
 
+/**
+ * The tool inventory, in the frozen `ai-tool-inventory` shape. Two of its fields are empty here and
+ * the page says so rather than dressing them up: this runtime has no role allowlist and no
+ * permission list to report — {@code allowedRoles} comes back empty and {@code permissions} null —
+ * because its gate decides on risk level alone. A console that filled those in would be describing a
+ * surface this deployment does not have.
+ *
+ * 工具清单，按冻结对象 `ai-tool-inventory` 的形状。其中两个字段在这里是**空的**，而页面**如实说**、
+ * 不替它们装点：本运行时没有角色白名单、也没有权限清单可报——`allowedRoles` 回来是空的、`permissions`
+ * 是 null——因为它的门**只看风险级**。一个把它们填上的控制台，就是在描述一个**本部署并不具备**的面。
+ */
+export interface ToolParameterRow {
+  name: string
+  type: string
+  required: boolean
+}
+
+export interface ToolInventoryItem {
+  name: string
+  description: string | null
+  parameters: ToolParameterRow[]
+  enabled: boolean
+  requiresConfirmation: boolean
+  requiresApproval: boolean
+  /** `auto` | `confirm` | `approval` | `blocked` — the effective gate, not the declaration. */
+  /** `auto` | `confirm` | `approval` | `blocked` —— **生效的**闸，不是声明。 */
+  gateMode: string
+  allowedRoles: string[]
+  permissions: string[] | null
+  riskLevel: string
+  riskStrategy: string
+  revokeClass: string | null
+}
+
+export const toolApi = {
+  inventory: () => runtime.get<ToolInventoryItem[]>('/ai/tools').then((r) => r.data),
+}
+
 export const effectApi = {
   /**
    * The ledger. Its scope is the caller's, decided by the server: a non-manager sees their own rows

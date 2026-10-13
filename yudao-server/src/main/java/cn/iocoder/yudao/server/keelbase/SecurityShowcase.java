@@ -22,7 +22,9 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>Four scenarios, not the reference's five.</b> This runtime's gate decides on risk level
  * alone ({@code R5 → block}); it has no policy toggles and no role allowlist, and this deployment
- * declares no R4 or R5 tool. So "R5 blocked" has nothing to land on here, and "prompt injection" has
+ * declares no R5 tool — it does declare an R4 one, which waits for a second person rather than being
+ * refused, and that is a different gate. So "R5 blocked" has nothing to land on here, and "prompt
+ * injection" has
  * no prompt to land on — this deployment's planner is rule-based. Both are recorded in
  * {@code keelbase-docs/KEELBASE-SHOWCASE.md} rather than faked.
  *
@@ -35,7 +37,8 @@ import org.springframework.stereotype.Component;
  * 而不把边界搬到宿主上的原因。
  *
  * <p><b>四条场景，不是参照实现那五条。</b> 本运行时的门**只看风险级**（{@code R5 → block}）；它没有
- * 策略开关、没有角色白名单，而本部署也**没有声明任何 R4/R5 工具**。故「R5 阻断」在这里**没有可落的
+ * 策略开关、没有角色白名单，而本部署也**没有声明任何 R5 工具**——它**有**一个 R4 的，那一个等的是
+ * **第二个人**而不是被拒绝，是另一道闸。故「R5 阻断」在这里**没有可落的
  * 东西**，「提示词注入」也没有提示词可注入——本部署的规划器是**规则版**。两者记在
  * {@code keelbase-docs/KEELBASE-SHOWCASE.zh-CN.md} 里，而不是编一个出来。
  */

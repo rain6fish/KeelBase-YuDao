@@ -65,8 +65,9 @@ The last one is not decoration. Without it, "refuse everything" would pass every
 **Two of the reference's five have nothing to land on here, and are not faked:**
 
 - **R5 blocked.** This runtime's gate decides on risk level alone (`R5 → block`); it has no policy
-  toggles and no role allowlist, and this deployment declares no R4 or R5 tool. There is no tool that
-  could be blocked, and no policy that could block one. Landing this scenario needs a tool at that
+  toggles and no role allowlist, and this deployment declares **no R5 tool** — it does declare an R4
+  one (`escalate_customer`), which waits for a second person rather than being refused, and that is a
+  different gate. There is no tool that could be blocked, and no policy that could block one. Landing this scenario needs a tool at that
   level — or a policy surface the runtime does not have.
 - **Prompt injection.** There is no prompt on this path. This deployment's planner is rule-based, so
   an injection has nothing to be injected into. Landing it needs a model path.
