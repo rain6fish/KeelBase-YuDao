@@ -81,7 +81,46 @@
     </template>
 
     <div v-if="effectsError" class="text-[var(--el-color-danger)] mb-10px">{{ effectsError }}</div>
-    <el-table v-loading="effectsLoading" :data="effects" stripe>
+    <el-table v-loading="effectsLoading" :data="effects" stripe @expand-change="onExpand">
+      <!--
+        The business leg (YD-T18 / D50). An AI write leaves a row here and a row in YuDao's own
+        operate log, and both carry the same business object id — so the second is shown beside the
+        first. It is labelled a correlation and not a link: nothing writes a shared id, every traceId
+        in that log is empty, and the AI-caused row carries no user at all. A non-admin is refused by
+        the host's own permission, and the refusal is what this shows.
+
+        业务那一腿（`YD-T18` / `D50`）。一次 AI 写在这边留一行、在芋道自己的操作日志里也留一行，两者握着
+        同一个业务对象 id —— 故把第二行摆在第一行旁边。它被标成**相关**、不是链接：没有任何东西写共享 id，
+        那张日志里每个 traceId 都是空的，而 AI 引起的那行根本不带用户。非管理员由宿主自己的权限拒掉，这里
+        显示的就是那次拒绝。
+      -->
+      <el-table-column type="expand" width="44">
+        <template #default="{ row }">
+          <div class="biz">
+            <div class="biz-hint">{{ t('keelbase.effects.businessLogHint') }}</div>
+            <div v-if="!businessLogApi.mappedType(row.resultType)" class="biz-note">
+              {{ t('keelbase.effects.businessLogUnmapped') }}
+            </div>
+            <div v-else-if="bizError[row.id]" class="biz-note text-[var(--el-color-danger)]">{{ bizError[row.id] }}</div>
+            <div v-else-if="!bizLoaded[row.id]" class="biz-note">{{ t('keelbase.common.loading') }}</div>
+            <el-empty
+              v-else-if="!(bizRows[row.id]?.length)"
+              :description="t('keelbase.effects.businessLogEmpty')"
+              :image-size="48"
+            />
+            <el-table v-else :data="bizRows[row.id]" size="small" border>
+              <el-table-column :label="t('keelbase.effects.businessLogColWhen')" width="180">
+                <template #default="{ row: r }">{{ timeText(r.createTime) }}</template>
+              </el-table-column>
+              <el-table-column :label="t('keelbase.effects.businessLogColWhat')" prop="subType" width="140" />
+              <el-table-column :label="t('keelbase.effects.businessLogColWho')" width="110">
+                <template #default="{ row: r }">{{ r.userId ?? '—' }}</template>
+              </el-table-column>
+              <el-table-column :label="t('keelbase.effects.businessLogColAction')" prop="action" show-overflow-tooltip />
+            </el-table>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTool')" prop="toolName" width="200" />
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
         <template #default="{ row }">{{ row.targetTitle || `#${row.resultId}` }}</template>
@@ -123,7 +162,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import Pagination from '@/components/Pagination/index.vue'
-import { confirmationApi, effectApi, type ConfirmationItem, type EffectRow } from '@/keelbase/governanceApi'
+import { businessLogApi, confirmationApi, effectApi, type BusinessLogRow, type ConfirmationItem, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 
 defineOptions({ name: 'KeelbaseGovernanceActionCenter' })
@@ -140,6 +179,11 @@ const page = ref(1)
 const limit = ref(20)
 const effectsLoading = ref(false)
 const effectsError = ref('')
+
+const bizRows = ref<Record<number, BusinessLogRow[]>>({})
+const bizLoaded = ref<Record<number, boolean>>({})
+const bizLoading = ref<Record<number, boolean>>({})
+const bizError = ref<Record<number, string>>({})
 
 function timeText(v: string | null | undefined): string {
   return v ? v.replace('T', ' ').slice(0, 19) : '—'
@@ -188,6 +232,30 @@ async function loadEffects() {
     effectsError.value = runtimeErrorMessage(e, t('keelbase.common.loadFailed'))
   } finally {
     effectsLoading.value = false
+  }
+}
+
+/**
+ * Load the host's business-log row(s) for a row whose module this page can name. Fetched when the row
+ * is expanded, not with the ledger: the call is the host's admin API and most rows are never opened.
+ *
+ * 为这一页认得出模块的那些行，取宿主那一侧的业务日志行。**展开时才取**、不随台账取：这个调用打的是宿主的
+ * admin API，而多数行根本不会被打开。
+ */
+async function onExpand(row: EffectRow, expandedRows: EffectRow[]) {
+  const isOpen = expandedRows.some((r) => r.id === row.id)
+  if (!isOpen || bizLoaded.value[row.id] || bizLoading.value[row.id]) return
+  const businessType = businessLogApi.mappedType(row.resultType)
+  if (!businessType || row.resultId === null || row.resultId === undefined) return
+  bizLoading.value = { ...bizLoading.value, [row.id]: true }
+  try {
+    const res = await businessLogApi.byObject(businessType, row.resultId)
+    bizRows.value = { ...bizRows.value, [row.id]: res.list ?? [] }
+  } catch (e) {
+    bizError.value = { ...bizError.value, [row.id]: runtimeErrorMessage(e, t('keelbase.common.loadFailed')) }
+  } finally {
+    bizLoaded.value = { ...bizLoaded.value, [row.id]: true }
+    bizLoading.value = { ...bizLoading.value, [row.id]: false }
   }
 }
 
@@ -278,5 +346,17 @@ onMounted(() => {
   word-break: break-all;
   max-height: 160px;
   overflow: auto;
+}
+.biz {
+  padding: 8px 12px;
+}
+.biz-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 8px;
+}
+.biz-note {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

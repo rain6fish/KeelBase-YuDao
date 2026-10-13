@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..07e7fd9 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,205 @@
+@@ -1,4 +1,212 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -72,6 +72,13 @@ index 96269a8..07e7fd9 100644
 +      revokeFailed: 'The revoke did not go through',
 +      statusExecuted: 'Executed',
 +      statusRevoked: 'Revoked',
++      businessLogHint: 'Writes the host logged for this object, newest first — a correlation by object id and time, not a hard link.',
++      businessLogEmpty: 'The host logged no write for this object.',
++      businessLogUnmapped: 'This result type maps to no host-side module here.',
++      businessLogColWhen: 'When',
++      businessLogColWhat: 'What',
++      businessLogColWho: 'Who',
++      businessLogColAction: 'Action',
 +    },
 +    tools: {
 +      ledgerTitle: 'AI write ledger',
@@ -212,7 +219,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..6f57241 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,205 @@
+@@ -1,4 +1,212 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -282,6 +289,13 @@ index 35f1e1a..6f57241 100644
 +      revokeFailed: '撤销没有通过',
 +      statusExecuted: '已执行',
 +      statusRevoked: '已撤销',
++      businessLogHint: '宿主为这个对象记下的写，最新在前 —— 按对象 id 与时间的相关，不是硬链接。',
++      businessLogEmpty: '宿主没有为这个对象记下任何写。',
++      businessLogUnmapped: '这个结果类型在本部署里没有对应的宿主模块。',
++      businessLogColWhen: '何时',
++      businessLogColWhat: '做了什么',
++      businessLogColWho: '谁',
++      businessLogColAction: '详情',
 +    },
 +    tools: {
 +      ledgerTitle: 'AI 写入台账',
