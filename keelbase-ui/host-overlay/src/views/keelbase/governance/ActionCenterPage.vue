@@ -47,8 +47,10 @@
             which is the honest substitute for a sentence about them.
 
             给人读的摘要是运行时**送 null** 的字段：它没有展示层。故改为原样显示参数——那是这次调用
-            真会带的东西，也是那句摘要的诚实替代品。
+            真会带的东西，也是那句摘要的诚实替代品。上面那句话把这块是**什么**说清楚，好让一块裸 JSON
+            读起来是「这次调用会带的东西」，而不是一段没头没尾的文本。
           -->
+          <div class="args-label">{{ t('keelbase.actionCenter.argsLabel') }}</div>
           <pre class="args">{{ formatArgs(c.arguments) }}</pre>
           <div class="row-meta">
             {{ timeText(c.createdAt) }}
@@ -260,6 +262,11 @@ onMounted(() => {
   gap: 8px;
   flex-shrink: 0;
   align-items: center;
+}
+.args-label {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .args {
   margin: 6px 0 0;

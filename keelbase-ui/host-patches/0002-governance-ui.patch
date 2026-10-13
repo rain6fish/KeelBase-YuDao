@@ -1,7 +1,8 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
+index 96269a8..36071f1 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,3 +1,114 @@
+@@ -1,4 +1,167 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -22,17 +23,21 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 +      userIdPlaceholder: 'Filter by caller id',
 +      since: 'From',
 +      sincePlaceholder: 'Start of the window',
-+      isError: 'Outcome',
++      isError: 'Status',
 +      statusOk: 'OK',
 +      statusError: 'Error',
 +      colId: 'ID',
 +      colTime: 'Time',
++      colWho: 'Who',
 +      colUser: 'Caller',
 +      colAction: 'Action',
 +      colTool: 'Tool',
++      colWhat: 'What',
 +      colOutcome: 'Outcome',
++      colResult: 'Result',
 +      colStatus: 'Status',
 +      colDetail: 'Detail',
++      attemptedHint: 'records the attempt only — its outcome is on the adjacent row',
 +      prev: 'Previous',
 +      next: 'Next',
 +      window: 'from row {from}, {n} fetched',
@@ -48,6 +53,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 +      approved: 'Approved',
 +      declined: 'Declined',
 +      decideFailed: 'The decision did not go through',
++      argsLabel: 'This call would carry:',
 +      writesTitle: 'What the AI wrote for me',
 +      writesTotal: '{n} rows',
 +    },
@@ -100,6 +106,53 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 +      stepsTitle: 'Trace',
 +      noticeTag: 'disclosure',
 +    },
++    vocab: {
++      action: {
++        chat: 'Conversation',
++        tool_call: 'Tool call',
++        navigate: 'Navigation',
++        error: 'Error',
++        login: 'Sign-in',
++        plan: 'Plan',
++        analyze: 'Analysis',
++        knowledge: 'Knowledge',
++        delegate: 'Delegation',
++        tool_confirmation: 'Confirmation',
++        flow_node: 'Flow step',
++        content_blocked: 'Content blocked',
++        effect_revoke: 'Revocation',
++      },
++      outcome: {
++        attempted: 'Attempted',
++        executed: 'Executed',
++        pending: 'Pending',
++        blocked: 'Blocked',
++        refused: 'Refused',
++        declined: 'Declined',
++        failed: 'Failed',
++        approved: 'Approved',
++        timeout: 'Timed out',
++        revoked: 'Revoked',
++      },
++      gate: {
++        auto: 'Auto',
++        confirm: 'Needs confirmation',
++        approval: 'Needs approval',
++        blocked: 'Blocked',
++      },
++      showcaseOutcome: {
++        allowed: 'Allowed',
++        denied: 'Denied',
++        unresolved: 'Unresolved',
++        requiresConfirmation: 'Needs confirmation',
++        unknownScenario: 'Unknown scenario',
++      },
++      traceStep: {
++        input: 'Input',
++        assistant: 'Reply',
++        notice: 'Disclosure',
++      },
++    },
 +    showcase: {
 +      title: 'Adversarial demonstration',
 +      caveat:
@@ -116,10 +169,12 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 +  },
    common: {
      inputText: 'Please input',
+     selectText: 'Please select',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
+index 35f1e1a..fc2877f 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,3 +1,114 @@
+@@ -1,4 +1,167 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -140,17 +195,21 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 +      userIdPlaceholder: '按调用方 id 筛选',
 +      since: '起始',
 +      sincePlaceholder: '窗口起点',
-+      isError: '结局',
++      isError: '状态',
 +      statusOk: '正常',
 +      statusError: '错误',
 +      colId: '编号',
 +      colTime: '时间',
++      colWho: '谁',
 +      colUser: '调用方',
 +      colAction: '动作',
 +      colTool: '工具',
++      colWhat: '做了什么',
 +      colOutcome: '结局',
++      colResult: '结果',
 +      colStatus: '状态',
 +      colDetail: '详情',
++      attemptedHint: '只记「试过」——它的结局在相邻那一行',
 +      prev: '上一页',
 +      next: '下一页',
 +      window: '自第 {from} 行起，取到 {n} 行',
@@ -166,6 +225,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 +      approved: '已批准',
 +      declined: '已拒绝',
 +      decideFailed: '裁决没有通过',
++      argsLabel: '这次调用会带：',
 +      writesTitle: 'AI 替我写了什么',
 +      writesTotal: '{n} 行',
 +    },
@@ -218,6 +278,53 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 +      stepsTitle: '轨迹',
 +      noticeTag: '披露',
 +    },
++    vocab: {
++      action: {
++        chat: '对话',
++        tool_call: '工具调用',
++        navigate: '导航',
++        error: '错误',
++        login: '登录',
++        plan: '规划',
++        analyze: '分析',
++        knowledge: '知识',
++        delegate: '委托',
++        tool_confirmation: '确认',
++        flow_node: '流程节点',
++        content_blocked: '内容拦截',
++        effect_revoke: '撤销',
++      },
++      outcome: {
++        attempted: '试过',
++        executed: '已执行',
++        pending: '待决',
++        blocked: '阻断',
++        refused: '拒绝',
++        declined: '否决',
++        failed: '失败',
++        approved: '已批准',
++        timeout: '超时',
++        revoked: '已撤销',
++      },
++      gate: {
++        auto: '自动放行',
++        confirm: '需确认',
++        approval: '需审批',
++        blocked: '已阻断',
++      },
++      showcaseOutcome: {
++        allowed: '放行',
++        denied: '拒绝',
++        unresolved: '未解析',
++        requiresConfirmation: '需确认',
++        unknownScenario: '未知场景',
++      },
++      traceStep: {
++        input: '输入',
++        assistant: '回复',
++        notice: '披露',
++      },
++    },
 +    showcase: {
 +      title: '对抗证明',
 +      caveat:
@@ -234,3 +341,4 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 +  },
    common: {
      inputText: '请输入',
+     selectText: '请选择',

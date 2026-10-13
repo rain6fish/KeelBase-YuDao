@@ -61,7 +61,7 @@
     <div v-else class="steps">
       <div v-for="s in trace.steps" :key="s.id" class="step" :class="{ notice: s.type === 'notice' }">
         <span class="step-time">{{ timeText(s.time) }}</span>
-        <el-tag v-if="s.type !== 'notice'" size="small" effect="plain">{{ s.type }}</el-tag>
+        <el-tag v-if="s.type !== 'notice'" size="small" effect="plain">{{ stepTypeText(s.type) }}</el-tag>
         <!-- A `notice` step is the runtime disclosing what it cannot place here, so it is drawn as a
              disclosure and not as one more thing that happened. -->
         <!-- 一条 `notice` 步，是运行时在**披露**它放不进这里的东西，故按披露画、不按「又发生了一件事」画。 -->
@@ -78,10 +78,18 @@ import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 import { conversationApi, type ConversationData, type ConversationTrace } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
+import { traceStepLabelKey } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceConversationTrace' })
 
 const { t } = useI18n()
+
+/** The step's kind in the reader's words; an unknown type is shown as itself. */
+/** 这一步的**种类**用读者的话说；不认识的类型原样显示。 */
+function stepTypeText(type: string): string {
+  const key = traceStepLabelKey(type)
+  return key ? t(key) : type
+}
 
 const conversations = ref<ConversationData[]>([])
 const loading = ref(false)

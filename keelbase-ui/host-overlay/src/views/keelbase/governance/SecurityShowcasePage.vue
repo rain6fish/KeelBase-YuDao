@@ -39,7 +39,7 @@
       <el-table-column :label="t('keelbase.showcase.colOutcome')" width="170">
         <template #default="{ row }">
           <template v-if="row.result">
-            <el-tag :type="outcomeTag(row.result.outcome)" size="small">{{ row.result.outcome }}</el-tag>
+            <el-tag :type="showcaseOutcomeTagType(row.result.outcome)" size="small">{{ showcaseOutcomeText(row.result.outcome) }}</el-tag>
             <span v-if="row.result.engine" class="ml-6px text-12px text-[var(--el-text-color-secondary)]">
               {{ row.result.engine }}
             </span>
@@ -71,6 +71,7 @@ import { ElMessage } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import { showcaseApi, type ShowcaseResult, type ShowcaseScenario } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
+import { showcaseOutcomeLabelKey, showcaseOutcomeTagType } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceShowcase' })
 
@@ -83,15 +84,11 @@ const loading = ref(false)
 const error = ref('')
 const running = ref<string | null>(null)
 
-/** A refused call and a call that did not run read differently, so the tag says which happened. */
-/** 「被拒绝」与「没跑成」读起来不一样，故标签说出发生的是哪一种。 */
-function outcomeTag(outcome: string): 'success' | 'danger' | 'warning' | 'info' {
-  if (outcome === 'allowed' || outcome === 'denied' || outcome === 'unresolved') return 'success'
-  if (outcome === 'requiresConfirmation') return 'warning'
-  if (outcome === 'unknown-scenario') return 'info'
-  // Anything the scenarios call a finding: the call did not do what the scenario exists to show.
-  // 一切被场景称作「发现」的结果：这次调用没有做到那条场景存在来展示的事。
-  return 'danger'
+/** A refused call and a call that did not run read differently, so the word says which happened. */
+/** 「被拒绝」与「没跑成」读起来不一样，故这个词说出发生的是哪一种。 */
+function showcaseOutcomeText(outcome: string): string {
+  const key = showcaseOutcomeLabelKey(outcome)
+  return key ? t(key) : outcome
 }
 
 async function load() {

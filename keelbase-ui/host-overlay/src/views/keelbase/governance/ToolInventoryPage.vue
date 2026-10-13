@@ -38,11 +38,13 @@
         </template>
       </el-table-column>
       <!-- The gate the call will actually meet — the server reads it off the decision, not off the
-           declaration, and the page does not second-guess it. -->
-      <!-- 这次调用**真会**遇到的那道闸 —— 服务端是从**判定**读出来的、不是从声明，而页面不替它重算。 -->
+           declaration, and the page does not second-guess it. The word is the plain one (`auto`,
+           `confirm`, `approval`, `blocked` in the reader's language), not the code. -->
+      <!-- 这次调用**真会**遇到的那道闸 —— 服务端是从**判定**读出来的、不是从声明，而页面不替它重算。词用的是
+           朴素的那些（读者语言里的 `auto`/`confirm`/`approval`/`blocked`），不是码。 -->
       <el-table-column :label="t('keelbase.toolInv.colGate')" width="140">
         <template #default="{ row }">
-          <el-tag :type="gateTag(row.gateMode)" size="small">{{ row.gateMode }}</el-tag>
+          <el-tag :type="gateTagType(row.gateMode)" size="small">{{ gateText(row.gateMode) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.toolInv.colRevoke')" width="150">
@@ -80,6 +82,7 @@ import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 import { toolApi, type ToolInventoryItem, type ToolParameterRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
+import { gateLabelKey, gateTagType } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernanceToolInventory' })
 
@@ -89,11 +92,11 @@ const items = ref<ToolInventoryItem[]>([])
 const loading = ref(false)
 const error = ref('')
 
-function gateTag(mode: string): 'success' | 'warning' | 'danger' | 'info' {
-  if (mode === 'auto') return 'success'
-  if (mode === 'blocked') return 'danger'
-  if (mode === 'confirm' || mode === 'approval') return 'warning'
-  return 'info'
+/** The gate in the reader's words; an unknown code is shown as itself. */
+/** 门槛的**人话**；不认识的码原样显示。 */
+function gateText(gate: string): string {
+  const key = gateLabelKey(gate)
+  return key ? t(key) : gate
 }
 
 async function load() {

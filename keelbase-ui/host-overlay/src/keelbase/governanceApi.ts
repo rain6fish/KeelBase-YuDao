@@ -36,6 +36,9 @@ export interface AuditRow {
 /** `/audit/verify` 那次走链的一个节点——是链本身，不是它的摘要。 */
 export interface ChainNode {
   id: number
+  /** When the row was written. The runtime fills it; the node used to be drawn without it. */
+  /** 这一行写下的时刻。运行时填它；此前画节点时没有用它。 */
+  createdAt?: string | null
   action?: string | null
   hash?: string | null
   prevHash?: string | null

@@ -32,6 +32,9 @@
     <el-form :inline="true" class="-mb-15px" @submit.prevent>
       <el-form-item :label="t('keelbase.tools.userId')">
         <el-input v-model="userId" clearable :placeholder="t('keelbase.tools.userIdPlaceholder')" class="!w-200px" @keyup.enter="refresh" />
+        <!-- The filter takes an id; when the host's directory can name that id, say who it is. -->
+        <!-- 该筛选收的是 id；当宿主的名录能把这个 id 配上名时，把那**是谁**说出来。 -->
+        <span v-if="filteredName" class="ml-8px text-12px text-[var(--el-text-color-secondary)]">{{ filteredName }}</span>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="refresh">{{ t('keelbase.common.filter') }}</el-button>
@@ -79,6 +82,7 @@ import { ContentWrap } from '@/components/ContentWrap'
 import Pagination from '@/components/Pagination/index.vue'
 import { effectApi, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
+import { resolveCallerNames } from '@/keelbase/callerNames'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
@@ -91,6 +95,9 @@ const limit = ref(20)
 const loading = ref(false)
 const error = ref('')
 const userId = ref('')
+/** The name behind the id being filtered, when the directory knows one. */
+/** 正在筛选的那个 id 背后的名字，当名录认识一个时。 */
+const filteredName = ref('')
 
 function timeText(v: string | null | undefined): string {
   return v ? v.replace('T', ' ').slice(0, 19) : '—'
@@ -103,6 +110,13 @@ async function load() {
     const res = await effectApi.list(page.value, limit.value, userId.value || undefined)
     rows.value = res.items
     total.value = res.total
+    if (userId.value) {
+      const resolved = await resolveCallerNames([userId.value])
+      const name = resolved[userId.value]
+      filteredName.value = name && name !== userId.value ? name : ''
+    } else {
+      filteredName.value = ''
+    }
   } catch (e) {
     rows.value = []
     total.value = 0
