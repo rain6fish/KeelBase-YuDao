@@ -201,6 +201,50 @@ export const toolApi = {
   inventory: () => runtime.get<ToolInventoryItem[]>('/ai/tools').then((r) => r.data),
 }
 
+/**
+ * One conversation, in the frozen `conversation-data` shape. The runtime derives conversations from
+ * their messages, so there is no separate conversation row behind these.
+ *
+ * 一个会话，按冻结对象 `conversation-data` 的形状。本运行时的会话是**由消息推出来的**，故这些字段背后
+ * 没有单独的一行会话记录。
+ */
+export interface ConversationMessageRow {
+  role: string
+  content: string
+  timestamp: string
+}
+
+export interface ConversationData {
+  id: string
+  userId: string
+  provider: string
+  model: string
+  summary: string | null
+  createdAt: string
+  lastActivityAt: string
+  messages: ConversationMessageRow[]
+}
+
+/** One step of a trace, in the frozen `trace-step` shape. Only four of its fields are filled here. */
+/** 轨迹的一步，按冻结对象 `trace-step` 的形状。这里只填了它四个字段。 */
+export interface TraceStep {
+  id: string
+  type: string
+  time: string
+  content: string | null
+}
+
+export interface ConversationTrace {
+  conversation: ConversationData
+  steps: TraceStep[]
+}
+
+export const conversationApi = {
+  list: () => runtime.get<ConversationData[]>('/ai/conversations').then((r) => r.data),
+  trace: (id: string) =>
+    runtime.get<ConversationTrace>(`/ai/conversations/${encodeURIComponent(id)}/trace`).then((r) => r.data),
+}
+
 export const effectApi = {
   /**
    * The ledger. Its scope is the caller's, decided by the server: a non-manager sees their own rows

@@ -43,6 +43,21 @@ function unwrapEnvelope(payload: unknown): unknown {
 }
 
 runtime.interceptors.response.use((response) => {
+  // A path the front-end's proxy does not know is answered by the SPA fallback: `index.html`, HTTP
+  // 200. Nothing here is JSON, and a page that takes that string for its data renders a plausible
+  // lie — a list whose length is the byte count of a web page. So this refuses it instead, and says
+  // which thing to go and check.
+  //
+  // 前端的代理**不认识**的路径，会被 SPA 兜底接走：`index.html`、状态码 **200**。这里没有任何 JSON，而
+  // 一个把那个字符串当成自己数据的页面，会渲染出一个**像模像样的谎**——一个长度等于某个网页字节数的列表。
+  // 故这里把它拒掉，并说出该去查哪一样。
+  const contentType = String(response.headers?.['content-type'] ?? '')
+  if (!contentType.includes('json')) {
+    return Promise.reject(new Error(
+      `not a JSON response (content-type: ${contentType || 'none'}) — the proxy has no rule for `
+        + `${response.config?.url ?? 'this path'}, so the SPA fallback answered it`,
+    ))
+  }
   response.data = unwrapEnvelope(response.data)
   return response
 })
