@@ -63,7 +63,7 @@
     <!-- A description of this page, said as such — the window is all the face gives. -->
     <!-- **本页**的描述，并如实这么说 —— 这条面给的就是一个窗口。 -->
     <div v-if="rows.length && !rowsError" class="overview">{{ overview }}</div>
-    <el-table v-loading="rowsLoading" :data="rows" stripe>
+    <el-table v-loading="rowsLoading" :data="rows" stripe @expand-change="(row: AuditRow) => void onExpand(row)">
       <!-- Opening a row lays out the whole of it in one place: the sentence the list compresses. -->
       <!-- 摊开一行，就是把列表压住的那句话一次摆全。 -->
       <el-table-column type="expand">
@@ -108,6 +108,14 @@
             <div v-if="meaningText(row)" class="d-row">
               <span class="d-key">{{ t('keelbase.audit.meaning') }}</span>
               <span>{{ meaningText(row) }}</span>
+            </div>
+            <!-- The record this write landed on — only when exactly one candidate matches, and the
+                 matching rule is named here rather than left for a reader to assume. -->
+            <!-- 这次写落在的那条记录 —— 只在**恰好一个**候选对得上时显示，而配对规则写在**这里**，不留
+                 给读者去假设。 -->
+            <div v-if="recordText(row)" class="d-row">
+              <span class="d-key">{{ t('keelbase.audit.writeRecord') }}</span>
+              <span>{{ recordText(row) }}</span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colDetail') }}</span>
@@ -208,7 +216,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
-import { auditApi, toolApi, type AuditRow, type ChainVerification, type ToolInventoryItem } from '@/keelbase/governanceApi'
+import {
+  auditApi,
+  effectApi,
+  toolApi,
+  type AuditRow,
+  type ChainVerification,
+  type EffectRow,
+  type ToolInventoryItem,
+} from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import {
   actionLabelKey,
@@ -219,6 +235,8 @@ import {
   toolLabelKey,
 } from '@/keelbase/labels'
 import { resolveCallerNames } from '@/keelbase/callerNames'
+import { maskTitle } from '@/keelbase/mask'
+import { resolveRecordName } from '@/keelbase/recordNames'
 
 defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
 
@@ -256,6 +274,40 @@ const names = ref<Record<string, string>>({})
  * 工具那列写着 `create_crm_customer`，两者都没告诉他：它新建了一个客户。
  */
 const inventory = ref<Record<string, ToolInventoryItem>>({})
+
+/**
+ * The ledger of what the AI wrote, fetched beside the audit rows. It is what makes 「点开能看到新建了哪个
+ * 客户」 answerable at all: the audit row names the tool, and only the ledger knows the record.
+ *
+ * 副作用台账 —— 与审计行一起取回来。它正是「点开能看到新建了哪个客户」答得上来的原因：审计行只说出工具，
+ * **只有台账知道那条记录**。
+ */
+const effects = ref<EffectRow[]>([])
+
+/**
+ * What each matched record is called, asked of this host on the row that needs it. Resolved when a row
+ * is opened rather than for the whole page: one request per row a reader actually looks at, and the
+ * host is asked only about records the ledger already named.
+ *
+ * 对上的每条记录叫什么 —— 在**需要它的那一行**上问宿主。**摊开时**才解析、不是整页都解析：读者真去看的
+ * 那一行才发一次请求，而宿主只会被问到台账**已经点过名**的那些记录。
+ */
+const recordNames = ref<Record<string, string>>({})
+
+/** Ask the host about the row's record once, when the row is opened. */
+/** 行被摊开时，问宿主一次那条记录。 */
+async function onExpand(row: AuditRow) {
+  const e = recordOf(row)
+  if (!e || e.resultId === null || e.resultId === undefined) return
+  const key = `${e.resultType ?? ''}#${e.resultId}`
+  if (recordNames.value[key] !== undefined) return
+  const name = await resolveRecordName(e.resultType, e.resultId)
+  recordNames.value = { ...recordNames.value, [key]: name }
+}
+
+/** How many ledger rows to look through when matching. Bounded on purpose, and said on the page. */
+/** 配对时翻多少条台账行。**刻意有界**，并在页面上说出来。 */
+const EFFECT_WINDOW = 50
 
 const query = reactive<{ userId: string; isError: string }>({ userId: '', isError: '' })
 
@@ -310,6 +362,53 @@ function toolGateOf(row: AuditRow): string {
   const mode = row.tool ? inventory.value[row.tool]?.gateMode : ''
   const key = gateLabelKey(mode)
   return key ? t(key) : (mode || '')
+}
+
+/**
+ * The write record this row landed on, when **exactly one** candidate matches. The two trails carry no
+ * shared key — the audit says what a call came to, the ledger says what it wrote — so the only honest
+ * match is tool plus a close timestamp, and only when that leaves one candidate. A guess here would put
+ * one record beside another person's action, which is worse than showing nothing at all.
+ *
+ * 这一行落在哪条写入记录上 —— **恰好只有一个**候选项时。两条轨之间没有共同的键（审计说「一次调用怎么了」、
+ * 台账说「它写了什么」），故唯一诚实的对法是**工具 ＋ 相近的时刻**，且只在它**只剩一个**候选时成立。
+ * 在这里猜，会把**一条记录摆到另一个人的动作旁边** —— 那比什么都不显示更糟。
+ */
+function recordOf(row: AuditRow): EffectRow | null {
+  if (!row.tool) return null
+  const at = Date.parse(row.createdAt)
+  const near = effects.value.filter(
+    (e) => e.toolName === row.tool && Math.abs(Date.parse(e.createdAt) - at) <= 5000,
+  )
+  return near.length === 1 ? near[0] : null
+}
+
+/** Whether that record is still there — read off the ledger row, never re-derived. */
+/** 那条记录**还在不在** —— 按台账行读，绝不自己重算。 */
+function recordState(e: EffectRow): string {
+  if (!e.targetExists) return t('keelbase.effects.stateGone')
+  if (e.targetSoftDeleted) return t('keelbase.effects.stateDeleted')
+  return t('keelbase.effects.statePresent')
+}
+
+/** The matched record as one line: what it is, which one, and its masked title. */
+/** 对上的那条记录，一行说完：是什么、哪一条、以及**掩码后的**标题。 */
+function recordText(row: AuditRow): string {
+  const e = recordOf(row)
+  if (!e) return ''
+  // The title is drawn only where the runtime answered one: it names this deployment's sample module's
+  // records and answers nothing for the others, and a "masked" note beside a title that never existed
+  // would describe an act nobody performed.
+  // 标题只在运行时**真答了**的时候画：它只给本部署**样例模块**的记录配标题、对其余的一律不答；而在一个
+  // **本来就没有**的标题旁边写「已掩码」，是在描述一件没人做过的事。
+  const parts = [e.resultType || '—', `#${e.resultId ?? '—'}`]
+  // The host's own answer first (asked when the row was opened), then what the ledger carried. Either
+  // way it is masked before it is drawn.
+  // 先用**宿主自己的答复**（行被摊开时问的），再用台账带的那一份。无论哪一份，**画出来之前都先掩码**。
+  const shown = recordNames.value[`${e.resultType ?? ''}#${e.resultId}`] || e.targetTitle
+  if (shown) parts.push(maskTitle(shown))
+  parts.push(recordState(e))
+  return `${parts.join(' · ')} ${t('keelbase.audit.matchNote')}`
 }
 
 /** What the outcome means, in one line — the part a single word cannot carry. */
@@ -396,6 +495,12 @@ async function loadRows() {
       const tools = await toolApi.inventory()
       inventory.value = Object.fromEntries(tools.map((toolItem) => [toolItem.name, toolItem]))
     }
+    // The ledger, for the drill-down only: it is the one face that knows which record a write landed
+    // on. Bounded to one window of it, and the page says so where it uses it.
+    // 台账，只给下钻用：它是唯一知道「这次写落在哪条记录上」的那条面。只取一窗，且页面在用到它的地方
+    // 把这一点说出来。
+    const ledger = await effectApi.list(1, EFFECT_WINDOW)
+    effects.value = ledger.items
   } catch (e) {
     rows.value = []
     hasMore.value = false

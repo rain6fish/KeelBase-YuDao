@@ -43,12 +43,40 @@
 
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
     <el-table v-loading="loading" :data="rows" stripe>
+      <!-- Opened, this row lays out the record the write landed on. Here the row **is** the effect, so
+           the two trails agree without a guess. The record's own text is masked — what a record is
+           about is the thing this console must not print (CLAUDE.md §5.5 ②). -->
+      <!-- 摊开时，这一行把「这次写落在哪条记录上」摆出来。这里这一行**本身就是**那条副作用，故两条轨
+           **无需猜测**就一致。记录自己的文字是**掩码的** —— 一条记录讲的是什么，正是本控制台不得打印的东西
+           （`CLAUDE.md` §5.5 ②）。 -->
+      <el-table-column type="expand">
+        <template #default="{ row }">
+          <div class="row-detail">
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTool') }}</span><span>{{ toolText(row.toolName) }}</span></div>
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colResultType') }}</span><span>{{ row.resultType || '—' }}</span></div>
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTargetId') }}</span><span>#{{ row.resultId ?? '—' }}</span></div>
+            <div class="d-row">
+              <span class="d-key">{{ t('keelbase.effects.colTarget') }}</span>
+              <span>
+                {{ maskTitle(row.targetTitle) }}
+                <!-- The masking note belongs to a title that exists; see the Action Center's copy. -->
+                <!-- 掩码那句话属于**真有过标题**的情形；理由见行动中心那一份。 -->
+                <span v-if="row.targetTitle" class="muted">{{ t('keelbase.effects.maskedNote') }}</span>
+              </span>
+            </div>
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colState') }}</span><span>{{ stateText(row) }}</span></div>
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTime') }}</span><span>{{ timeText(row.createdAt) }}</span></div>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colId')" prop="id" width="90" align="center" />
       <el-table-column :label="t('keelbase.effects.colTool')" width="220">
         <template #default="{ row }">{{ toolText(row.toolName) }}</template>
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
-        <template #default="{ row }">{{ row.targetTitle || `#${row.resultId}` }}</template>
+        <template #default="{ row }">
+          {{ maskTitle(row.targetTitle) }} <span class="muted">#{{ row.resultId ?? '—' }}</span>
+        </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colResultType')" prop="resultType" width="150" />
       <el-table-column :label="t('keelbase.effects.colRevokeClass')" prop="revokeClass" width="150" />
@@ -86,6 +114,7 @@ import { effectApi, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { resolveCallerNames } from '@/keelbase/callerNames'
 import { toolLabelKey } from '@/keelbase/labels'
+import { maskTitle } from '@/keelbase/mask'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
@@ -97,6 +126,14 @@ function toolText(name: string | null | undefined): string {
   if (!name) return '—'
   const key = toolLabelKey(name)
   return key ? t(key) : name
+}
+
+/** Whether the record this write landed on is still there — read off the row, never re-derived. */
+/** 这次写落在的那条记录**还在不在** —— 按行读，绝不自己重算。 */
+function stateText(row: EffectRow): string {
+  if (!row.targetExists) return t('keelbase.effects.stateGone')
+  if (row.targetSoftDeleted) return t('keelbase.effects.stateDeleted')
+  return t('keelbase.effects.statePresent')
 }
 
 const rows = ref<EffectRow[]>([])
@@ -164,3 +201,26 @@ onMounted(() => {
   void load()
 })
 </script>
+
+<style scoped>
+.muted {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.row-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 8px 40px;
+}
+.d-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.d-key {
+  min-width: 72px;
+  color: var(--el-text-color-secondary);
+}
+</style>

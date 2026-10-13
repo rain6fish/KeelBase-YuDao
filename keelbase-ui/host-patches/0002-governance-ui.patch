@@ -1,8 +1,8 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 96269a8..4498f8a 100644
+index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,239 @@
+@@ -1,4 +1,247 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -42,6 +42,8 @@ index 96269a8..4498f8a 100644
 +      meaning: 'What that means',
 +      overviewRows: 'This page: {n} rows',
 +      overviewScope: '{tools} tools, {callers} people',
++      writeRecord: 'The write it landed on',
++      matchNote: ' — matched by tool and time; the two trails share no key',
 +      prev: 'Previous',
 +      next: 'Next',
 +      window: 'from row {from}, {n} fetched',
@@ -76,6 +78,12 @@ index 96269a8..4498f8a 100644
 +      revokeFailed: 'The revoke did not go through',
 +      statusExecuted: 'Executed',
 +      statusRevoked: 'Revoked',
++      colTargetId: 'Record id',
++      colState: 'Record state',
++      maskedNote: '(masked — this console does not print what a record is about)',
++      statePresent: 'still there',
++      stateDeleted: 'deleted (recoverable from the recycle bin)',
++      stateGone: 'no longer there',
 +    },
 +    tools: {
 +      ledgerTitle: 'AI write ledger',
@@ -243,10 +251,10 @@ index 96269a8..4498f8a 100644
      inputText: 'Please input',
      selectText: 'Please select',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 35f1e1a..b59fa28 100644
+index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,239 @@
+@@ -1,4 +1,247 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -286,6 +294,8 @@ index 35f1e1a..b59fa28 100644
 +      meaning: '这意味着',
 +      overviewRows: '本页 {n} 行',
 +      overviewScope: '涉及 {tools} 个工具、{callers} 位同事',
++      writeRecord: '这次写落在',
++      matchNote: ' —— 按工具与时刻对上的；两条轨之间没有共同的键',
 +      prev: '上一页',
 +      next: '下一页',
 +      window: '自第 {from} 行起，取到 {n} 行',
@@ -320,6 +330,12 @@ index 35f1e1a..b59fa28 100644
 +      revokeFailed: '撤销没有通过',
 +      statusExecuted: '已执行',
 +      statusRevoked: '已撤销',
++      colTargetId: '记录编号',
++      colState: '记录状态',
++      maskedNote: '（已掩码 —— 本控制台不打印记录的内容）',
++      statePresent: '还在',
++      stateDeleted: '已删除（回收站可恢复）',
++      stateGone: '已不在',
 +    },
 +    tools: {
 +      ledgerTitle: 'AI 写入台账',
