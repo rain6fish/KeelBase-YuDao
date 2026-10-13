@@ -6,7 +6,7 @@
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
 # what we *have* touched is `YD-T4`).
 #
-# Four jobs, and each answers a question the others cannot:
+# Five jobs, and each answers a question the others cannot:
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
@@ -17,7 +17,10 @@
 #   console-pages        every page the assistant offers is a route the menus we ship compose, so a
 #                        curated list cannot quietly point at a page that moved;
 #   generator            the committed generated files are still a Spec's output (`--check-boundary`)
-#                        and still what that Spec says (`--check`).
+#                        and still what that Spec says (`--check`);
+#   family-block         the generated "KeelBase family" section at the top of this repository's
+#                        READMEs still matches the stamp it was generated with — the copy carries its
+#                        own hash, so this needs neither the sibling repositories nor the network.
 #
 # All but `generator` are pure Node and finish in seconds. `generator` wants a JDK 25 toolchain and a
 # Maven build, so it is the one job here that costs minutes — and it is kept to those two **offline**
@@ -29,7 +32,7 @@
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
 # 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
 #
-# 四个 job，各答一个别的 job 答不了的问题：
+# 五个 job，各答一个别的 job 答不了的问题：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
@@ -40,7 +43,9 @@
 #   console-pages        助手提供的每一页，都是**我们发布的菜单**解得出来的一条路径 —— 策展清单因而不会
 #                        悄悄指向一个已经挪走的页面；
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
-#                        东西（`--check`）。
+#                        东西（`--check`）；
+#   family-block         本仓 README 开头生成的「KeelBase 家族」段仍与生成时的戳相符 —— 副本自带哈希，
+#                        故既不需要兄弟仓、也不需要联网。
 #
 # 除 `generator` 外都是 pure Node、几秒完事。`generator` 要一套 JDK 25 工具链与一次 Maven 构建，是本文件里唯一
 # 按分钟计的 job —— 它只跑那两道**离线**检查。符合性套件与四个治理率要一套**跑着的栈**（PostgreSQL + Redis +
@@ -134,3 +139,22 @@ jobs:
         run: KEELBASE_JDK25="$JAVA_HOME" bash scripts/gen-from-spec.sh specs/products.json --check
       - name: Only a Spec may write into the generated namespaces
         run: KEELBASE_JDK25="$JAVA_HOME" bash scripts/gen-from-spec.sh --check-boundary
+
+  family-block:
+    name: The generated family section still matches its stamp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # Pure Node, and offline by construction: the section at the top of each README is generated in
+      # the main repository, and each copy carries a sha256 of its own body on its BEGIN line — so a
+      # repository can verify its own copy without checking out its siblings or reaching the network,
+      # which is the only shape that works for a gate that has to live in every repository separately.
+      #
+      # 纯 Node，且**构造上**离线：每个 README 开头那一段是在主仓生成的，而每一份都在 BEGIN 行带着自身
+      # 内容的 sha256 —— 于是任何仓都能在不检出兄弟仓、不联网的前提下自检本仓副本；对一道必须分别住在每个
+      # 仓里的闸来说，这是唯一行得通的形状。
+      - name: The family section in the READMEs must match its stamp
+        run: node scripts/check-family-block.mjs
