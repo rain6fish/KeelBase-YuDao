@@ -58,6 +58,21 @@ public class SecurityShowcase {
     /**
      * The four, in the order the console shows them. `drives` says what is actually exercised, so a
      * reader can tell what a green result did and did not prove.
+     *
+     * <p>Three of the four ids are the reference's own strings, kept on purpose: same case, same
+     * name, so the two demonstrations can be read side by side without a translation table. That is
+     * a convenience and not a vocabulary — nothing freezes these words, no schema covers them, and
+     * the fourth id has no counterpart in the reference at all. See
+     * {@code keelbase-docs/KEELBASE-SHOWCASE.md} for where the names come from and where the overlap
+     * stops.
+     *
+     * 四条，按控制台显示的顺序。`drives` 说的是**实际**驱动了什么，故读者能分清一个绿灯的结果证明了什么、
+     * 没证明什么。
+     *
+     * <p>四条 id 里有三条**是参照实现自己的字符串、刻意沿用**：同一个案子、同一个名字，好让两个演示不必
+     * 用一张对照表就能并起来看。那是**方便、不是词汇**——这些词没有任何东西冻结、没有 schema 覆盖它们，
+     * 而第四条在参照实现里**根本没有对应物**。名字从哪来、重叠到哪里为止，见
+     * {@code keelbase-docs/KEELBASE-SHOWCASE.md}。
      */
     private static final List<Scenario> SCENARIOS = List.of(
             new Scenario("unauthorized", "unauthorized",

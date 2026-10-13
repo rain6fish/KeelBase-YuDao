@@ -30,6 +30,27 @@ So this page adds **nothing** to cross-runtime comparability, and nothing here s
 contract conformance. What it offers is what a demonstration offers: a way to watch *this*
 deployment refuse things, in front of somebody.
 
+## Where the ids and the outcome words come from
+
+Three of the four ids — `unauthorized`, `confirmation`, `unknown-tool` — are **the reference's own
+strings, kept deliberately**, and so are the words they answer with (`denied`,
+`requiresConfirmation`, `unresolved`). Same case, same name: a reader who has seen the other
+demonstration can line the two up without a translation table.
+
+**That is a convenience, not a shared vocabulary — and the difference matters.** Nothing freezes
+these words. The reference's own pack defines no schema for them (its replay grammar does not mention
+`outcome` at all), the contract repository has no object for any of this, and nothing anywhere asserts
+that two implementations should agree. So the overlap is a fact about **two implementations that
+happened to name the same danger the same way**, and it stops where the two sets differ:
+
+- `positive-control` has **no counterpart** in the reference — a demonstration of refusal needs one
+  call that must *succeed*, and the reference's pack is a list of adversarial cases.
+- The reference's `injection` and `r5-block` have no landing here, for the reasons below.
+
+**Do not read the four as the reference's five minus one.** They are not a subset, and treating the
+names as a vocabulary would make the two missing cases look like an omission rather than the two
+things this deployment cannot demonstrate at all.
+
 ## Four scenarios, not the reference's five
 
 | id | drives | expects |
