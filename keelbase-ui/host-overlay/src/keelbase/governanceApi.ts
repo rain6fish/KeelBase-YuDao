@@ -312,3 +312,45 @@ export const operationAuditApi = {
   list: (page: number, limit: number) =>
     runtime.get<OperationAuditPage>('/audit/operations/logs', { params: { page, limit } }).then((r) => r.data),
 }
+
+/**
+ * The governance policy, in the shape the runtime stores it: what a tool's gate is overridden to, and
+ * how much of the audit is kept. An override is a **narrow** document — a tool's mode, whether it is
+ * enabled, who may call it — because that is all this runtime validates; anything else it *refuses*
+ * rather than stores, on the ground that a console would render it as a restriction while nothing
+ * would ever enforce it.
+ *
+ * 治理策略，按运行时**存它**的形状：某个工具的闸被覆盖成什么，以及审计留到什么粒度。一条覆盖是一份
+ * **很窄**的文档 —— 某个工具的 mode、它是否启用、谁可以调它 —— 因为本运行时**只校验**这些；其余的它
+ * **拒绝**、而不是存下来，理由是：控制台会把它渲染成一条限制，而**没有任何东西会去施加它**。
+ */
+export interface ToolPolicyOverride {
+  /** `auto` | `confirm` | `approval` — a policy may tighten or relax a gate, not invent one. */
+  /** `auto` | `confirm` | `approval` —— 策略可以收紧或放松一道闸，不能发明一道。 */
+  mode?: string
+  enabled?: boolean
+  requiresConfirmation?: boolean
+  /** Only this deployment's two roles; the runtime refuses anything else. */
+  /** 只认本部署的那两个角色；其余运行时一律拒绝。 */
+  allowedRoles?: string[]
+}
+
+export interface GovernancePolicy {
+  tools: Record<string, ToolPolicyOverride>
+  audit: { granularity: string }
+  revision?: string | number
+  updatedAt?: string
+}
+
+export const policyApi = {
+  read: () => runtime.get<GovernancePolicy>('/ai/governance/policy').then((r) => r.data),
+  /**
+   * Replace the policy. The body is the whole document — `tools` and `audit` — because that is what the
+   * face takes; the runtime offers no partial write, so the page must not invent one.
+   *
+   * 替换整份策略。正文是**整份文档** —— `tools` 与 `audit` —— 因为那条面收的就是它；运行时**不提供**
+   * 局部写，故页面也不该在这里发明一个。
+   */
+  write: (body: { tools: Record<string, ToolPolicyOverride>; audit: { granularity: string } }) =>
+    runtime.put<GovernancePolicy>('/ai/governance/policy', body).then((r) => r.data),
+}

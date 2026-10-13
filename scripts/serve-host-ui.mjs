@@ -54,7 +54,7 @@ const backend = new URL(BACKEND)
 // and KeelBase's root-mounted surface (`/app`, `/ai`, `/audit`) as a regex.
 // 哪些路径转给接口，与 deploy/demo-ecs/admin-nginx.conf 保持一致：两条字面前缀，加上 KeelBase 挂在根
 // 路径上的面（`/app`、`/ai`、`/audit`）用正则匹配。
-const API_PREFIXES = ['/admin-api/', '/app-api/']
+const API_PREFIXES = ['/admin-api/', '/app-api/', '/druid/']
 // `/app/` and `/audit/` have no page in this app, so a prefix is enough for them. `/ai/` is not so
 // simple: the AI module's own pages live at `/ai/chat`, `/ai/image`, `/ai/console/…` as well, so a
 // bare `/ai/` prefix answers those with the backend's JSON and the page looks broken rather than
@@ -65,7 +65,7 @@ const API_PREFIXES = ['/admin-api/', '/app-api/']
 // **坏掉**而不是**走错路由**。这里只列运行时自己的路径；`/ai/chat` 既是页面（GET）又是运行时端点
 // （POST），这一个由方法决定。
 const API_ROOT_RE = /^\/(app|audit)\//
-const AI_RUNTIME_RE = /^\/ai\/(task|chat\/stream|conversations|confirmations|my\/confirmations|tool-effects|tools|security-showcase)(\/|$)/
+const AI_RUNTIME_RE = /^\/ai\/(task|chat\/stream|conversations|confirmations|my\/confirmations|tool-effects|tools|governance|security-showcase)(\/|$)/
 const isApiPath = (p, method = 'GET') =>
   API_PREFIXES.some((prefix) => p.startsWith(prefix)) ||
   API_ROOT_RE.test(p) ||

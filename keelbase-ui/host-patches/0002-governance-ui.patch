@@ -1,8 +1,8 @@
 diff --git a/src/locales/en.ts b/src/locales/en.ts
-index 96269a8..a1909a5 100644
+index 96269a8..07e7fd9 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,185 @@
+@@ -1,4 +1,205 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -116,6 +116,26 @@ index 96269a8..a1909a5 100644
 +      ok: 'Succeeded',
 +      failed: 'Failed',
 +    },
++    policy: {
++      title: 'Policy center',
++      save: 'Save',
++      saved: 'Policy saved',
++      saveFailed: 'The policy did not save',
++      note:
++        'An override is a narrow document: a tool’s gate, whether it is enabled, and who may call it — that is all this runtime validates, and it refuses anything else rather than storing it. Saving replaces the whole policy, so an override this page does not draw is carried back unchanged. “Reset” removes a tool’s override; it is not the same as setting it to the default.',
++      granularity: 'Audit granularity',
++      granularityAll: 'All',
++      granularityWrite: 'Writes only',
++      granularityOff: 'Off',
++      colEnabled: 'Enabled',
++      colReset: '',
++      useDefault: 'Default',
++      overrideTag: 'override',
++      resetRow: 'Reset',
++      roleAdmin: 'Administrator',
++      roleUser: 'User',
++      revision: 'revision {r}',
++    },
 +    vocab: {
 +      action: {
 +        chat: 'Conversation',
@@ -189,10 +209,10 @@ index 96269a8..a1909a5 100644
      inputText: 'Please input',
      selectText: 'Please select',
 diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
-index 35f1e1a..f913966 100644
+index 35f1e1a..6f57241 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,185 @@
+@@ -1,4 +1,205 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -305,6 +325,26 @@ index 35f1e1a..f913966 100644
 +      colSource: '来源',
 +      ok: '成功',
 +      failed: '失败',
++    },
++    policy: {
++      title: '策略中心',
++      save: '保存',
++      saved: '策略已保存',
++      saveFailed: '策略没有保存进去',
++      note:
++        '一条覆盖是一份**很窄**的文档：某个工具的闸、它是否启用、以及谁可以调它 —— 这就是本运行时**校验的全部**，其余它**拒绝**而不是存下来。保存替换的是**整份**策略，故本页不画的那条覆盖会**原样带回去**。「恢复」是把该工具的覆盖**整条删掉**，与「设成默认值」不是一回事。',
++      granularity: '审计粒度',
++      granularityAll: '全部',
++      granularityWrite: '仅写',
++      granularityOff: '关闭',
++      colEnabled: '启用',
++      colReset: '',
++      useDefault: '用默认',
++      overrideTag: '覆盖',
++      resetRow: '恢复',
++      roleAdmin: '管理员',
++      roleUser: '普通用户',
++      revision: '版本 {r}',
 +    },
 +    vocab: {
 +      action: {

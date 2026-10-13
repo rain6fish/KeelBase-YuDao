@@ -190,6 +190,7 @@ public final class SpecCodegen {
             "sql/keelbase-tool-inventory-menu.sql",
             "sql/keelbase-trace-menu.sql",
             "sql/keelbase-operation-audit-menu.sql",
+            "sql/keelbase-policy-menu.sql",
             "sql/keelbase-file-storage.sql");
 
     private SpecCodegen() {
