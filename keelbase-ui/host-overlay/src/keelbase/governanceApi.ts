@@ -276,9 +276,11 @@ export const effectApi = {
  * the page says that out loud rather than presenting it as an identifier.
  *
  * This reaches the host's admin API — `/admin-api/system/operate-log/page` — through the runtime
- * client, which already carries the host's token and tenant and unwraps the host's envelope. Its
- * permission is YuDao's own `system:operate-log:query`, so a non-admin is refused by the server and
- * this page shows that rather than deciding it.
+ * client, which already carries the host's token and tenant and unwraps the host's envelope. Who may
+ * read it is the host's decision, not this console's: the endpoint is guarded by YuDao's own
+ * `system:operate-log:query`, and that permission is not admin-only here — this deployment grants it
+ * to the `common` role — so the leg's scope is the host's own. A refusal is shown as it comes rather
+ * than being decided here.
  *
  * 宿主自己的操作日志，按一个业务对象取（`YD-T18` / `D50`）。
  *
@@ -290,8 +292,9 @@ export const effectApi = {
  * 根本**不带用户** —— 所以这是「对象 id + 时间」的**相关**，页面把这句话说出来，而不是把它摆成一个标识符。
  *
  * 它经**运行时客户端**够到宿主的 admin API（`/admin-api/system/operate-log/page`）—— 那个客户端本已带着宿主的
- * token 与租户、并拆宿主的信封。权限是芋道自己的 `system:operate-log:query`，故非管理员由**服务端**拒，本页
- * 显示这件事、而不是自己判。
+ * token 与租户、并拆宿主的信封。**谁能读是宿主的决定、不是这个控制台的**：那个端点由芋道自己的
+ * `system:operate-log:query` 守着，而该权限在本部署**不是管理员专属** —— 它授给了 `common` 角色 —— 故这一腿的
+ * 范围就是**宿主自己的**。被拒就照原样显示，而不是在这里判。
  */
 const BUSINESS_LOG_TYPE: Record<string, string> = {
   // The runtime names a module its own way; the host names it in Chinese. One side has to translate,

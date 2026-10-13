@@ -86,13 +86,14 @@
         The business leg (YD-T18 / D50). An AI write leaves a row here and a row in YuDao's own
         operate log, and both carry the same business object id — so the second is shown beside the
         first. It is labelled a correlation and not a link: nothing writes a shared id, every traceId
-        in that log is empty, and the AI-caused row carries no user at all. A non-admin is refused by
-        the host's own permission, and the refusal is what this shows.
+        in that log is empty, and the AI-caused row carries no user at all. Whether a caller may read
+        it is the host's own decision — this host grants `system:operate-log:query` to its `common`
+        role — so the leg's scope is the host's, and a refusal is shown as it comes.
 
         业务那一腿（`YD-T18` / `D50`）。一次 AI 写在这边留一行、在芋道自己的操作日志里也留一行，两者握着
         同一个业务对象 id —— 故把第二行摆在第一行旁边。它被标成**相关**、不是链接：没有任何东西写共享 id，
-        那张日志里每个 traceId 都是空的，而 AI 引起的那行根本不带用户。非管理员由宿主自己的权限拒掉，这里
-        显示的就是那次拒绝。
+        那张日志里每个 traceId 都是空的，而 AI 引起的那行根本不带用户。**谁能读是宿主的决定** —— 本宿主把
+        `system:operate-log:query` 授给了 `common` 角色 —— 故这一腿的范围是**宿主自己的**，被拒就照原样显示。
       -->
       <el-table-column type="expand" width="44">
         <template #default="{ row }">
