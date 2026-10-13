@@ -107,24 +107,20 @@ check('工具报出', 'navigate_console_page', (answer.toolCalls || [])[0]);
 
 // ── 2) the same phrase on the streaming channel ───────────────────────────────────────────────────
 //
-// On `/ai/chat/stream` rather than its administrator sibling, and the reason is a finding about this
-// host rather than a preference: `/admin/ai/chat/stream` answers 500 here, before the turn is built.
-// Upstream's access-log interceptor reads the request body in its non-production branch, and the
-// administrator path reaches the endpoint without a wrapper that would let it be read twice, so
-// Spring's @RequestBody resolver is left with a stream somebody else has closed
-// (`getReader() has already been called`). That is a host-running-in-dev defect that predates this
-// change and belongs on this line's list; `/ai/**` is wrapped and reads fine. Both paths run the same
-// turn (the runtime's `ChatStreamController.open`), so the event sequence asserted here is the one the
-// console would see once that is fixed.
+// On `/admin/ai/chat/stream` — the console's own administrator channel. This gate was once forced onto
+// its sibling `/ai/chat/stream`, because the admin one answered a 500-carrying-200 here (`YD-17`:
+// upstream's access-log interceptor reads the request body in its non-production branch, and the admin
+// path had no wrapper letting it be read twice, so Spring's @RequestBody resolver met an already-closed
+// stream). That is fixed on this host, so the gate is back on the path the console actually uses; both
+// paths run the same turn (the runtime's `ChatStreamController.open`).
 //
-// 走 `/ai/chat/stream`、不走它那个管理员兄弟，理由**是关于本宿主的一条发现**、不是偏好：`/admin/ai/chat/stream`
-// 在这里答 500，且**在回合被构造之前**。上游的访问日志拦截器在**非生产**分支里读走请求体，而管理员那条路到达端点时
-// **没有一层能让它被读两次**的包装，于是 Spring 的 `@RequestBody` 解析器拿到的是一个**已被别人关掉**的流
-// （`getReader() has already been called`）。那是**宿主跑在开发模式**下的缺陷，早于本次改动，该记在本线的清单上；
-// `/ai/**` 有包装、读得动。两条路跑的是**同一个回合**（运行时的 `ChatStreamController.open`），故这里断言的
-// 事件序，就是那条修好之后控制台会看到的那个。
+// 走 `/admin/ai/chat/stream` —— 控制台**自己的**管理员通道。本门禁**曾**被迫改走它的兄弟 `/ai/chat/stream`，
+// 因为管理员那条在这里答出「包着 500 的 200」（`YD-17`：上游的访问日志拦截器在**非生产**分支里读走请求体，
+// 而管理员那条路**没有一层能让它被读两次**的包装，于是 Spring 的 `@RequestBody` 解析器碰到一个**已被关掉**的流）。
+// **本宿主上已修好**，故门禁**回到了控制台真正在用的那条**；两条路跑的是**同一个回合**（运行时的
+// `ChatStreamController.open`）。
 console.log('== 流式：打开用户管理 ==');
-const streamed = await stream(admin, '/ai/chat/stream', '打开用户管理');
+const streamed = await stream(admin, '/admin/ai/chat/stream', '打开用户管理');
 check('流打开', 200, streamed.status);
 check('事件序', 'tool_start,text,navigate,tool_end,done', types(streamed.events).join(','));
 check('navigate 事件带的是那条路径', '/system/user', (eventOf(streamed.events, 'navigate') || {}).route);
