@@ -129,6 +129,40 @@ export const confirmationApi = {
     runtime.post(`/ai/my/confirmations/${encodeURIComponent(token)}/decide`, { decision }).then((r) => r.data),
 }
 
+/**
+ * The adversarial demonstration. It is a runtime-specific exhibit — no wire object, not in replay
+ * scope — so nothing about it is promised by the contract, and it is read here the same way any
+ * other route of this deployment's is.
+ *
+ * 对抗性演示。它是 runtime-specific 的展示物——无 wire 对象、不在 replay 范围——故契约对它不作任何
+ * 承诺，这里读它的方式与读本部署别的路由一样。
+ */
+export interface ShowcaseScenario {
+  id: string
+  category: string
+  /** What the scenario actually exercises, so a reader can tell what a result did and did not prove. */
+  /** 这条场景**实际**驱动什么——好让读者分得清一个结果证明了什么、没证明什么。 */
+  drives: string
+  expect: string
+}
+
+export interface ShowcaseResult {
+  id: string
+  /** What the console shows. */
+  /** 控制台显示的那个。 */
+  outcome: string
+  /** The runtime's own word for the same event; null when the call never reached the engine. */
+  /** 运行时对同一件事自己的叫法；这次调用根本没到引擎时为 null。 */
+  engine: string | null
+  detail: string
+}
+
+export const showcaseApi = {
+  scenarios: () => runtime.get<ShowcaseScenario[]>('/ai/security-showcase/scenarios').then((r) => r.data),
+  run: (id: string) =>
+    runtime.post<ShowcaseResult>(`/ai/security-showcase/run/${encodeURIComponent(id)}`).then((r) => r.data),
+}
+
 export const effectApi = {
   /**
    * The ledger. Its scope is the caller's, decided by the server: a non-manager sees their own rows

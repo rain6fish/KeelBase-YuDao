@@ -65,7 +65,7 @@ const API_PREFIXES = ['/admin-api/', '/app-api/']
 // **坏掉**而不是**走错路由**。这里只列运行时自己的路径；`/ai/chat` 既是页面（GET）又是运行时端点
 // （POST），这一个由方法决定。
 const API_ROOT_RE = /^\/(app|audit)\//
-const AI_RUNTIME_RE = /^\/ai\/(task|chat\/stream|confirmations|my\/confirmations|tool-effects|tools)(\/|$)/
+const AI_RUNTIME_RE = /^\/ai\/(task|chat\/stream|confirmations|my\/confirmations|tool-effects|tools|security-showcase)(\/|$)/
 const isApiPath = (p, method = 'GET') =>
   API_PREFIXES.some((prefix) => p.startsWith(prefix)) ||
   API_ROOT_RE.test(p) ||
