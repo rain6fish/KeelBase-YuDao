@@ -29,6 +29,15 @@
 # 它是**我们自己的文件**、不是上游 `application.yaml` 里的一行，理由是本线赖以运行的那一条：上游的文件保持
 # 一字未动，部署自己的设置住在部署自己的文件里。`scripts/run-server.sh` 激活该 profile，别的什么都不必知道。
 keelbase:
+  # 控制台助手的**常驻 agent** —— `sql/keelbase-assistant-agent.sql` 建的那一条（id 9001）。右侧抽屉据此
+  # 知道跟谁说话；**没配时它如实说「未配置」**，而不是画一个空选择器。改模型 / 改提示词改的是那份种子，
+  # 不是这里。
+  #
+  # The console assistant's **standing agent** — the one `sql/keelbase-assistant-agent.sql` creates (id
+  # 9001). The drawer uses it to know who to talk to; **unset, the drawer says so** rather than drawing an
+  # empty picker. Changing the model or the prompt means editing that seed, not this line.
+  assistant:
+    agent-id: 9001
   app:
     preset: full
     features:

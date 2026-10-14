@@ -244,6 +244,15 @@ if (chainReady) {
   const answer = await api('/keelbase/assistant/agent', { token: admin });
   check('助手 agent 那条面答得出形状（configured + agentId）', true,
     answer.code === 0 && answer.data?.configured !== undefined && 'agentId' in answer.data);
+
+  // The deployment's standing assistant itself: the seed's agent exists, is enabled, and carries a prompt.
+  // Without it the drawer opens configured-but-empty, which is the state `YD-30 ③` came from — the gate
+  // asserts the seed is in place, not what the model says (that part is not a gate's business).
+  // 部署方那条**种子**本身：常驻 agent 在、是启用的、且带着提示词。没有它，抽屉打开就是「配了但空着」
+  // —— 那正是 `YD-30 ③` 来时的状态。这里断言的是**种子在不在**，不是模型说了什么（那件事不该由门禁判）。
+  const seeded = Number(psql("select count(*) from ai1_agent where id = 9001 and status = 0"
+    + " and coalesce(system_prompt, '') <> '' and deleted = 0"));
+  check('部署方的常驻助手在、启用、且带提示词（`sql/keelbase-assistant-agent.sql`）', true, seeded > 0);
 }
 
 // ── 6) the ordinary caller: `YD-30 ①`'s judgement ─────────────────────────────────────────────────
