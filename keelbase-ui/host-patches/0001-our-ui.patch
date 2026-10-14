@@ -359,7 +359,24 @@ index 23f8a3a..38a291a 100644
  }
  
  export default defineComponent({
-@@ -121,14 +125,17 @@ export default defineComponent({
+@@ -95,6 +99,16 @@ export default defineComponent({
+         ) : undefined}
+         <div class="h-full flex items-center">
+           <FmsAccountSetSwitch />
++          {/* 全局 AI 助手入口。不挂在 `im` 那个开关上：它守的是即时通讯，而这里已经不是那个入口了。
++              图标用 `ri:robot-2-line`（线描机器人）：这一排本来就是线描图标，而原来的 `tabler:ai` 是一个
++              18px 的细「AI」字形，混在里面几乎看不见。侧边栏那条菜单跟它取同一个图标。 */}
++          {/* The global assistant entry. It is not hung off the `im` switch: that one guards instant
++              messaging, and this is no longer that entry. The icon is a solid robot because the rest of
++              this strip was already line icons, and the old `tabler:ai` was a thin 18px "AI" glyph that was
++              close to invisible among them. The sidebar menu row takes the same icon. */}
++          <div class="custom-hover" onClick={goToAssistant}>
++            <Icon color="var(--top-header-text-color)" size={20} icon="ri:robot-2-line" />
++          </div>
+           {hasTenantVisitPermission.value ? <TenantVisit /> : undefined}
+           <div
+             class="v-setting custom-hover"
+@@ -121,14 +135,12 @@ export default defineComponent({
            {message.value ? (
              <Message class="custom-hover" color="var(--top-header-text-color)"></Message>
            ) : undefined}
@@ -369,11 +386,6 @@ index 23f8a3a..38a291a 100644
 -              <Icon color="var(--top-header-text-color)" size={18} icon="ep:chat-dot-round" />
 -            </div>
 -          ) : undefined}
-+          {/* 全局 AI 助手入口。不挂在 `im` 那个开关上：它守的是即时通讯，而这里已经不是那个入口了。
-+              图标用 AI 那一组自己的。 */}
-+          <div class="custom-hover" onClick={goToAssistant}>
-+            <Icon color="var(--top-header-text-color)" size={18} icon="tabler:ai" />
-+          </div>
            <UserInfo></UserInfo>
          </div>
 +        {/* 助手抽屉。它渲染到 body，故放在这里只是**挂载**、不决定位置。 */}

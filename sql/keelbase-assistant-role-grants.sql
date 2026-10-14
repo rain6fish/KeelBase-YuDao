@@ -46,7 +46,7 @@
 -- 1) The parent: a hidden "AI 助手" whose page is the panel the drawer draws.
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name,
                          status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
-SELECT 20010, 'AI 助手', '', 2, 90, 0, '/ai-assistant', 'tabler:ai', 'keelbase/assistant/AssistantPanel', 'KeelbaseAssistantPanel',
+SELECT 20010, 'AI 助手', '', 2, 90, 0, '/ai-assistant', 'ri:robot-2-line', 'keelbase/assistant/AssistantPanel', 'KeelbaseAssistantPanel',
        0, '0', '1', '1', 'keelbase', now(), 'keelbase', now(), '0'
 WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE path = '/ai-assistant' AND deleted = 0);
 

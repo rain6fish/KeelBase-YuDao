@@ -22,3 +22,11 @@ UPDATE system_tenant SET name = 'KeelBase' WHERE name = '芋道源码';
 -- The seeded administrator's display name, shown in the top bar and in the greeting.
 -- 内置管理员的显示名，出现在顶栏与首页问候语里。
 UPDATE system_users SET nickname = 'KeelBase' WHERE username = 'admin' AND nickname = '芋道源码';
+
+-- 侧边栏那条 AI 分组菜单带的是厂商自己的「AI」标记，本部署显示机器人——与顶栏的助手入口同一个图标。
+-- The AI group in the sidebar carries the vendor's own "AI" mark; this deployment shows the robot, the
+-- same icon the header's assistant entry uses.
+-- 按旧值匹配：跑第二次时已经没有行可命中，幂等；一条语句同时盖住所有仍用旧图标的菜单行。
+-- Matched on the old value, so a second run finds nothing to change; one statement covers every menu
+-- row still carrying the old icon.
+UPDATE system_menu SET icon = 'ri:robot-2-line' WHERE icon = 'tabler:ai' AND deleted = 0;

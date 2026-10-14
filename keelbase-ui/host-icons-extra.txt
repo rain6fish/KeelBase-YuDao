@@ -13,4 +13,5 @@ fa6-solid:brush
 foundation:page-edit
 simple-icons:civicrm
 simple-icons:erpnext
+ri:robot-2-line
 tabler:ai
