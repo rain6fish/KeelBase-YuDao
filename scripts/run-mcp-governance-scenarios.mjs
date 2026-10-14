@@ -12,11 +12,13 @@
 // things a governed multi-step run has to leave behind: the probe's own log of what it was called
 // with, and the audit's account of who asked. Everything it creates, it removes again.
 //
-// **Where the model comes from changed, and this gate changed with it.** The chain used to name an
-// `ai1` provider and an `ai1` model row; this deployment's models now live on the console's model page
-// (`ai_api_key` + `ai_model`), which is what `YudaoAi1ChatModelResolver` answers from — so those are
-// the two rows built here. An agent pointing at an `ai1` model row is refused now, by that resolver,
-// with upstream's own `模型不存在!`.
+// **It builds the chain on `ai1`'s own rows, and it has now been there twice.** This line first pointed
+// at an `ai1` provider and an `ai1` model; it was moved to the console's model page (`ai_api_key` +
+// `ai_model`) while the built-in AI module answered the agent's model question, and `D52 ③` put that
+// question back on `ai1`'s own catalogue — so it points at `ai1` again. Note the cost of getting this
+// wrong, because it is silent in the other direction: an agent naming a row from the wrong catalogue is
+// refused at `create`, and the gate fails at its *setup* with `供应商不存在` rather than in anything it
+// meant to assert.
 //
 // The model key is read from `D:\Rain6fish\.secrets\spring-ai.env` and never printed.
 //
@@ -29,9 +31,11 @@
 // 请模型做**两件**事，然后查一次受治理的多步运行**必须留下**的两样：探针自己记下的「被调用成什么样」，以及
 // 审计记下的「谁在问」。**它建的每一样，跑完都拆掉。**
 //
-// **模型从哪来变了，这道门禁跟着变了。** 链路过去点的是一行 `ai1` 的 provider 与一行 `ai1` 的 model；而本部署的
-// 模型现在住在控制台的模型页上（`ai_api_key` + `ai_model`）——`YudaoAi1ChatModelResolver` 正是从那里回答的
-// ——故这里建的是那两行。一个指着 `ai1` 模型行的 agent 现在会被那个解析器拒掉，用的是上游自己的 `模型不存在!`。
+// **它建链建在 `ai1` 自己的行上，而这件事已经来回过两次。** 本线最早点的是一行 `ai1` 的 provider 与一行
+// `ai1` 的 model；在「内置 AI 模块回答 agent 的模型问题」那段时间，它被移到控制台的模型页（`ai_api_key` +
+// `ai_model`）上；而 `D52 ③` 把那个问题放回了 `ai1` 自己的目录 —— 于是它又指向 `ai1`。**点错的代价值得看一眼，
+// 因为反方向是静默的**：一个点着**另一个目录**的行的 agent 在 `create` 就被拒，门禁于是**在它的前置上**
+// 失败（`供应商不存在`），而不是在它要断言的任何一件事上。
 //
 // 模型 key 读自 `D:\Rain6fish\.secrets\spring-ai.env`，**从不打印**。
 import { execFileSync, spawn } from 'node:child_process';
@@ -155,20 +159,22 @@ ok('admin 登录');
 // ── 2) the chain, through the host's own APIs ─────────────────────────────────────────────────────
 console.log('== 前置 · 链路（经宿主自己的 API 建）==');
 const marker = `gate-${Date.now()}`;
-let keyId; let modelId; let mcpId; let agentId; let sessionId;
+let providerId; let modelId; let mcpId; let agentId; let sessionId;
 try {
-  // The console's model page writes exactly these two rows, and this is that page's own API.
-  // 控制台的模型页写下的正是这两行，而这里用的就是那个页面自己的 API。
-  keyId = postJson('/ai/api-key/create', admin,
-    { name: `gate-${marker}`, platform: 'DeepSeek', apiKey: KEY, url: 'https://api.deepseek.com', status: 0 });
-  modelId = postJson('/ai/model/create', admin,
-    { keyId, name: `gate-${marker}`, model: MODEL, platform: 'DeepSeek', type: 1, sort: 0, status: 0 });
+  // The chain is built on `ai1`'s **own** rows: `D52 ③` put the agent module's model back on its own
+  // catalogue, so an agent naming a row from anywhere else is refused — measured, `供应商不存在`.
+  // 链路建在 `ai1` **自己的**行上：`D52 ③` 把 agent 模块的模型放回了它自己的目录，故一个点着别处行的 agent
+  // 会被拒 —— 实测 `供应商不存在`。
+  providerId = postJson('/ai1/provider/create', admin,
+    { name: `probe-${marker}`, baseUrl: 'https://api.deepseek.com', apiKey: KEY, status: 0 });
+  modelId = postJson('/ai1/model/create', admin,
+    { providerId, name: `probe-${marker}`, model: MODEL, type: 0, status: 0 });
   mcpId = postJson('/ai1/mcp/create', admin,
     { name: `probe-${marker}`, transport: 'http', url: `http://127.0.0.1:${PORT}/mcp`, status: 0 });
   agentId = postJson('/ai1/agent/create', admin, {
     name: `probe-${marker}`,
     introduction: 'D32 门禁探针',
-    providerId: keyId,
+    providerId,
     modelId,
     systemPrompt: '你是一个只会照做的助手。用户让你用工具，你就按他说的顺序把工具用掉，不要多问。',
     knowledgeBaseIds: [],
@@ -244,8 +250,8 @@ const cleanup = [
   sessionId && `delete from ai1_session where id = ${sessionId}`,
   agentId && `delete from ai1_agent where id = ${agentId}`,
   mcpId && `delete from ai1_mcp where id = ${mcpId}`,
-  modelId && `delete from ai_model where id = ${modelId}`,
-  keyId && `delete from ai_api_key where id = ${keyId}`
+  modelId && `delete from ai1_model where id = ${modelId}`,
+  providerId && `delete from ai1_provider where id = ${providerId}`
 ].filter(Boolean).join('; ');
 try {
   psql(cleanup);
