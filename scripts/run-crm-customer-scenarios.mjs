@@ -51,13 +51,44 @@ const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 const psql = (sql) =>
   execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
 
+// One request, retried **once** when the host answers its transient 500.
+//
+// The host can fail the first request that follows a write. Measured on 2026-10-14: a
+// `permission/assign-user-role` followed immediately by a login answers `{"code":500}`, and **the same
+// request sent again** answers `{"code":0}`. Underneath it is a PostgreSQL statement, already closed,
+// being handed back out of the connection pool — the deployment's problem, and recorded as such — but a
+// gate that is red for it is a gate nobody can read, and every gate here logs in right after assigning
+// somebody a role.
+//
+// Only `500`, only once, and it says so: a business refusal is not retried (a wrong password answers a
+// code of its own and still fails on the first try), and the note is printed rather than swallowed — so
+// the day this stops happening it shows up as a line nobody sees any more, rather than as a rule nobody
+// remembers writing.
+//
+// 一次请求；宿主答它那个瞬时 500 时**重试一次**。
+//
+// 这台宿主会弄砸**紧跟一次写之后的第一个**请求。2026-10-14 实测：`permission/assign-user-role` 之后立刻登录
+// 答 `{"code":500}`，而**同一个请求再发一次**答 `{"code":0}`。底下是一条**已被关闭**的 PostgreSQL statement
+// 从连接池里被重新借出 —— 那是**部署方**的问题、也按部署问题记了账 —— 但一道因它而红的门禁是**没人读得懂**的门禁，
+// 而这里每一道门禁都在给某人授了权之后立刻登录。
+//
+// **只对 500、只试一次，而且说出来**：业务性拒绝不重试（密码错会答它自己的码、第一次就照样失败），而那一行是
+// **打印**出来的、不是吞掉的 —— 于是等这个瞬时故障不再发生时，它表现为**一行再也看不到的提示**，而不是一条没人
+// 记得写过的规则。
 async function api(path, { method = 'GET', token, body } = {}) {
-  const res = await fetch(`${HOST}/admin-api${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', 'tenant-id': TENANT, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {})
-  });
-  return res.json();
+  for (let attempt = 1; ; attempt += 1) {
+    const res = await fetch(`${HOST}/admin-api${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'tenant-id': TENANT, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    const json = await res.json();
+    if (json.code !== 500 || attempt > 1) {
+      return json;
+    }
+    console.log(`  note  ${path} 第一次答 500 —— 宿主的瞬时故障，重试一次`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
 }
 
 async function login(username, password) {
