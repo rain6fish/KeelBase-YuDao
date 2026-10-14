@@ -48,6 +48,7 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-crm.sql"
   "$REPO_ROOT/sql/keelbase-products.sql"
   "$REPO_ROOT/sql/keelbase-ai1.sql"
+  "$REPO_ROOT/sql/keelbase-assistant-role-grants.sql"
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
   "$REPO_ROOT/sql/keelbase-local-images.sql"

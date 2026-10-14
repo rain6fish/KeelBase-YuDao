@@ -99,6 +99,33 @@ async function login(username, password) {
   return r.data.accessToken;
 }
 
+/**
+ * 一个**普通调用方**：本部署的 `common` 角色、不是管理员。同名用户复用，没有就建一个（与兄弟门禁同一手法）。
+ * **注意**：给角色授权**之后紧接着**的那次登录会撞上宿主的瞬时 500 —— `api()` 已经为此重试一次。
+ *
+ * One **ordinary** caller: this deployment's `common` role, not an administrator. Reuses the same user,
+ * creating it if absent (the sibling gates' own approach). Note the login **immediately after** a role
+ * assignment hits the host's transient 500 — `api()` already retries that once.
+ */
+async function ensureOrdinaryCaller(adminToken) {
+  const existing = psql("select id from system_users where username = 'gatesales' and deleted = 0 limit 1");
+  let id = existing ? Number(existing) : null;
+  if (!id) {
+    const created = await api('/system/user/create', {
+      method: 'POST',
+      token: adminToken,
+      body: { username: 'gatesales', nickname: 'gatesales', password: 'gate-pass-1234', deptId: 100, postIds: [] }
+    });
+    if (created.code !== 0) throw new Error(`create ordinary user -> ${created.code}: ${created.msg}`);
+    id = created.data;
+  }
+  const roleId = psql("select id from system_role where code = 'common' and deleted = 0 limit 1");
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: adminToken, body: { userId: Number(id), roleIds: [Number(roleId)] }
+  });
+  return { id, username: 'gatesales', password: 'gate-pass-1234' };
+}
+
 // ── 0) the stack and the key ──────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 check('宿主在跑（/app/capabilities 200）', 200, await fetch(`${HOST}/app/capabilities`).then((r) => r.status).catch(() => 0));
@@ -219,25 +246,63 @@ if (chainReady) {
     answer.code === 0 && answer.data?.configured !== undefined && 'agentId' in answer.data);
 }
 
-// Named rather than implied: the drawer is meant for an **ordinary** caller, and every `ai1` route it
-// calls is behind `ai1:*` permissions that only a super administrator holds while this deployment ships no
-// `ai1` menus at all. So this line says which way that stands today; it is not an assertion, because the
-// decision it belongs to has not been taken.
-// 点名而不暗示：抽屉是打算给**普通调用方**用的，而它调用的每一条 `ai1` 路由都挡在 `ai1:*` 权限后面，而本部署
-// **根本没有发布 ai1 的菜单**，故只有超管持有它们。这一行说的是今天站在哪一边；它不是断言，因为它所属的那个
-// 决定还没有做。
+// ── 6) the ordinary caller: `YD-30 ①`'s judgement ─────────────────────────────────────────────────
+// The drawer is for an **ordinary** caller, and every `ai1` route it calls is behind `ai1:session:my`.
+// This block is that item's judgement, in its own words: an ordinary caller can open the drawer, start a
+// session, and send a message. `sql/keelbase-assistant-role-grants.sql` is what makes the permission
+// exist at all (the module ships no menus), so the first check here is that the grant is in place.
+// 普通调用方那一块 —— `YD-30 ①` 的判据：「普通调用方能开抽屉、能建会话、能发消息」。
+// 抽屉调的每条 `ai1` 路由都挡在 `ai1:session:my` 后面，而那条权限要 `sql/keelbase-assistant-role-grants.sql`
+// 才存在（模块不带菜单），故这里第一条断言就是那份授予在不在。
+console.log('== 普通调用方 · 抽屉的另一半用户 ==');
+let ordinarySessionId;
 if (chainReady) {
-  const ordinary = Number(psql("select count(*) from system_role_menu rm join system_menu m on m.id = rm.menu_id"
-    + " where rm.role_id = 2 and m.permission = 'ai1:session:my'"));
-  console.log(`  note  普通角色（role 2）持有 ai1:session:my 的菜单行数 = ${ordinary}`
-    + `（0 ⇒ 抽屉今天只有管理员用得了）`);
+  const granted = Number(psql("select count(*) from system_role_menu rm join system_menu m on m.id = rm.menu_id"
+    + " where rm.role_id = 2 and m.permission = 'ai1:session:my' and rm.deleted = 0"));
+  check('普通角色（role 2）持有 ai1:session:my', true, granted > 0);
+
+  const ordinary = await ensureOrdinaryCaller(admin);
+  const token = await login(ordinary.username, ordinary.password);
+  const theirs = await api(`/ai1/session/my-list?agentId=${agentId}`, { token });
+  check('普通调用方读得到自己的会话', 0, theirs.code);
+
+  const created = await api('/ai1/session/create-my', { method: 'POST', token, body: { agentId } });
+  check('普通调用方能建会话', 0, created.code);
+  ordinarySessionId = created.data;
+
+  if (ordinarySessionId) {
+    writeFileSync(SEND_FILE, JSON.stringify({ sessionId: ordinarySessionId, content: '请列出我的客户' }));
+    const streamed = execFileSync('curl', ['-s', '-N', '--max-time', '180', '-X', 'POST',
+      `${API}/ai1/session/message/send-stream`, '-H', 'Content-Type: application/json',
+      '-H', `tenant-id: ${TENANT}`, '-H', `Authorization: Bearer ${token}`, '--data-binary', `@${SEND_FILE}`],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    check('普通调用方发得出消息（流里有 message）', true, /event:\s*message/.test(streamed));
+    check('那一条流以 done 收尾', true, /event:\s*done/.test(streamed));
+
+    const mineRows = Number(psql(`select count(*) from ai_audit_logs where conversation_id = '${ordinarySessionId}'`
+      + ` and user_id = '${ordinary.id}'`));
+    check('那次调用记在普通调用方名下、且带着他的会话号', true, mineRows > 0);
+
+    // 两张卡对普通调用方也要可用——它们读的是**运行时**按调用方限范围的那两条面。
+    // Both cards must work for an ordinary caller too: they read the runtime's caller-scoped routes.
+    const effects = await fetch(`${HOST}/ai/tool-effects?page=1&limit=5`, {
+      headers: { Authorization: `Bearer ${token}`, 'tenant-id': TENANT }
+    }).then((r) => r.json()).catch(() => null);
+    check('工具卡对普通调用方可用', true, Array.isArray(effects?.data?.items));
+    const waiting = await fetch(`${HOST}/ai/my/confirmations`, {
+      headers: { Authorization: `Bearer ${token}`, 'tenant-id': TENANT }
+    }).then((r) => r.json()).catch(() => null);
+    check('确认卡对普通调用方可用', true, Array.isArray(waiting?.data));
+  }
 }
 
-// ── 6) put the scene back ─────────────────────────────────────────────────────────────────────────
+// ── 7) put the scene back ─────────────────────────────────────────────────────────────────────────
 console.log('== 收尾 ==');
 const cleanup = [
   `delete from confirmation_requests where tool_name = 'create_crm_customer' and args_json like '%${customer}%'`,
   `delete from ${CRM_TABLE} where name = '${customer}'`,
+  ordinarySessionId && `delete from ai1_session_message where session_id = ${ordinarySessionId}`,
+  ordinarySessionId && `delete from ai1_session where id = ${ordinarySessionId}`,
   sessionId && `delete from ai1_session_message where session_id = ${sessionId}`,
   sessionId && `delete from ai1_session where id = ${sessionId}`,
   agentId && `delete from ai1_agent where id = ${agentId}`,
