@@ -44,7 +44,26 @@ public interface Ai1LocalToolProvider {
     /**
      * The tools this agent's session gets, on top of the MCP and SKILL ones.
      *
-     * 这个 agent 的会话除 MCP 与 SKILL 之外还拿到的工具。
+     * <p><b>The session is named, not just the agent, and that is what makes a call attributable.</b>
+     * An implementation that governs its tools writes one row per call — a host's own audit, an effect
+     * ledger — and "which turn asked for this" is a column those rows can carry only if the caller is
+     * told which turn this is. Without the id, every call an agent ever makes is equally unlinked, and
+     * a screen that means to show *this* conversation's calls has nothing to filter on. Passing it is
+     * therefore not bookkeeping: it is the difference between a per-turn view and a per-user one.
+     *
+     * <p>A provider that has no use for it may ignore it. It is here rather than added later because a
+     * seam that does not carry the turn cannot be read per turn at all, and adding a parameter to a
+     * published interface is the one change that cannot be made quietly.
+     *
+     * 这个 agent 的**会话**除 MCP 与 SKILL 之外还拿到的工具——点的是会话，不只是 agent。
+     *
+     * <p><b>点名会话、而不是只点名 agent，正是「一次调用可被归属」的来源。</b>一个治理自己那些工具的实现，会为每次
+     * 调用写下一行——宿主自己的审计、副作用账本——而「**哪一轮**提出了它」是那些行**只有在调用方被告知这是哪一轮**
+     * 时才带得上的列。没有这个 id，一个 agent 做过的每一次调用都一样地**没有归属**，而一个想显示**本会话**调用的
+     * 界面也就**无从筛起**。故传它不是记账：它是「**逐轮**的视图」与「逐用户的视图」之间的差别。
+     *
+     * <p>用不上的实现可以忽略它。它现在就在这里、而不是以后再加，是因为**一条不带轮次的缝根本无法逐轮读**，而给一个
+     * 已发布的接口加参数，恰恰是唯一一种**没法悄悄做**的改动。
      */
-    List<ToolCallback> buildTools(Ai1AgentDO agent);
+    List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId);
 }

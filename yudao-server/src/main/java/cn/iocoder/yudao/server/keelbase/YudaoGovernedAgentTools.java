@@ -43,6 +43,13 @@ import org.springframework.stereotype.Component;
  * engine, and every host-facing tool here publishes it for its host calls (see {@code ActingCaller}),
  * so the row scope downstream answers for the person who asked rather than for nobody.
  *
+ * <p><b>The turn is named too, so the rows say which one they belong to.</b> The engine takes the
+ * conversation the call was made in, and this passes the session id it was assembled under. It was
+ * left out at first — the short call, the one that records nothing — and the cost is named rather than
+ * implied: every row an agent wrote was equally unattributable, so no screen could ever show *this*
+ * conversation's calls. Stamp it and a reader that filters on the column gets the turn; do not, and the
+ * best any reader can do is "the caller's recent calls", which is a different, weaker question.
+ *
  * <p><b>A write does not run from here.</b> An R3 tool comes back as {@code pending_confirmation} with
  * a token — the engine's answer, not this class's — and the model is told so. Somebody approves it in
  * the console, which is where a person is looking; the model only carries the news.
@@ -61,6 +68,11 @@ import org.springframework.stereotype.Component;
  * <p><b>调用方在装配会话时被捕获，而不是在调用发生的地方。</b>装配发生在**知道是谁在问**的那次生成里；而模型驱动的
  * 工具循环跑在一条**可能从未有过调用方**的线程上。工具自己的身份以交给引擎的 {@link Principal} 到达，而这里每一个面向
  * 宿主的工具都会为它的宿主调用把它发布出去（见 `ActingCaller`），故下游的行范围回答的是**提问的那个人**、而不是没人。
+ *
+ * <p><b>轮次也被点名了，故那些行说得清自己属于哪一轮。</b>引擎收这次调用发生在哪条会话里，而这里传的是装配它时的那个
+ * 会话号。它起初是**被漏掉的**——用的短签名、什么都不记——而代价写明而不暗示：一个 agent 写下的每一行都一样地**无法归属**，
+ * 于是**没有任何界面**能显示**本会话**的调用。盖上它，按那一列筛的读者就拿到那一轮；不盖，任何读者能做到的最好程度是
+ * 「这个调用方最近的调用」——那是一个不同、也更弱的问题。
  *
  * <p><b>写操作不从这里跑。</b>一个 R3 工具会带着 token 以 `pending_confirmation` 回来——那是**引擎的**回答、不是本类的
  * ——而模型会被告知这一点。有人会在控制台里批准它，那正是人在看的地方；模型只负责把这个消息带回去。
@@ -105,9 +117,15 @@ public class YudaoGovernedAgentTools implements Ai1LocalToolProvider {
      * 因为这条缝是**模块的**，而真去收窄的部署会在这里读它。
      */
     @Override
-    public List<ToolCallback> buildTools(Ai1AgentDO agent) {
+    public List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId) {
         Long caller = SecurityFrameworkUtils.getLoginUserId();
-        return tools.all().stream().map(tool -> callback(tool, caller)).toList();
+        // The turn this run belongs to, as the engine's own column spells it. The session id is a
+        // number here and a string there, and that is the whole translation — what it means on a row
+        // is "this call was made inside session N", which is what makes a per-turn view possible.
+        // 这一轮所属的会话，按引擎自己那一列的叫法。会话号在这边是数字、在那边是字符串，而这就是全部翻译——它在行上的
+        // 意思是「这次调用发生在会话 N 里」，也正是**逐轮的视图**得以存在的原因。
+        String conversationId = sessionId == null ? null : String.valueOf(sessionId);
+        return tools.all().stream().map(tool -> callback(tool, caller, conversationId)).toList();
     }
 
     /**
@@ -126,9 +144,10 @@ public class YudaoGovernedAgentTools implements Ai1LocalToolProvider {
      * 值得接受「原则上可能与同名 MCP 工具相撞」：一个工具两套词表更糟，而同时绑了两者的部署，看一眼任一份清单就会
      * 看见那个重名。
      */
-    private ToolCallback callback(AiTool tool, Long caller) {
+    private ToolCallback callback(AiTool tool, Long caller, String conversationId) {
         Function<Map<String, Object>, String> call = arguments -> JsonUtils.toJsonString(
-                engine.execute(tool.name(), arguments == null ? Map.of() : arguments, principal(caller)));
+                engine.execute(tool.name(), arguments == null ? Map.of() : arguments, principal(caller),
+                        conversationId));
         return FunctionToolCallback.builder(tool.name(), call)
                 .description(tool.description())
                 .inputType(Map.class)

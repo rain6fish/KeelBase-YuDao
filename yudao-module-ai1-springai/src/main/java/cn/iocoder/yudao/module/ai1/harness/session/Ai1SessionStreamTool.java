@@ -707,7 +707,10 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent));
         tools.addAll(skillToolFactory.buildTools(agent));
         if (localToolProvider != null) {
-            tools.addAll(localToolProvider.buildTools(agent));
+            // The session travels with the tools: see the seam — it is what makes a governed call
+            // attributable to *this* turn rather than to the caller in general.
+            // 会话随工具一起过去：见那条缝 —— 正是它让一次受治理的调用归得了**这一轮**、而不是笼统地归给调用方。
+            tools.addAll(localToolProvider.buildTools(agent, sessionId));
         }
         StringBuilder noticeText = new StringBuilder();
         List<Advisor> advisors = new ArrayList<>();

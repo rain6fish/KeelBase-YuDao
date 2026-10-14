@@ -29,7 +29,7 @@ RuoYi 线那条 `D15`——*绝不碰上游的生成物与 `vm/`*——**不平�
 | `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | 工具被**装配**时捕获调用方 | `D32`——同一条缝，在装配那一侧 |
 | `yudao-module-ai1-springai/.../harness/llm/Ai1LlmChatTool.java` | 它收到的是一个 `ChatClient`、不再是模型快照，也不再自己建 client | 一次会话跑在哪个模型上由**部署方**回答——见 `Ai1ChatModelResolver` |
 | `yudao-module-ai1-springai/.../service/agent/Ai1AgentServiceImpl.java` | 建 agent 时校验模型，问的是**会话所问的同一个**解析器 | 一个本部署够不到的模型在**写 agent 时**被拒，而不是后来表现为一次会话失败 |
-| `yudao-module-ai1-springai/.../harness/llm/Ai1ChatModelResolver.java` + `.../harness/local/Ai1LocalToolProvider.java`（**加在模块里的文件**） | 上面两条所问的那两条缝 | 模型来自宿主自己的模型管理，而 agent 够得到运行时那些受治理的工具 |
+| `yudao-module-ai1-springai/.../harness/llm/Ai1ChatModelResolver.java` + `.../harness/local/Ai1LocalToolProvider.java`（**加在模块里的文件**） | 上面两条所问的那两条缝——工具那一条**除 agent 之外还收会话号** | 模型来自部署方自己的目录，而 agent 够得到运行时那些受治理的工具**且可归属**：没有会话号，受治理调用写下的任何一行都**逐轮读不出来** |
 | `yudao-module-report/.../goview/GoViewProjectMapper.java` | `creator` 按字符串绑 | MySQL 隐式转换、PostgreSQL 直接拒绝 |
 | `yudao-framework/.../swagger/config/YudaoSwaggerWebConfiguration.java` + 它在那个 starter 的 `AutoConfiguration.imports` 里的那一行注册 | 一个**加进上游自己包里**的自动配置，以及打开它的那一行 | springdoc 3.0.3 与 Boot 4.x 对 `api-docs` 端点**声明的返回类型**谈不拢，没有这一处它就抛（`dcd9c6b548`） |
 

@@ -313,10 +313,22 @@ index 8d522ef..63fedf5 100644
                    <span class="message-title">
                      {{ item.templateNickname }}：{{ item.templateContent }}
 diff --git a/src/layout/components/ToolHeader.vue b/src/layout/components/ToolHeader.vue
-index 23f8a3a..4bff14a 100644
+index 23f8a3a..38a291a 100644
 --- a/src/layout/components/ToolHeader.vue
 +++ b/src/layout/components/ToolHeader.vue
-@@ -48,19 +48,20 @@ const locale = computed(() => appStore.getLocale)
+@@ -1,6 +1,9 @@
+ <script lang="tsx">
+-import { defineComponent, computed } from 'vue'
+-import router from '@/router'
++import { defineComponent, computed, ref } from 'vue'
++// 产品自己的助手面板：抽屉挂在顶栏这一层（抽屉本身 teleport 到 body，故它挂在哪一层不影响 DOM 位置）。
++// The product's own assistant panel: the drawer hangs off the header (a drawer teleports to the body, so
++// which component mounts it does not decide where it lands).
++import AssistantDrawer from '@/views/keelbase/assistant/AssistantDrawer.vue'
+ import { Message } from '@/layout/components/Message'
+ import { Collapse } from '@/layout/components/Collapse'
+ import { UserInfo } from '@/layout/components/UserInfo'
+@@ -48,20 +51,21 @@ const locale = computed(() => appStore.getLocale)
  // 消息图标
  const message = computed(() => appStore.getMessage)
  
@@ -333,19 +345,21 @@ index 23f8a3a..4bff14a 100644
 -const goToChat = () => {
 -  // 用路由 name resolve 出完整 URL，在新标签页打开 IM 主页
 -  const { href } = router.resolve({ name: 'ImHome' })
-+// The product's own assistant, reachable from every page. It opens in a new tab for the same reason
-+// the entry it replaces did: the assistant is a full-screen surface, and pushing it onto the current
-+// history would displace whatever console page is in use. Resolved by path rather than by name —
-+// this route comes from a menu record, so its name is generated rather than written down.
-+// 产品自己的助手，每一页都够得着。它在新标签页里打开，理由与被它替换掉的那个入口相同：助手是**整屏**的一个
-+// 面，push 进当前历史会把正在用的控制台页面挤掉。按**路径**解析而不是名字——这条路由来自菜单记录，它的名字
-+// 是生成的、不是写下来的。
+-  window.open(href, '_blank')
++// 产品自己的助手，每一页都够得着。它现在开**右侧抽屉**、不再开新标签页：它替换掉的那个入口开新标签页是有
++// 理由的（助手是整屏的一个面），而抽屉不是整屏——它停在右边，正在用的控制台页面留在原处。原来跳的那条
++// `/ai/chat` 已按 `D52 ①` 停用，故这一改也把那处空指向一并修好。
++// The product's own assistant, reachable from every page. It opens a **drawer on the right** now rather
++// than a new tab: the entry it replaces opened a tab for a reason (the assistant was a full-screen
++// surface), and a drawer is not one — it sits on the right and leaves the console page where it was. The
++// `/ai/chat` route it used to open was switched off under `D52 ①`, so this also repairs that dead end.
++const assistantOpen = ref(false)
 +const goToAssistant = () => {
-+  const { href } = router.resolve({ path: '/ai/chat' })
-   window.open(href, '_blank')
++  assistantOpen.value = true
  }
  
-@@ -121,12 +122,11 @@ export default defineComponent({
+ export default defineComponent({
+@@ -121,14 +125,17 @@ export default defineComponent({
            {message.value ? (
              <Message class="custom-hover" color="var(--top-header-text-color)"></Message>
            ) : undefined}
@@ -362,7 +376,13 @@ index 23f8a3a..4bff14a 100644
 +          </div>
            <UserInfo></UserInfo>
          </div>
++        {/* 助手抽屉。它渲染到 body，故放在这里只是**挂载**、不决定位置。 */}
++        {/* The assistant drawer. It renders into the body, so being mounted here decides nothing about
++            where it lands. */}
++        <AssistantDrawer v-model={assistantOpen.value} />
        </div>
+     )
+   }
 diff --git a/src/layout/components/UserInfo/src/UserInfo.vue b/src/layout/components/UserInfo/src/UserInfo.vue
 index 355aabc..679978a 100644
 --- a/src/layout/components/UserInfo/src/UserInfo.vue
