@@ -184,8 +184,17 @@ const summary = out.map((c) => `${c.prefix}:${Object.keys(c.icons).length}`).joi
 const total = out.reduce((n, c) => n + Object.keys(c.icons).length, 0)
 
 if (check) {
+  // Compare on content, not on bytes: git checks the file out with the platform's line endings
+  // (`core.autocrlf=true` on Windows), while this writes `\n`, so a byte comparison reports a set that
+  // is current as stale — every time, on that platform — and the build stops before it builds. The
+  // loud failure is for a drifted set, and a drifted set is one whose *content* differs.
+  //
+  // 比的是**内容**、不是字节：git 按平台的行尾检出这个文件（Windows 上 `core.autocrlf=true`），而这里写的是
+  // `\n`，故逐字节比较会把一份**本来就对**的集合报成陈旧 —— 在那个平台上**每次都如此** —— 于是构建在构建之前
+  // 就停了。那声响亮是留给**真漂移**的集合的，而真漂移指的是**内容**不同。
+  const norm = (s) => s.replace(/\r\n/g, '\n')
   const cur = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : ''
-  if (cur !== text) {
+  if (norm(cur) !== norm(text)) {
     console.error(`offline icon set is stale — regenerate: ${path.relative(REPO_ROOT, OUT)}`)
     console.error(`would write ${total} icons across ${out.length} collections`)
     process.exit(1)
