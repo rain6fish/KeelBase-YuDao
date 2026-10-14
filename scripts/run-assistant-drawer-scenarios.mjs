@@ -100,6 +100,19 @@ async function login(username, password) {
 }
 
 /**
+ * 工具卡按轮读（`YD-T21` 甲+乙）：那条副作用面按**会话号**筛一页。范围由服务端按调用方定 —— 点名别人的会话
+ * 应当得到**空**、而不是他们的行。
+ *
+ * The tool card read per turn (`YD-T21`, both halves): that effect surface narrowed to one conversation.
+ * The scope is the server's per-caller decision — naming somebody else's conversation must answer empty.
+ */
+async function effectsOfTurn(conversationId, token) {
+  const res = await fetch(`${HOST}/ai/tool-effects?conversationId=${encodeURIComponent(conversationId)}`
+    + '&page=1&limit=20', { headers: { Authorization: `Bearer ${token}`, 'tenant-id': TENANT } });
+  return res.json().catch(() => null);
+}
+
+/**
  * 一个**普通调用方**：本部署的 `common` 角色、不是管理员。同名用户复用，没有就建一个（与兄弟门禁同一手法）。
  * **注意**：给角色授权**之后紧接着**的那次登录会撞上宿主的瞬时 500 —— `api()` 已经为此重试一次。
  *
@@ -230,6 +243,18 @@ if (chainReady) {
   const items = effects?.data?.items ?? [];
   check('副作用面里有本轮那笔写', true, items.some((e) => e.toolName === 'create_crm_customer' && e.resultType === 'crm_customer'));
 
+  // `YD-T21` (both halves): the column says **which turn**, and the filter narrows a page to it. Before
+  // it the field existed in the frozen object and was sent as null — the drawer's tool card could only
+  // ever say "this caller's recent writes", never "this turn's".
+  // `YD-T21`（甲+乙）：那一列说得出**哪一轮**，而筛选把一页收窄到那一轮。在它之前，那个字段在冻结对象里存在、
+  // 却按 null 送出 —— 抽屉的工具卡只能停在「这个调用方最近的写」，永远到不了「这一轮的」。
+  const thisTurn = await effectsOfTurn(sessionId, admin);
+  const turnItems = thisTurn?.data?.items ?? [];
+  check('按本会话筛得到这一轮的写', true, turnItems.length > 0);
+  check('那一行的 conversationId 就是本会话号', String(sessionId), String(turnItems[0]?.conversationId));
+  const anotherTurn = await effectsOfTurn(`${sessionId}000000`, admin);
+  check('按另一个会话号筛得到空', 0, (anotherTurn?.data?.items ?? []).length);
+
   // The half no screen could fake: the rows say which session they came from.
   // 任何界面都伪装不了的那一半：那些行说得出自己来自哪条会话。
   const linked = Number(psql(`select count(*) from ai_audit_logs where conversation_id = '${sessionId}'`
@@ -302,6 +327,14 @@ if (chainReady) {
       headers: { Authorization: `Bearer ${token}`, 'tenant-id': TENANT }
     }).then((r) => r.json()).catch(() => null);
     check('确认卡对普通调用方可用', true, Array.isArray(waiting?.data));
+
+    // The scope is the **reader's**, not the filter's: an ordinary caller naming the administrator's
+    // conversation gets an empty answer, never their rows. That is what makes the per-turn filter safe
+    // to hand out at all.
+    // 范围是**读者的**、不是筛选的：普通调用方点名**管理员**的会话，拿到的是**空**、绝不是他们的行。正是这一点
+    // 让「按轮筛」这件事可以被发出去。
+    const notMine = await effectsOfTurn(sessionId, token);
+    check('普通调用方按别人的会话号筛，拿到空', 0, (notMine?.data?.items ?? []).length);
   }
 }
 
