@@ -218,14 +218,28 @@ if (fail === 0) {
   const body = `请依次做两件事，两步都要真的调用工具，顺序不要颠倒，不要只回答文字：`
     + `第一步，用列客户的工具把客户列出来；`
     + `第二步，用新建客户的工具新建一个客户，客户名称就是这段：${customer}。`;
-  writeFileSync(SEND_FILE, JSON.stringify({ sessionId, content: body }));
-  execFileSync('curl', ['-s', '-N', '--max-time', '240', '-X', 'POST', `${API}/ai1/session/message/send-stream`,
-    '-H', 'Content-Type: application/json', '-H', `tenant-id: ${TENANT}`,
-    '-H', `Authorization: Bearer ${admin}`, '--data-binary', `@${SEND_FILE}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-
-  console.log('== 审计 · 走通的那一半 ==');
   const after = (tool, outcome) => Number(psql(`select count(*) from ai_audit_logs where id > ${auditFloor}`
     + ` and user_id = '1' and tool = '${tool}' and outcome = '${outcome}'`));
+  // The send is retried **once**, and it says so, for the same reason `api()` retries its 500: a host in
+  // its first minute can take the call and answer nothing. Measured 2026-10-14 — a gate run right after a
+  // start was red while the same gate on a warmed-up host was green, and the send is what differs. The
+  // assertions are counted after the retry, so a retried run is not counted twice.
+  // 这次发送**重试一次**、并**说出来**，理由与 `api()` 重试它那个 500 相同：刚起头一分钟内的宿主可能接下调用
+  // 却什么也不答。2026-10-14 实测 —— 紧接着启动跑的门禁是红的，而同一道在热身宿主上是绿的，差的正是一次发送。
+  // 断言在重试**之后**才数，故重试过的一轮不会被数两遍。
+  for (let attempt = 1; ; attempt += 1) {
+    writeFileSync(SEND_FILE, JSON.stringify({ sessionId, content: body }));
+    execFileSync('curl', ['-s', '-N', '--max-time', '240', '-X', 'POST', `${API}/ai1/session/message/send-stream`,
+      '-H', 'Content-Type: application/json', '-H', `tenant-id: ${TENANT}`,
+      '-H', `Authorization: Bearer ${admin}`, '--data-binary', `@${SEND_FILE}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    if (after('list_crm_customers', 'executed') > 0 || attempt > 1) {
+      break;
+    }
+    console.log('  note  这一步发送没有产生工具调用（宿主可能刚起）—— 等 5 秒、在同一会话里重发一次');
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+
+  console.log('== 审计 · 走通的那一半 ==');
   check('读那一半执行了，且属主是登录用户', true, after('list_crm_customers', 'executed') > 0);
 
   console.log('== 扣下 · 写没有落地 ==');
