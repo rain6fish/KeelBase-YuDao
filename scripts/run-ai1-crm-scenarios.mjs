@@ -9,11 +9,11 @@
 //
 // Two things are being checked, and neither can be checked by reading the code.
 //
-//   * **The model comes from the console's model page.** The chain built here is an `ai_api_key` row
-//     and an `ai_model` row — the two rows the console's own AI pages write — and the agent points at
-//     them. Nothing is passed on the command line and `KEELBASE_MODEL_API_KEY` is not needed: this
-//     gate deliberately does **not** start the host's own model loop, because the point is that this
-//     path no longer needs it.
+//   * **The model comes from the assistant's own model page.** The chain built here is an
+//     `ai1_provider` row and an `ai1_model` row — the two rows the assistant's own model pages write —
+//     and the agent points at them. Nothing is passed on the command line and `KEELBASE_MODEL_API_KEY`
+//     is not needed: this gate deliberately does **not** start the host's own model loop, because the
+//     point is that this path no longer needs it.
 //   * **CRM is reachable, and governed.** A read goes through and leaves an audit row; a write is held
 //     for a person by the engine, leaves a confirmation, and the customer row does not land. The last
 //     one is the half a refusal cannot fake.
@@ -33,8 +33,8 @@
 //
 // 查的是两件事，而两件都**读代码读不出来**。
 //
-//   * **模型来自控制台的模型页。** 这里建的链路是一行 `ai_api_key` 加一行 `ai_model`——正是控制台自己的
-//     AI 页面会写的那两行——而 agent 指着它们。命令行什么都不传，也不需要 `KEELBASE_MODEL_API_KEY`：本门禁
+//   * **模型来自助手自己的模型页。** 这里建的链路是一行 `ai1_provider` 加一行 `ai1_model`——正是助手自己的
+//     模型页面会写的那两行——而 agent 指着它们。命令行什么都不传，也不需要 `KEELBASE_MODEL_API_KEY`：本门禁
 //     **刻意不**打开宿主自己那条模型回路，因为要证的正是**这条路不再需要它**。
 //   * **CRM 够得到，而且受治理。** 读走通了、留下审计行；写被引擎**扣下等人**、留下一条待确认，而客户行**没有
 //     落地**。最后这一条是**拒绝伪装不了的**那一半。
@@ -177,22 +177,25 @@ const auditFloor = Number(psql('select coalesce(max(id), 0) from ai_audit_logs')
 // ── 1) the chain, through the host's own APIs ─────────────────────────────────────────────────────
 console.log('== 前置 · 链路（经宿主自己的 API 建）==');
 const marker = `gate-${Date.now()}`;
-let keyId; let modelId; let agentId; let sessionId;
+let providerId; let modelId; let agentId; let sessionId;
 try {
-  // The console's model page writes exactly these two rows, and this is that page's own API — so the
-  // gate proves the page is where this deployment's models live, not a file.
-  // 控制台的模型页写下的正是这两行，而这里用的就是那个页面自己的 API——故本门禁证的是：本部署的模型住在
-  // **那个页面**里，不是一个文件里。
-  keyId = postJson('/ai/api-key/create', admin,
-    { name: `gate-${marker}`, platform: 'DeepSeek', apiKey: KEY, url: 'https://api.deepseek.com', status: 0 });
-  modelId = postJson('/ai/model/create', admin,
-    { keyId, name: `gate-${marker}`, model: MODEL, platform: 'DeepSeek', type: 1, sort: 0, status: 0 });
+  // The assistant's own model pages write exactly these two rows, and this is their own API — so the
+  // gate proves the page is where this deployment's models live, not a file. It used to build the
+  // upstream `ai_api_key` / `ai_model` pair; `D52 ③` / `YD-29 ③` moved the model source onto ai1's own
+  // rows, and the gate follows it there.
+  // 助手自己的模型页面写下的正是这两行，而这里用的就是那个页面自己的 API——故本门禁证的是：本部署的模型住在
+  // **那个页面**里，不是一个文件里。它从前造的是上游的 `ai_api_key` / `ai_model`；`D52 ③` / `YD-29 ③` 把
+  // 模型来源搬到了 `ai1` 自己的行，门禁随之。
+  providerId = postJson('/ai1/provider/create', admin,
+    { name: `gate-${marker}`, baseUrl: 'https://api.deepseek.com', apiKey: KEY, status: 0 });
+  modelId = postJson('/ai1/model/create', admin,
+    { providerId, name: `gate-${marker}`, model: MODEL, type: 0, status: 0 });
   // No MCP server and no SKILL: what the agent can call is what the runtime holds.
   // 没有 MCP 服务、也没有 SKILL：这个 agent 能调的就是运行时持有的那些。
   agentId = postJson('/ai1/agent/create', admin, {
     name: `gate-${marker}`,
     introduction: '把受治理工具面接进会话的门禁探针',
-    providerId: keyId,
+    providerId,
     modelId,
     systemPrompt: '你是一个只会照做的助手。用户让你用工具，你就按他说的顺序把工具用掉，不要多问，也不要只回答文字。',
     knowledgeBaseIds: [],
@@ -248,8 +251,8 @@ const cleanup = [
   `delete from ai1_session_message where session_id = ${sessionId}`,
   `delete from ai1_session where id = ${sessionId}`,
   `delete from ai1_agent where id = ${agentId}`,
-  `delete from ai_model where id = ${modelId}`,
-  `delete from ai_api_key where id = ${keyId}`
+  `delete from ai1_model where id = ${modelId}`,
+  `delete from ai1_provider where id = ${providerId}`
 ].join('; ');
 try {
   psql(cleanup);
