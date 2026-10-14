@@ -7,10 +7,16 @@
 //   bash scripts/run-server.sh &            # a running stack, PostgreSQL + redis
 //   node scripts/run-mcp-governance-scenarios.mjs
 //
-// It brings up the probe MCP server itself, builds the chain it needs (provider, model, MCP, agent,
+// It brings up the probe MCP server itself, builds the chain it needs (API key, model, MCP, agent,
 // session) through the host's own APIs, asks the model for a two-step job, and then checks the two
 // things a governed multi-step run has to leave behind: the probe's own log of what it was called
 // with, and the audit's account of who asked. Everything it creates, it removes again.
+//
+// **Where the model comes from changed, and this gate changed with it.** The chain used to name an
+// `ai1` provider and an `ai1` model row; this deployment's models now live on the console's model page
+// (`ai_api_key` + `ai_model`), which is what `YudaoAi1ChatModelResolver` answers from — so those are
+// the two rows built here. An agent pointing at an `ai1` model row is refused now, by that resolver,
+// with upstream's own `模型不存在!`.
 //
 // The model key is read from `D:\Rain6fish\.secrets\spring-ai.env` and never printed.
 //
@@ -19,9 +25,13 @@
 //   bash scripts/run-server.sh &            # 一套跑着的栈：PostgreSQL + redis
 //   node scripts/run-mcp-governance-scenarios.mjs
 //
-// 它自己拉起探针 MCP 服务，经宿主**自己的 API** 建出它需要的链路（provider · model · mcp · agent · session），
+// 它自己拉起探针 MCP 服务，经宿主**自己的 API** 建出它需要的链路（API 密钥 · 模型 · mcp · agent · session），
 // 请模型做**两件**事，然后查一次受治理的多步运行**必须留下**的两样：探针自己记下的「被调用成什么样」，以及
 // 审计记下的「谁在问」。**它建的每一样，跑完都拆掉。**
+//
+// **模型从哪来变了，这道门禁跟着变了。** 链路过去点的是一行 `ai1` 的 provider 与一行 `ai1` 的 model；而本部署的
+// 模型现在住在控制台的模型页上（`ai_api_key` + `ai_model`）——`YudaoAi1ChatModelResolver` 正是从那里回答的
+// ——故这里建的是那两行。一个指着 `ai1` 模型行的 agent 现在会被那个解析器拒掉，用的是上游自己的 `模型不存在!`。
 //
 // 模型 key 读自 `D:\Rain6fish\.secrets\spring-ai.env`，**从不打印**。
 import { execFileSync, spawn } from 'node:child_process';
@@ -145,18 +155,20 @@ ok('admin 登录');
 // ── 2) the chain, through the host's own APIs ─────────────────────────────────────────────────────
 console.log('== 前置 · 链路（经宿主自己的 API 建）==');
 const marker = `gate-${Date.now()}`;
-let providerId; let modelId; let mcpId; let agentId; let sessionId;
+let keyId; let modelId; let mcpId; let agentId; let sessionId;
 try {
-  providerId = postJson('/ai1/provider/create', admin,
-    { name: `probe-${marker}`, baseUrl: 'https://api.deepseek.com', apiKey: KEY, status: 0 });
-  modelId = postJson('/ai1/model/create', admin,
-    { providerId, name: `probe-${marker}`, model: MODEL, type: 0, status: 0 });
+  // The console's model page writes exactly these two rows, and this is that page's own API.
+  // 控制台的模型页写下的正是这两行，而这里用的就是那个页面自己的 API。
+  keyId = postJson('/ai/api-key/create', admin,
+    { name: `gate-${marker}`, platform: 'DeepSeek', apiKey: KEY, url: 'https://api.deepseek.com', status: 0 });
+  modelId = postJson('/ai/model/create', admin,
+    { keyId, name: `gate-${marker}`, model: MODEL, platform: 'DeepSeek', type: 1, sort: 0, status: 0 });
   mcpId = postJson('/ai1/mcp/create', admin,
     { name: `probe-${marker}`, transport: 'http', url: `http://127.0.0.1:${PORT}/mcp`, status: 0 });
   agentId = postJson('/ai1/agent/create', admin, {
     name: `probe-${marker}`,
     introduction: 'D32 门禁探针',
-    providerId,
+    providerId: keyId,
     modelId,
     systemPrompt: '你是一个只会照做的助手。用户让你用工具，你就按他说的顺序把工具用掉，不要多问。',
     knowledgeBaseIds: [],
@@ -220,14 +232,21 @@ if (fail === 0) {
 // ── 4) put the scene back ─────────────────────────────────────────────────────────────────────────
 console.log('== 收尾 ==');
 probe.kill();
+// Only the rows this run actually built. A chain that failed half-way leaves some of these ids
+// unset, and the previous version pasted `undefined` into the SQL — where it made psql refuse the
+// **whole** statement, so the rows that *had* been built survived a cleanup that reported a failure.
+// A failed setup is exactly when the cleanup has to work.
+// 只删本轮**确实建出来**的行。建到一半就失败的链路会让其中一些 id 没被赋值，而上一版把 `undefined` 拼进
+// SQL——psql 因此拒掉**整条**语句，于是**已经建出来**的那些行，活过了一次报错的收尾。建链失败时，恰恰是收尾
+// 最需要能用的时候。
 const cleanup = [
-  `delete from ai1_session_message where session_id = ${sessionId}`,
-  `delete from ai1_session where id = ${sessionId}`,
-  `delete from ai1_agent where id = ${agentId}`,
-  `delete from ai1_mcp where id = ${mcpId}`,
-  `delete from ai1_model where id = ${modelId}`,
-  `delete from ai1_provider where id = ${providerId}`
-].join('; ');
+  sessionId && `delete from ai1_session_message where session_id = ${sessionId}`,
+  sessionId && `delete from ai1_session where id = ${sessionId}`,
+  agentId && `delete from ai1_agent where id = ${agentId}`,
+  mcpId && `delete from ai1_mcp where id = ${mcpId}`,
+  modelId && `delete from ai_model where id = ${modelId}`,
+  keyId && `delete from ai_api_key where id = ${keyId}`
+].filter(Boolean).join('; ');
 try {
   psql(cleanup);
   rmSync(NOTE_FILE, { force: true });

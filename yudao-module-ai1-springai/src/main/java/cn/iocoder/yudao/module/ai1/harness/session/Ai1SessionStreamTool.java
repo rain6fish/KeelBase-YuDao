@@ -31,12 +31,17 @@ import cn.iocoder.yudao.module.ai1.service.session.Ai1SessionMessageService;
 import cn.iocoder.yudao.module.ai1.service.knowledge.Ai1KnowledgeBaseService;
 import cn.iocoder.yudao.module.ai1.service.model.Ai1ModelService;
 import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
+import cn.iocoder.yudao.module.ai1.harness.llm.Ai1ChatModelResolver;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmChatTool;
+import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
+import cn.iocoder.yudao.module.ai1.harness.local.Ai1LocalToolProvider;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpToolFactory;
 import cn.iocoder.yudao.module.ai1.harness.rag.Ai1RagTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -187,12 +192,32 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     @Resource
     private Ai1LlmChatTool llmChatTool;
     @Resource
+    private Ai1LlmModelFactory llmModelFactory;
+    @Resource
     private Ai1RagTool ragTool;
 
     @Resource
     private Ai1McpToolFactory mcpToolFactory;
     @Resource
     private Ai1SkillToolFactory skillToolFactory;
+
+    /**
+     * Two seams a deployment may fill, and both are optional on purpose — see the interfaces. Absent
+     * means this module's own behaviour, which is what keeps it usable on its own.
+     *
+     * <p>Both fields, and the two places below that read them, are KeelBase's own change to an
+     * upstream file: registered in {@code keelbase-docs/KEELBASE-UPSTREAM.md}, covered by
+     * {@code scripts/run-ai1-crm-scenarios.mjs}.
+     *
+     * 部署方可以填的两条缝，两者都**刻意**是可选的——见那两个接口。缺席即本模块自己的行为，`ai1` 因此能单独用。
+     *
+     * <p>这两个字段、以及下面读它们的这两处，都是 KeelBase 对**上游文件**的改动：登记在
+     * {@code keelbase-docs/KEELBASE-UPSTREAM.md}，由 {@code scripts/run-ai1-crm-scenarios.mjs} 覆盖。
+     */
+    @Autowired(required = false)
+    private Ai1ChatModelResolver chatModelResolver;
+    @Autowired(required = false)
+    private Ai1LocalToolProvider localToolProvider;
 
     /**
      * 结果流 TTL 上次续期时刻：助手消息编号 → 毫秒时间戳，用于 EXPIRE 节流
@@ -649,12 +674,9 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     @SuppressWarnings("SequencedCollectionMethodCanBeUsed")
     private Ai1LlmChatTool.ChatText generate(Long messageId, Long agentId, Long sessionId, String content,
                                              Consumer<String> onThinking, Consumer<String> onContent) {
-        // 1. 生成可能发生在其他节点，重新校验 Agent 与模型；后台会话不要求 Agent 已发布
+        // 1. 生成可能发生在其他节点，重新校验 Agent 与会话要用的模型；后台会话不要求 Agent 已发布
         Ai1AgentDO agent = agentService.validateAgentExists(agentId);
-        Ai1ModelRespBO model = modelService.getModelRespBO(agent.getProviderId(), agent.getModelId());
-        if (!Ai1ModelTypeEnum.isChat(model.getModelType())) {
-            throw ServiceExceptionUtil.exception(Ai1ErrorCodeConstants.MODEL_TYPE_NOT_CHAT);
-        }
+        ChatClient chatClient = resolveChatClient(agent, sessionId);
 
         // 2. 历史消息：按编号倒序取最近 N 条，再升序还原为会话顺序
         // TODO @芋艿：【优化点】截取历史的 limit 会导致 prompt cache 频繁失效。后续需要改成 prompt 压缩
@@ -681,9 +703,12 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
                 : StrUtil.replace(ai1Properties.getSession().getDefaultSystemPrompt(),
                 YudaoAi1Properties.Session.AGENT_NAME_PLACEHOLDER, agent.getName());
 
-        // 4. 工具（MCP + SKILL）与 RAG Advisor；知识库不可用时降级跳过，并把提示写入思考流
+        // 4. 工具（MCP + SKILL + 部署方在进程内交来的）与 RAG Advisor；知识库不可用时降级跳过，并把提示写入思考流
         List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent));
         tools.addAll(skillToolFactory.buildTools(agent));
+        if (localToolProvider != null) {
+            tools.addAll(localToolProvider.buildTools(agent));
+        }
         StringBuilder noticeText = new StringBuilder();
         List<Advisor> advisors = new ArrayList<>();
         for (Ai1KnowledgeBaseDO knowledgeBase : knowledgeBaseService.getKnowledgeBaseList(agent.getKnowledgeBaseIds())) {
@@ -701,12 +726,39 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         }
 
         // 5. 流式会话；降级提示并入最终思考文本，保证刷新后内容一致
-        Ai1LlmChatTool.ChatText chatText = llmChatTool.chat(model, systemPrompt, histories, content, tools, advisors,
-                sessionId, onThinking, onContent);
+        Ai1LlmChatTool.ChatText chatText = llmChatTool.chat(chatClient, systemPrompt, histories, content, tools,
+                advisors, onThinking, onContent);
         if (!noticeText.isEmpty()) {
             chatText.setThinking(noticeText + StrUtil.nullToEmpty(chatText.getThinking()));
         }
         return chatText;
+    }
+
+    /**
+     * The client this turn talks through: the deployment's answer when it gives one, this module's own
+     * provider rows otherwise.
+     *
+     * <p>Which of the two it is decides nothing downstream — the turn is the same either way — so the
+     * choice is made once, here, and the rest of this method never sees a model.
+     *
+     * 这一轮经哪个客户端说话：部署方给了答案就用它的，否则用本模块自己的 provider 行。
+     *
+     * <p>是哪一种**不影响下游任何东西**——两种情形下这一轮都是一样的——故选择在这里做一次，本方法其余部分
+     * 再也见不到模型。
+     *
+     * <p>One of ours, like the fields it reads — see the register named there.
+     *
+     * <p>与它读的那两个字段一样，是本方的一处改动——见那里点名的登记册。
+     */
+    private ChatClient resolveChatClient(Ai1AgentDO agent, Long sessionId) {
+        if (chatModelResolver != null) {
+            return ChatClient.builder(chatModelResolver.resolve(agent)).build();
+        }
+        Ai1ModelRespBO model = modelService.getModelRespBO(agent.getProviderId(), agent.getModelId());
+        if (!Ai1ModelTypeEnum.isChat(model.getModelType())) {
+            throw ServiceExceptionUtil.exception(Ai1ErrorCodeConstants.MODEL_TYPE_NOT_CHAT);
+        }
+        return llmModelFactory.buildChatClient(model, sessionId);
     }
 
     /**

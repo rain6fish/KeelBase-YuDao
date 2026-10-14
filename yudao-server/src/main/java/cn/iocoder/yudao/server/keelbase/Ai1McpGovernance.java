@@ -32,6 +32,19 @@ import org.springframework.stereotype.Component;
  * console's red line is that identity fields are masked on the way out; the same instinct applies to
  * what an audit keeps.
  *
+ * <p><b>The outcome and the tool name go on the row's own columns.</b> `C-3` added those two columns
+ * and filled them at every writer in the runtime; this writer was missed, so its rows carried the two
+ * facts only inside the sentence — and a reader that had switched to the columns, as the runtime's
+ * readers did, found nothing. The sentence stays, because it is what a person reads in the raw table;
+ * the columns are what the evaluation plane reads.
+ *
+ * 参数不写进审计。工具的入参是调用方可能无权留存的数据，故那一行只写**工具**与**结果**、从不写载荷。管理端那条红线是
+ * 身份字段**输出时掩码**；审计留什么，同一个直觉适用。
+ *
+ * <p><b>结局与工具名落在行**自己的列**上。</b>`C-3` 加了那两列、并在运行时的**每一个写入点**填好；这一个写入点被漏了，
+ * 于是它的行只把这两个事实带在**那句话里** —— 而一个像运行时那些读取方一样改用**列**的读者，什么都找不到。那句话留着，
+ * 因为那是人**在原始表里读**的东西；而列是**评估面**读的东西。
+ *
  * 治理**宿主自己**的那条工具路径：它的 agent 交给模型的 MCP 工具。
  *
  * <p>这是 `D32`——「治理它，但**不动它的装配**」。宿主自己装配那些工具：`Ai1McpToolFactory.buildToolCallback`
@@ -75,22 +88,24 @@ public class Ai1McpGovernance {
         String tool = name(call.getArgs());
         Long caller = callers.current();
         if (caller == null || caller == 0L) {
-            audit.append("tool_call", NO_IDENTITY, tool + " refused: no identity");
+            audit.append("tool_call", NO_IDENTITY, tool + " refused: no identity", true, "refused", tool);
             throw new AccessDeniedException("这个工具要在有身份的情况下调用");
         }
         String who = String.valueOf(caller);
         try {
             Object result = call.proceed();
-            audit.append("tool_call", who, tool + " -> ok");
+            audit.append("tool_call", who, tool + " -> ok", false, "executed", tool);
             return result;
         } catch (Throwable failure) {
             // A failed call is the half an audit is most useful for, so it is written before the
             // failure is handed on. The failure itself is not swallowed.
             // 失败的调用正是审计最有用的那一半，故在把失败递出去**之前**先写下来。失败本身不被吞掉。
-            audit.append("tool_call", who, tool + " failed: " + failure.getClass().getSimpleName());
+            audit.append("tool_call", who, tool + " failed: " + failure.getClass().getSimpleName(),
+                    true, "failed", tool);
             throw failure;
         }
     }
+
 
     /**
      * The tool as the audit should name it: the MCP server and the tool on it. The factory's own

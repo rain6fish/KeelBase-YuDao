@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.ai1.service.knowledge.Ai1KnowledgeBaseService;
 import cn.iocoder.yudao.module.ai1.service.model.Ai1ModelService;
 import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmChatTool;
+import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpToolFactory;
 import cn.iocoder.yudao.module.ai1.harness.rag.Ai1RagTool;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
+import org.springframework.ai.chat.client.ChatClient;
 import org.redisson.api.RStream;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -86,6 +88,8 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
     @Mock
     private Ai1LlmChatTool llmChatTool;
     @Mock
+    private Ai1LlmModelFactory llmModelFactory;
+    @Mock
     private Ai1McpToolFactory mcpToolFactory;
     @Mock
     private Ai1SkillToolFactory skillToolFactory;
@@ -103,6 +107,12 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         lenient().when(sessionMessageService.getSessionMessage(MESSAGE_ID)).thenReturn(new Ai1SessionMessageDO()
                 .setId(MESSAGE_ID).setRole(Ai1SessionMessageRoleEnum.ASSISTANT.getRole())
                 .setStatus(Ai1SessionMessageStatusEnum.GENERATING.getStatus()));
+        // No deployment answers the model question in these tests, so the module's own path runs and
+        // the client it builds is this stub. The client is only ever handed on: what the chat tool
+        // does with it is that class's own test.
+        // 这些测试里没有部署方回答模型问题，故跑的是模块自己那条路，它建出的 client 就是这个桩。client 只是
+        // 被**转交**出去：会话工具拿它做什么，是那个类自己的测试。
+        lenient().when(llmModelFactory.buildChatClient(any(), any())).thenReturn(mock(ChatClient.class));
     }
 
     @Test
@@ -145,7 +155,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         when(modelService.getModelRespBO(1L, 2L)).thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
         when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
                 .thenReturn(new ArrayList<>());
-        when(llmChatTool.chat(any(), eq("你是 客服 的智能助手。"), anyList(), eq("你好"), anyList(), anyList(), eq(SESSION_ID), any(), any()))
+        when(llmChatTool.chat(any(), eq("你是 客服 的智能助手。"), anyList(), eq("你好"), anyList(), anyList(), any(), any()))
                 .thenReturn(new Ai1LlmChatTool.ChatText("您好", ""));
         // 准备参数
         Map<String, String> fields = buildTaskFields();
@@ -173,7 +183,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         when(modelService.getModelRespBO(1L, 2L)).thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
         when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
                 .thenReturn(new ArrayList<>());
-        when(llmChatTool.chat(any(), anyString(), anyList(), eq("你好"), anyList(), anyList(), eq(SESSION_ID), any(), any()))
+        when(llmChatTool.chat(any(), anyString(), anyList(), eq("你好"), anyList(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
                     Consumer<String> onContent = invocation.getArgument(8);
                     onContent.accept("您好");
@@ -300,7 +310,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         when(modelService.getModelRespBO(1L, 2L)).thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
         when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
                 .thenReturn(new ArrayList<>());
-        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any()))
+        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
                     when(taskLock.isHeldByThread(anyLong())).thenReturn(false);
                     Consumer<String> onContent = invocation.getArgument(8);
@@ -348,7 +358,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         when(modelService.getModelRespBO(1L, 2L)).thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
         when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
                 .thenReturn(new ArrayList<>());
-        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any()))
+        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any()))
                 .thenReturn(new Ai1LlmChatTool.ChatText("回复", ""));
         when(taskStream.ack("ai1-session-workers", RECORD_ID)).thenThrow(new IllegalStateException("ACK 失败"))
                 .thenReturn(1L);
@@ -359,7 +369,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         sessionStreamTool.handleTask(RECORD_ID, buildTaskFields());
         sessionStreamTool.handleTask(RECORD_ID, buildTaskFields(), true);
         // 断言
-        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any());
+        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any());
         verify(sessionMessageService).updateSessionMessage(any());
         assertEquals(List.of("ping", "done"), captureResultTypes());
         verify(taskStream, times(2)).ack("ai1-session-workers", RECORD_ID);

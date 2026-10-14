@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmChatTool;
+import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpToolFactory;
 import cn.iocoder.yudao.module.ai1.harness.rag.Ai1RagTool;
 import cn.iocoder.yudao.module.ai1.harness.skill.Ai1SkillToolFactory;
@@ -35,6 +36,7 @@ import org.redisson.api.stream.StreamReadGroupArgs;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
 import org.redisson.config.NameMapper;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -82,6 +84,8 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
     @Mock
     private Ai1LlmChatTool llmChatTool;
     @Mock
+    private Ai1LlmModelFactory llmModelFactory;
+    @Mock
     private Ai1McpToolFactory mcpToolFactory;
     @Mock
     private Ai1SkillToolFactory skillToolFactory;
@@ -123,11 +127,12 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
         when(agentService.validateAgentExists(1L)).thenReturn(new Ai1AgentDO().setId(1L).setName("客服")
                 .setProviderId(1L).setModelId(2L));
         when(modelService.getModelRespBO(1L, 2L)).thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
+        when(llmModelFactory.buildChatClient(any(), any())).thenReturn(mock(ChatClient.class));
         when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
                 .thenReturn(new ArrayList<>());
-        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any()))
+        when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
-                    Consumer<String> onContent = invocation.getArgument(8);
+                    Consumer<String> onContent = invocation.getArgument(7);
                     onContent.accept("第一段");
                     generated.countDown();
                     assertTrue(release.await(15, TimeUnit.SECONDS));
@@ -167,7 +172,7 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
         // 断言第二个节点没有生成或确认在途任务
         assertEquals(1, taskStream.getPendingInfo(SESSION_TASK_GROUP).getTotal());
         assertEquals(List.of("ping", "message"), resultTypes());
-        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any());
+        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any());
 
         // 调用第一个节点继续完成，并断言只有一份输出
         release.countDown();
@@ -199,7 +204,7 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
         assertEquals(Ai1SessionMessageStatusEnum.FAILED.getStatus(), message.get().getStatus());
         assertEquals(List.of("ping", "message", "error", "done"), resultTypes());
         assertEquals(0, taskStream.getPendingInfo(SESSION_TASK_GROUP).getTotal());
-        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), anyLong(), any(), any());
+        verify(llmChatTool).chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any());
 
         // 调用旧节点恢复，断言不追加旧增量或覆盖回填结果
         release.countDown();
@@ -238,6 +243,7 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
         ReflectionTestUtils.setField(worker, "modelService", modelService);
         ReflectionTestUtils.setField(worker, "knowledgeBaseService", knowledgeBaseService);
         ReflectionTestUtils.setField(worker, "llmChatTool", llmChatTool);
+        ReflectionTestUtils.setField(worker, "llmModelFactory", llmModelFactory);
         ReflectionTestUtils.setField(worker, "mcpToolFactory", mcpToolFactory);
         ReflectionTestUtils.setField(worker, "skillToolFactory", skillToolFactory);
         ReflectionTestUtils.setField(worker, "ragTool", ragTool);

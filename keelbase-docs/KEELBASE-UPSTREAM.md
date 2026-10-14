@@ -29,8 +29,11 @@ says how many such places exist; without the test, nothing says the change still
 
 | file | what it changes | why |
 |---|---|---|
-| `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | the security context upstream sets on its own threads | `D32` — the caller has to reach the tool's thread |
+| `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | the security context upstream sets on its own threads; **and the two seams it now consults before running a turn** (which model, and the deployment's own tools) | `D32` — the caller has to reach the tool's thread; the two seams are the deployment's answer to a question upstream otherwise answers itself |
 | `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | the caller captured where the tool is assembled | `D32` — the same seam, at assembly |
+| `yudao-module-ai1-springai/.../harness/llm/Ai1LlmChatTool.java` | it is handed a `ChatClient` rather than a model snapshot, and no longer builds the client itself | the deployment answers which model a session runs on — see `Ai1ChatModelResolver` |
+| `yudao-module-ai1-springai/.../service/agent/Ai1AgentServiceImpl.java` | agent creation validates a model by asking the same resolver the session asks | a model this deployment cannot reach is refused when the agent is written, rather than surfacing as a failed session later |
+| `yudao-module-ai1-springai/.../harness/llm/Ai1ChatModelResolver.java` + `.../harness/local/Ai1LocalToolProvider.java` (**files added inside the module**) | the two seams the entries above consult | the model comes from this host's own model management, and an agent can reach the runtime's governed tools |
 | `yudao-module-report/.../goview/GoViewProjectMapper.java` | the creator is bound as a string | PostgreSQL refuses the coercion MySQL performs |
 | `yudao-framework/.../swagger/config/YudaoSwaggerWebConfiguration.java` + its registration in that starter's `AutoConfiguration.imports` | a new auto-configuration inside upstream's own package, and the one line that switches it on | springdoc 3.0.3 and Boot 4.x disagree about the `api-docs` endpoint's declared return type, and it throws without this（`dcd9c6b548`） |
 

@@ -1,10 +1,8 @@
 package cn.iocoder.yudao.module.ai1.harness.llm;
 
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
-import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -34,8 +32,6 @@ public class Ai1LlmChatToolTest extends BaseMockitoUnitTest {
 
     @InjectMocks
     private Ai1LlmChatTool llmChatTool;
-    @Mock
-    private Ai1LlmModelFactory llmModelFactory;
 
     @Test
     public void testChat_mixedTools() {
@@ -76,11 +72,15 @@ public class Ai1LlmChatToolTest extends BaseMockitoUnitTest {
             assertTrue(results.stream().anyMatch(result -> result.responseData().contains("skill:hello")));
             return Flux.just(new ChatResponse(List.of(new Generation(new AssistantMessage("工具调用成功")))));
         });
-        when(llmModelFactory.buildChatClient(any(), any())).thenReturn(ChatClient.create(chatModel));
+        // The client is what the chat tool is handed now — which model it talks to is decided before
+        // this call, so this test supplies one directly instead of mocking a factory that builds it.
+        // client 是现在交给会话工具的东西——跟哪个模型说话在**这次调用之前**就定好了，故本测试直接给一个，
+        // 而不是去 mock 一个造它的工厂。
+        ChatClient chatClient = ChatClient.create(chatModel);
 
         // 调用
-        Ai1LlmChatTool.ChatText result = llmChatTool.chat(new Ai1ModelRespBO(), "", List.of(), "调用工具",
-                tools, List.of(), 1L, null, null);
+        Ai1LlmChatTool.ChatText result = llmChatTool.chat(chatClient, "", List.of(), "调用工具",
+                tools, List.of(), null, null);
         // 断言
         assertEquals("工具调用成功", result.getContent());
         assertEquals(1, annotatedTools.calls);

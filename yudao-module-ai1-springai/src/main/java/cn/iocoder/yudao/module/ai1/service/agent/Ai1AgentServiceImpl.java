@@ -9,11 +9,13 @@ import cn.iocoder.yudao.module.ai1.controller.admin.agent.vo.Ai1AgentSaveReqVO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.agent.Ai1AgentDO;
 import cn.iocoder.yudao.module.ai1.dal.mysql.agent.Ai1AgentMapper;
 import cn.iocoder.yudao.module.ai1.enums.model.Ai1ModelTypeEnum;
+import cn.iocoder.yudao.module.ai1.harness.llm.Ai1ChatModelResolver;
 import cn.iocoder.yudao.module.ai1.harness.skill.Ai1SkillToolFactory;
 import cn.iocoder.yudao.module.ai1.service.session.Ai1SessionService;
 import cn.iocoder.yudao.module.ai1.service.model.Ai1ModelService;
 import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,17 @@ public class Ai1AgentServiceImpl implements Ai1AgentService {
 
     @Resource
     private Ai1SkillToolFactory skillToolFactory;
+
+    /**
+     * A deployment that answers the model question itself; see {@link Ai1ChatModelResolver}. Optional
+     * on purpose: absent means this module's own provider rows, which is what keeps `ai1` usable on
+     * its own.
+     *
+     * 自己回答模型问题的部署方；见 {@link Ai1ChatModelResolver}。**刻意**可选：缺席即本模块自己的 provider
+     * 行，`ai1` 因此能单独用。
+     */
+    @Autowired(required = false)
+    private Ai1ChatModelResolver chatModelResolver;
 
     @Override
     public Long createAgent(Ai1AgentSaveReqVO createReqVO) {
@@ -167,7 +180,30 @@ public class Ai1AgentServiceImpl implements Ai1AgentService {
     /**
      * 校验对话模型：Provider、模型存在且开启，模型归属于该 Provider，且为对话模型
      */
+    /**
+     * Refuses an agent whose model cannot be used, at the moment it is written rather than at the
+     * moment somebody speaks to it.
+     *
+     * <p>Which model that is, is the deployment's answer when it gives one — so the same resolver the
+     * session uses is the one asked here, and a model this deployment cannot reach is refused on
+     * create rather than surfacing as a failed session later. The agent is only ever read for the
+     * fields that name a model, which is why a throwaway instance is enough to ask.
+     *
+     * 在 agent 被写下的那一刻、而不是有人跟它说话的那一刻，拒掉一个模型用不了的 agent。
+     *
+     * <p>用的是哪个模型，**部署方给了答案就用它**——故这里问的就是会话所问的那个解析器，一个本部署够不到的模型
+     * 在创建时被拒，而不是后来表现为一次会话失败。这里只读 agent 里**指明模型**的那几个字段，故一个临时实例
+     * 就够问了。
+     *
+     * <p>One of ours, like the field it reads — see the register in {@code keelbase-docs/KEELBASE-UPSTREAM.md}.
+     *
+     * <p>与它读的那个字段一样，是本方的一处改动——见 {@code keelbase-docs/KEELBASE-UPSTREAM.md} 里的登记册。
+     */
     private void validateChatModel(Long providerId, Long modelId) {
+        if (chatModelResolver != null) {
+            chatModelResolver.resolve(new Ai1AgentDO().setProviderId(providerId).setModelId(modelId));
+            return;
+        }
         Ai1ModelRespBO model = modelService.getModelRespBO(providerId, modelId);
         if (!Ai1ModelTypeEnum.isChat(model.getModelType())) {
             throw exception(MODEL_TYPE_NOT_CHAT);
