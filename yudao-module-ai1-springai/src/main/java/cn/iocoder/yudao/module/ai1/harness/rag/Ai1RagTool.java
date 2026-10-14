@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.ai1.harness.rag;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
-import cn.hutool.core.lang.loader.LazyFunLoader;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.ai1.controller.admin.knowledge.vo.base.Ai1KnowledgeSearchRespVO;
@@ -14,14 +13,6 @@ import cn.iocoder.yudao.module.ai1.service.model.Ai1ModelService;
 import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import io.milvus.client.MilvusServiceClient;
-import io.milvus.param.ConnectParam;
-import io.milvus.param.IndexType;
-import io.milvus.param.MetricType;
-import io.milvus.param.R;
-import io.milvus.param.RpcStatus;
-import io.milvus.param.collection.DropCollectionParam;
-import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -31,9 +22,11 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-import org.springframework.ai.vectorstore.milvus.MilvusVectorStore;
+import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,16 +35,35 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 import static cn.iocoder.yudao.module.ai1.enums.Ai1ErrorCodeConstants.MODEL_TYPE_NOT_EMBEDDING;
 
 /**
- * AI1 RAG 工具（Spring AI + Milvus）
+ * AI1 RAG 工具（Spring AI + pgvector）
  *
  * 知识库的向量化、检索、清理与 Advisor 装配：
  * 1. 向量化：分片 → Document（含 documentId、chunkIndex 元数据）→ VectorStore.add（先清理旧向量）
  * 2. 检索：VectorStore.similaritySearch
- * 3. 清理：按 documentId 元数据删除向量；知识库删除时 drop 整个集合
+ * 3. 清理：按 documentId 元数据删除向量；知识库删除时 drop 整张表
  * 4. Advisor：为会话装配 QuestionAnswerAdvisor，检索上下文自动注入
  *
- * 集合名为 {collectionPrefix}{知识库编号}（编号全局唯一，无需租户前缀）；调用方必须先在当前租户下查出知识库，再传入本工具，
- * 以此保证不会越权访问其他租户的集合
+ * 每个知识库一张向量表 {tablePrefix}{知识库编号}（编号全局唯一，无需租户前缀）；调用方必须先在当前租户下
+ * 查出知识库，再传入本工具，以此保证不会越权访问其他租户的表。
+ *
+ * 与旧实现（Milvus）的关系：**同一套语义，只换后端**。Milvus 是一个知识库一个集合（collection），这里是一个
+ * 知识库一张表 —— 两者都由「编号全局唯一 + 调用方先按租户查出知识库」保证隔离。后端换成本机 PG 里已有的
+ * pgvector，少起一个容器；而应用侧打的仍是 Spring AI 的 {@code VectorStore}，将来换别的库也只换这一段。
+ *
+ * AI1 RAG tool (Spring AI + pgvector).
+ *
+ * Vectorising, retrieving and cleaning a knowledge base, plus the Advisor that injects the retrieved
+ * context into a conversation. Each knowledge base gets its own vector table
+ * {@code {tablePrefix}{knowledgeBaseId}} — the id is globally unique, so no tenant prefix is needed —
+ * and the caller must resolve the knowledge base under the current tenant before handing it in, which
+ * is what keeps one tenant out of another's table.
+ *
+ * Against the previous implementation (Milvus): the same semantics, a different backend. Milvus gave
+ * each knowledge base a collection; here each gets a table. Both keep isolation through the same two
+ * facts — a globally unique id, and the caller resolving the base under the current tenant. The
+ * backend is now pgvector, which this host's PostgreSQL already has, so one container is no longer
+ * needed; and because the application still codes against Spring AI's {@code VectorStore}, moving to
+ * another store later is a change to this class alone.
  *
  * @author 芋道源码
  */
@@ -81,22 +93,25 @@ public class Ai1RagTool {
     @Resource
     private Ai1LlmModelFactory llmModelFactory;
 
+    @Resource
+    private DataSource dataSource;
+
     /**
      * 向量存储缓存：知识库编号 → 向量存储；按访问顺序淘汰，嵌入模型实例变化（配置变更后重建）时自动重建
      */
     private final Cache<Long, CachedVectorStore> vectorStoreCache = CacheBuilder.newBuilder()
             .maximumSize(CACHE_MAX).build();
     /**
-     * 按知识库串行初始化的锁，避免并发首访重复创建集合和索引
+     * 按知识库串行初始化的锁，避免并发首访重复建表
      */
     private final Map<Long, Object> vectorStoreLocks = new ConcurrentHashMap<>();
     /**
-     * Milvus 客户端：首次使用时创建，全局复用一个连接
+     * JdbcTemplate：首次使用时基于宿主已有的 DataSource 构建，全局复用一个
      */
-    private final LazyFunLoader<MilvusServiceClient> milvusClientLoader = LazyFunLoader.on(this::createMilvusClient);
+    private volatile JdbcTemplate jdbcTemplate;
 
     /**
-     * 文档向量化：分片 → 嵌入 → 写入 Milvus；先清理旧向量再写入，支持重复向量化
+     * 文档向量化：分片 → 嵌入 → 写入向量表；先清理旧向量再写入，支持重复向量化
      *
      * @param knowledgeBase 知识库（需已配置嵌入模型）
      * @param documentId    文档编号
@@ -111,7 +126,7 @@ public class Ai1RagTool {
         }
 
         // 2. 清理旧向量后写入
-        MilvusVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
+        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
         vectorStore.delete(new FilterExpressionBuilder().eq(METADATA_DOCUMENT_ID, documentId).build());
         List<Document> documents = new ArrayList<>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {
@@ -134,7 +149,7 @@ public class Ai1RagTool {
      */
     public List<Ai1KnowledgeSearchRespVO> search(Ai1KnowledgeBaseDO knowledgeBase, String query, Integer topK) {
         // 1. 相似度检索：未指定检索数量时，使用知识库配置
-        MilvusVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
+        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
         List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
                 .query(query).topK(topK != null && topK > 0 ? topK : getDefaultTopK(knowledgeBase)).build());
 
@@ -164,22 +179,17 @@ public class Ai1RagTool {
     }
 
     /**
-     * 删除知识库的整个向量集合（知识库删除时调用，避免遗留孤儿集合）；失败时仅记录日志
+     * 删除知识库的整张向量表（知识库删除时调用，避免遗留孤儿表）；失败时仅记录日志
      *
      * @param knowledgeBaseId 知识库编号
      */
     public void dropCollection(Long knowledgeBaseId) {
         evict(knowledgeBaseId);
         try {
-            R<RpcStatus> result = milvusClientLoader.get().dropCollection(DropCollectionParam.newBuilder()
-                    .withDatabaseName(ai1Properties.getMilvus().getDatabase())
-                    .withCollectionName(buildCollectionName(knowledgeBaseId))
-                    .build());
-            if (result.getStatus() != R.Status.Success.getCode()) {
-                log.warn("[dropCollection][知识库({}) 向量集合删除失败：{}]", knowledgeBaseId, result.getMessage());
-            }
+            // 表名里只有配置前缀与一个 Long 编号，无注入面
+            jdbcTemplate().execute("DROP TABLE IF EXISTS " + buildTableName(knowledgeBaseId));
         } catch (Exception e) {
-            log.warn("[dropCollection][知识库({}) 向量集合删除异常]", knowledgeBaseId, e);
+            log.warn("[dropCollection][知识库({}) 向量表删除异常]", knowledgeBaseId, e);
         }
     }
 
@@ -190,7 +200,7 @@ public class Ai1RagTool {
      * @return RAG Advisor
      */
     public Advisor buildAdvisor(Ai1KnowledgeBaseDO knowledgeBase) {
-        MilvusVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
+        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
         SearchRequest searchRequest = SearchRequest.builder().topK(getDefaultTopK(knowledgeBase)).build();
         return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build();
     }
@@ -206,17 +216,12 @@ public class Ai1RagTool {
         vectorStoreCache.invalidate(knowledgeBaseId);
     }
 
-    @PreDestroy
-    public void destroy() {
-        milvusClientLoader.ifInitialized(MilvusServiceClient::close);
-    }
-
     // ==================== 内部实现：嵌入模型 / 向量存储 / 分片 ====================
 
     /**
      * 获取（或构建）知识库向量存储：嵌入模型实例不变时复用；Provider、模型配置变更后模型工厂会重建实例，此处随之重建
      */
-    private MilvusVectorStore getOrCreateVectorStore(Ai1KnowledgeBaseDO knowledgeBase) {
+    private PgVectorStore getOrCreateVectorStore(Ai1KnowledgeBaseDO knowledgeBase) {
         // 1. 缓存命中、且嵌入模型实例未变化时，直接复用
         EmbeddingModel embeddingModel = getEmbeddingModel(knowledgeBase);
         CachedVectorStore cached = vectorStoreCache.getIfPresent(knowledgeBase.getId());
@@ -224,26 +229,25 @@ public class Ai1RagTool {
             return cached.getVectorStore();
         }
 
-        // 2. 缓存未命中或嵌入模型实例变化时，构建新的向量存储；按知识库串行初始化，避免并发首访重复创建集合和索引
+        // 2. 缓存未命中或嵌入模型实例变化时，构建新的向量存储；按知识库串行初始化，避免并发首访重复建表
         synchronized (vectorStoreLocks.computeIfAbsent(knowledgeBase.getId(), key -> new Object())) {
             cached = vectorStoreCache.getIfPresent(knowledgeBase.getId());
             if (cached != null && cached.getEmbeddingModel() == embeddingModel) {
                 return cached.getVectorStore();
             }
-            // 2.1 构建向量存储：集合不存在时自动创建
-            String collectionName = buildCollectionName(knowledgeBase.getId());
-            MilvusVectorStore vectorStore = MilvusVectorStore.builder(milvusClientLoader.get(), embeddingModel)
-                    .databaseName(ai1Properties.getMilvus().getDatabase())
-                    .collectionName(collectionName)
-                    .metricType(MetricType.COSINE)
-                    .indexType(IndexType.FLAT)
+            // 2.1 构建向量存储：这张表不存在时由 initializeSchema 建出来
+            String tableName = buildTableName(knowledgeBase.getId());
+            PgVectorStore vectorStore = PgVectorStore.builder(jdbcTemplate(), embeddingModel)
+                    .vectorTableName(tableName)
+                    .distanceType(PgVectorStore.PgDistanceType.COSINE_DISTANCE)
+                    .indexType(PgVectorStore.PgIndexType.HNSW)
                     .initializeSchema(true)
                     .build();
-            // 2.2 手动构建的实例不会触发 Spring 生命周期回调，需主动初始化：建集合、建索引、加载
+            // 2.2 手动构建的实例不会触发 Spring 生命周期回调，需主动初始化：建表、建索引
             try {
                 vectorStore.afterPropertiesSet();
             } catch (Exception e) {
-                throw new IllegalStateException("向量集合(" + collectionName + ") 初始化失败：" + e.getMessage(), e);
+                throw new IllegalStateException("向量表(" + tableName + ") 初始化失败：" + e.getMessage(), e);
             }
             // 2.3 放入缓存
             vectorStoreCache.put(knowledgeBase.getId(), new CachedVectorStore()
@@ -266,34 +270,34 @@ public class Ai1RagTool {
     }
 
     /**
-     * 创建 Milvus 客户端：配置了用户名时，开启鉴权
+     * 基于宿主已有的 DataSource 构建（并复用）JdbcTemplate
      */
-    private MilvusServiceClient createMilvusClient() {
-        YudaoAi1Properties.Milvus milvus = ai1Properties.getMilvus();
-        ConnectParam.Builder builder = ConnectParam.newBuilder()
-                .withUri(milvus.getUri())
-                .withDatabaseName(milvus.getDatabase());
-        if (StrUtil.isNotBlank(milvus.getUsername())) {
-            builder.withAuthorization(milvus.getUsername(), milvus.getPassword());
+    private JdbcTemplate jdbcTemplate() {
+        if (jdbcTemplate == null) {
+            synchronized (this) {
+                if (jdbcTemplate == null) {
+                    jdbcTemplate = new JdbcTemplate(dataSource);
+                }
+            }
         }
-        return new MilvusServiceClient(builder.build());
+        return jdbcTemplate;
     }
 
     /**
-     * 构建知识库的向量集合名：一个知识库对应一个集合
+     * 构建知识库的向量表名：一个知识库一张表
      *
-     * 不同知识库可能使用不同的嵌入模型，向量维度不同，无法共用一个集合；后续也可能落到不同的向量库，按知识库隔离更便于迁移和整体删除
+     * 不同知识库可能使用不同的嵌入模型，向量维度不同，无法共用一张表；后续也可能落到不同的向量库，按知识库隔离更便于迁移和整体删除
      */
-    private String buildCollectionName(Long knowledgeBaseId) {
-        return ai1Properties.getMilvus().getCollectionPrefix() + knowledgeBaseId;
+    private String buildTableName(Long knowledgeBaseId) {
+        return ai1Properties.getPgvector().getTablePrefix() + knowledgeBaseId;
     }
 
     /**
-     * 获得知识库的检索数量：知识库未配置时，使用 yudao.ai1.milvus.default-top-k 配置
+     * 获得知识库的检索数量：知识库未配置时，使用 yudao.ai1.pgvector.default-top-k 配置
      */
     private int getDefaultTopK(Ai1KnowledgeBaseDO knowledgeBase) {
         return knowledgeBase.getTopK() != null && knowledgeBase.getTopK() > 0 ? knowledgeBase.getTopK()
-                : ai1Properties.getMilvus().getDefaultTopK();
+                : ai1Properties.getPgvector().getDefaultTopK();
     }
 
     /**
@@ -338,7 +342,7 @@ public class Ai1RagTool {
         /**
          * 向量存储
          */
-        private MilvusVectorStore vectorStore;
+        private PgVectorStore vectorStore;
 
     }
 

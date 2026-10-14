@@ -23,7 +23,6 @@
         <!-- 以下依赖不在 spring-ai-bom 中，需显式声明版本 -->
         <mcp-sdk.version>2.0.1</mcp-sdk.version>
         <spring-ai-agent-utils.version>0.12.0</spring-ai-agent-utils.version>
-        <milvus-sdk.version>3.0.10</milvus-sdk.version>
     </properties>
 
     <dependencies>
@@ -82,29 +81,10 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-vector-store-advisor</artifactId>
         </dependency>
-        <!-- Spring AI：Milvus 向量存储（非 starter 构件） -->
+        <!-- Spring AI：pgvector 向量存储（非 starter 构件）。用宿主已有的 DataSource，不另起容器。 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-milvus-store</artifactId>
-            <exclusions>
-                <!-- 解决和 logback 的日志冲突 -->
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-reload4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.milvus</groupId>
-            <artifactId>milvus-sdk-java</artifactId>
-            <version>${milvus-sdk.version}</version>
-            <exclusions>
-                <!-- 解决和 logback 的日志冲突 -->
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-reload4j</artifactId>
-                </exclusion>
-            </exclusions>
+            <artifactId>spring-ai-pgvector-store</artifactId>
         </dependency>
         <!-- spring-ai-agent-utils：SkillsTool 技能系统（SKILL.md）及 Shell / FileSystem 等执行工具 -->
         <dependency>

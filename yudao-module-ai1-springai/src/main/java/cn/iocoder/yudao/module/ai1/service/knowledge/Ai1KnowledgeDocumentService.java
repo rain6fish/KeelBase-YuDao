@@ -101,7 +101,7 @@ public interface Ai1KnowledgeDocumentService {
     }
 
     /**
-     * 文档向量化：分片 → 嵌入 → 写入 Milvus，并回写状态与分片数；失败时回写失败状态并抛出异常
+     * 文档向量化：分片 → 嵌入 → 写入向量表，并回写状态与分片数；失败时回写失败状态并抛出异常
      *
      * @param id 编号
      * @return 分片数量

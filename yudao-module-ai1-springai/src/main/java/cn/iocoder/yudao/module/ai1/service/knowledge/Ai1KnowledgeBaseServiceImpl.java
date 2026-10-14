@@ -104,7 +104,7 @@ public class Ai1KnowledgeBaseServiceImpl implements Ai1KnowledgeBaseService {
         knowledgeBaseMapper.deleteByIds(ids);
         knowledgeDocumentService.deleteKnowledgeDocumentListByKnowledgeBaseIds(ids);
 
-        // 3. 删除 Milvus 向量集合：外部资源无法回滚，事务提交后再执行，失败仅记录日志
+        // 3. 删除向量表：外部资源无法回滚，事务提交后再执行，失败仅记录日志
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

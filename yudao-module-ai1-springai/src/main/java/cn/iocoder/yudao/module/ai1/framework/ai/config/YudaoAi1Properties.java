@@ -13,9 +13,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class YudaoAi1Properties {
 
     /**
-     * Milvus 向量数据库
+     * pgvector 向量库：用宿主已有的 DataSource，不再需要 Milvus 容器
+     *
+     * pgvector vector store: it uses the host's own DataSource, so no Milvus container is needed
      */
-    private Milvus milvus = new Milvus();
+    private Pgvector pgvector = new Pgvector();
 
     /**
      * 会话流
@@ -28,30 +30,18 @@ public class YudaoAi1Properties {
     private Skill skill = new Skill();
 
     @Data
-    public static class Milvus {
+    public static class Pgvector {
 
         /**
-         * 连接地址
+         * 知识库向量表名前缀，实际表名为 {tablePrefix}{知识库编号}
+         *
+         * Prefix of a knowledge base's vector table; the table is {tablePrefix}{knowledgeBaseId}
          */
-        private String uri = "http://127.0.0.1:19530";
-        /**
-         * 用户名
-         */
-        private String username;
-        /**
-         * 密码
-         */
-        private String password;
-        /**
-         * 数据库
-         */
-        private String database = "default";
-        /**
-         * 知识库集合名前缀，实际集合名为 {collectionPrefix}{知识库编号}
-         */
-        private String collectionPrefix = "knowledge_base_";
+        private String tablePrefix = "knowledge_base_";
         /**
          * 默认检索数量，知识库未配置检索数量时使用
+         *
+         * Default number of chunks retrieved, used when a knowledge base sets none of its own
          */
         private Integer defaultTopK = 5;
 

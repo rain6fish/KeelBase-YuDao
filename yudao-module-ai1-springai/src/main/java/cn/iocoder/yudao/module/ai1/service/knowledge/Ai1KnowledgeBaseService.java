@@ -33,14 +33,14 @@ public interface Ai1KnowledgeBaseService {
     void updateKnowledgeBase(@Valid Ai1KnowledgeBaseSaveReqVO updateReqVO);
 
     /**
-     * 删除知识库，连带删除文档与 Milvus 向量集合
+     * 删除知识库，连带删除文档与向量表
      *
      * @param id 编号
      */
     void deleteKnowledgeBase(Long id);
 
     /**
-     * 批量删除知识库，连带删除文档与 Milvus 向量集合
+     * 批量删除知识库，连带删除文档与向量表
      *
      * @param ids 编号列表
      */
