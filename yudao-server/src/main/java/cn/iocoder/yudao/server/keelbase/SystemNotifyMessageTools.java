@@ -12,6 +12,7 @@ import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
 import cn.iocoder.yudao.module.system.service.notify.NotifyMessageService;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,14 @@ public class SystemNotifyMessageTools {
 
     /** The caller is an administrator: this host's identity bridge resolves Yudao access tokens. */
     private static final Integer CALLER_USER_TYPE = UserTypeEnum.ADMIN.getValue();
+
+    /**
+     * The argument that makes one "mark everything read" a different call from the next one — see
+     * {@link MarkAllReadTool} for why it exists at all.
+     *
+     * 让一次「全部标记已读」成为与下一次**不同的调用**的那个实参——它为什么存在，见 {@link MarkAllReadTool}。
+     */
+    static final String REQUESTED_AT = "requestedAt";
 
     @Bean
     AiTool listMyNotifyMessages(NotifyMessageService service) {
@@ -352,6 +361,40 @@ public class SystemNotifyMessageTools {
      * R3——**第二种实参形状**的写，也是本面要有第四个工具的原因：把那一对钉在 {@code args[0..1]} 的通知，管的是未读
      * 计数、未读列表与这一个写，而它们此前**没有一个**从工具够得到。这一个是个写，故它做的事在表里看得见——那正是让这条
      * 通知**可观测**的东西。
+     *
+     * <p><b>It takes an argument, and that argument is what keeps it from running once in the
+     * database's whole lifetime.</b> The runtime refuses to repeat a call it has already executed, keyed
+     * on the caller, the tool and its arguments — and this tool used to declare none, so *every* call
+     * after the first was "the same call": it executed once, and each later one came back as
+     * {@code effect N reused}, leaving the caller's unread rows unread for good. Measured: the gate for
+     * this face saw the caller's unread count grow by a row per run, and the audit row said
+     * {@code effect 142 reused: the same call}. Naming the moment of the request makes two calls two
+     * calls — and giving up the ledger's protection is safe here, because bringing a mailbox to read
+     * <em>is</em> idempotent: repeating it changes nothing, which is exactly what the ledger would have
+     * concluded had it been able to look.
+     *
+     * <p>Both callers fill it in: the route, once per turn, and a model, from the schema this
+     * declaration produces.
+     *
+     * <p><b>它收一个实参，而那个实参正是让它不在**库的一生**里只跑一次的东西。</b>运行时拒绝重跑一次它已经执行过的
+     * 调用，键是调用方、工具与它的实参 —— 而本工具过去**一个都不声明**，于是第一次之后的**每一次**都是「同一个调用」：
+     * 它执行一次，此后每一次都以 {@code effect N reused} 回来，调用方的未读行就此**永远**未读。实测：本面那条门禁看着
+     * 调用方的未读数**每跑一次涨一行**，而审计行写着 {@code effect 142 reused: the same call}。点名请求的时刻，两次
+     * 调用就是两次调用 —— 而在这里丢掉账本那层保护是**安全**的，因为把信箱弄成已读**本来就是幂等的**：重复它什么都不改，
+     * 那正是账本若能去看就会得出的结论。
+     *
+     * <p>两个调用方都填它：路由每轮填一次，模型则按这条声明生成的 schema 填。
+     *
+     * <p><b>What this does not fix, and it is small and named rather than implied.</b> A caller that
+     * repeats an earlier value — a model copying an argument out of the conversation, say — gets the
+     * ledger's reuse back, and the call is then a no-op on a mailbox that has since received something.
+     * That is the same outcome every call after the first used to get; what changed is that it now takes
+     * a stale value to happen, instead of happening always. The route cannot go stale: it reads the
+     * clock once per turn.
+     *
+     * <p><b>它没修什么，这一点很小、但写明而不暗示。</b>一个**重复了先前取值**的调用方——比如模型从对话里把实参抄下来
+     * ——拿回的是账本那一次复用，而这次调用于是对「此后又收到过东西的」信箱成为 no-op。那正是**从前每一次**（第一次之后
+     * 的每一次）都会得到的结局；变的是它现在**需要**一个陈旧取值才会发生，而不是总会发生。路由不会陈旧：它每轮读一次时钟。
      */
     static final class MarkAllReadTool implements AiTool {
 
@@ -404,6 +447,20 @@ public class SystemNotifyMessageTools {
             return "notify_mailbox";
         }
 
+        /**
+         * The one argument, and it is not read for what it says but for what it *does*: a call that
+         * names its own moment is a different call each time. See the class comment for the measurement
+         * that made this necessary.
+         *
+         * 唯一的那个实参；读它不是为了它说的内容，而是为了它**造成的**那件事：一次点名了自己时刻的调用，每次都**是**
+         * 不同的调用。它为什么必要，见类注释里那一次实测。
+         */
+        @Override
+        public List<ToolParameter> parameters() {
+            return List.of(ToolParameter.required(REQUESTED_AT, ToolParameter.STRING,
+                    "本次请求的时刻，ISO-8601（例如 2026-10-14T09:30:00Z）"));
+        }
+
         @Override
         public ToolResult execute(Map<String, Object> args, Principal principal) {
             Long caller = asId(principal.userId());
@@ -413,6 +470,11 @@ public class SystemNotifyMessageTools {
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", caller);
             out.put("changed", changed);
+            // The moment the call named, handed back — so the effect recorded for it says *when* the
+            // mailbox was brought to read, and not only that it was.
+            // 这次调用点名的那个时刻，原样交回——于是为这次调用记下的副作用说得清信箱是**什么时候**被弄成已读的，
+            // 而不只是「被弄成已读了」。
+            out.put("requestedAt", args.get(REQUESTED_AT));
             return ToolResult.ok(out);
         }
     }
@@ -429,9 +491,15 @@ public class SystemNotifyMessageTools {
             return List.of("全部已读", "全部标记为已读", "清空未读", "一键已读");
         }
 
+        /**
+         * The moment this turn is asking in, so that this call is not the previous one. A route
+         * answers once per turn, which is exactly the resolution the ledger needs — see the tool.
+         *
+         * 这一轮提问的时刻，好让这次调用不是上一次。路由**每轮**答一次，而那个粒度正是账本需要的——见那个工具。
+         */
         @Override
         public Map<String, Object> args(Map<String, Object> context) {
-            return Map.of();
+            return Map.of(REQUESTED_AT, Instant.now().toString());
         }
     }
 
