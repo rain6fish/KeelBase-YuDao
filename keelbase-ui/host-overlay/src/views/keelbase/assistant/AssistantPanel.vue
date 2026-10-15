@@ -77,14 +77,29 @@
             <summary>思考过程</summary>
             <div class="thinking-text">{{ m.reasoning }}</div>
           </details>
-          <div class="text">{{ m.content }}</div>
+          <!-- 助手的话按行内粗体渲染；**用户自己打的字按原样显示** —— 见 `boldSegments` 上方那条注释。 -->
+          <!-- The assistant's text is rendered with inline bold; **what the user typed is shown as typed** —
+               see the note above `boldSegments`. -->
+          <div v-if="m.role === 'user'" class="text">{{ m.content }}</div>
+          <div v-else class="text">
+            <template v-for="(seg, i) in boldSegments(m.content)" :key="i">
+              <strong v-if="seg.bold">{{ seg.text }}</strong>
+              <template v-else>{{ seg.text }}</template>
+            </template>
+          </div>
         </div>
       </div>
 
       <div v-if="streaming" class="row left">
         <div class="bubble assistant-bubble">
           <div v-if="thinking" class="thinking-live">{{ thinking }}</div>
-          <div class="text">{{ reply }}<span class="caret">▌</span></div>
+          <div class="text">
+            <template v-for="(seg, i) in boldSegments(reply)" :key="i">
+              <strong v-if="seg.bold">{{ seg.text }}</strong>
+              <template v-else>{{ seg.text }}</template>
+            </template>
+            <span class="caret">▌</span>
+          </div>
         </div>
       </div>
 
@@ -180,6 +195,58 @@ function outcomeText(outcome: string | null | undefined): string {
   if (!outcome) return '—'
   const key = outcomeLabelKey(outcome)
   return key ? t(key) : outcome
+}
+
+/**
+ * A piece of the assistant's text, and whether it was marked as bold.
+ *
+ * 助手的一段文字，以及它有没有被标成粗体。
+ */
+interface Segment {
+  text: string
+  bold: boolean
+}
+
+/**
+ * Splits the assistant's text on `**bold**` runs, so those read as bold instead of as asterisks.
+ *
+ * **Why not `v-html`.** This text is the model's output — content the deployment does not author and does not
+ * control. Handing it to `v-html` would make every reply an HTML injection surface, and escaping it first is a
+ * second thing to get right. Instead the text is only ever *split*, and the pieces are rendered as ordinary
+ * Vue children: there is no HTML parsing anywhere on this path, so there is nothing to inject into.
+ *
+ * **Only the assistant's side.** What the user typed is shown as typed — turning their own `**` into bold would
+ * be this panel editing their words back at them. The model's output is the only thing here that arrives with
+ * markdown in it.
+ *
+ * **An unterminated `**` stays literal**, which is what streaming looks like: while the model is still emitting
+ * a bold run, the opening marker is not yet paired, so it shows as a marker for a moment and settles. Pairing
+ * it early would mean guessing where a run ends.
+ *
+ * 把助手的文字按 `**粗体**` 切开，好让它们读作粗体、而不是星号。
+ *
+ * **为什么不用 `v-html`。** 这段文字是**模型的输出** —— 本部署既不是它的作者、也控制不了它。把它交给
+ * `v-html`，等于让每条回复都成为一处 HTML 注入面；而先转义再交出去，是多一件要做对的事。这里只做**切分**，
+ * 各段按普通 Vue 子节点渲染：这条路径上**没有任何 HTML 解析**，也就没有可注入的地方。
+ *
+ * **只管助手那一侧。** 用户自己打的字按原样显示 —— 把他们的 `**` 变成粗体，是本面板在替他们改自己的话。
+ * 这里唯一会带着 markdown 来的，是模型的输出。
+ *
+ * **没配对的 `**` 保持字面**，而那正是流式过程中的样子：模型还在往外吐一段粗体时，起始标记尚未配对，于是它
+ * 先像个标记、随后落定。提前配对它，等于去猜那一段在哪儿结束。
+ */
+function boldSegments(text: string | null | undefined): Segment[] {
+  if (!text) return []
+  const segments: Segment[] = []
+  const pattern = /\*\*([\s\S]+?)\*\*/g
+  let end = 0
+  for (const match of text.matchAll(pattern)) {
+    if (match.index > end) segments.push({ text: text.slice(end, match.index), bold: false })
+    segments.push({ text: match[1], bold: true })
+    end = match.index + match[0].length
+  }
+  if (end < text.length) segments.push({ text: text.slice(end), bold: false })
+  return segments
 }
 
 /**
