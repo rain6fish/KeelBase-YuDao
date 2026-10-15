@@ -72,15 +72,31 @@ if [[ ! -f "$THEME_SCSS" ]]; then
 fi
 
 # --- 1. the checkout ------------------------------------------------------------------------------
-# Remove a checkout directory even when an earlier run left it half-deleted. On Windows the nested
-# `node_modules` paths exceed MAX_PATH, so `rm -rf` stops partway; what remains is not empty, and
-# `git clone` refuses a non-empty destination. The `\\?\` route (robocopy in mirror mode, then `rd`)
-# lifts that limit; elsewhere `rm -rf` is already enough. It takes no view on whether the directory is
-# there — see the caller.
+# 删掉一个检出目录，哪怕更早的一次运行只删了它一半 —— 半删状态下目标**非空**，而 `git clone` 拒绝非空的
+# 目标。它**不对目录在不在作判断**（见调用处）；末尾那条收尾检查只**把「删不掉」说出来**，不改权威归属。
 #
-# 删掉一个检出目录，哪怕更早的一次运行只删了它一半。Windows 里嵌套的 `node_modules` 路径超过 MAX_PATH，
-# `rm -rf` 会中途停下；剩下的是**非空**的，而 `git clone` 拒绝非空的目标。`\\?\` 那条路（robocopy 镜像 +
-# `rd`）能绕开上限；别处 `rm -rf` 本就够。它**不对目录在不在作判断** —— 见调用处。
+# ⚠ Windows 那两步的写法是**踩着两个坑**定下来的（2026-10-15 实测，两个坑都会**静默**）：
+#   · `robocopy` 必须配 `MSYS_NO_PATHCONV=1`（**只给这一行**）：不关参数改写时，Git Bash 会把 `/MIR`
+#     等开关先变成 Windows 路径，robocopy 于是**以 16（用法错误）退出、什么都不删**；
+#   · `rd` 的两个开关都要写**双斜杠**：默认转换下 `//s` 到 cmd 手里正好是 `/s`，而裸的 `/s` 会被改写成
+#     盘符路径；「整条命令套一对引号」的旧写法同样不成立 —— cmd 会剥掉外层引号，`rd` 报语法错（123）。
+#   两处失败原先都被 `|| true` 吞掉 ⇒ **一次什么也没干的清理会被读成成功**，故补了下面的收尾检查。
+#
+# Remove a checkout directory even when an earlier run left it half-deleted — in that state the
+# destination is non-empty and `git clone` refuses it. It takes no view on whether the directory is
+# there (see the caller); the check at the end only *says out loud* that it could not remove it, and
+# does not move the authority.
+#
+# ⚠ The two Windows steps read the way they do because of two traps, both measured 2026-10-15 and both
+# **silent**:
+#   · `robocopy` needs `MSYS_NO_PATHCONV=1` (**on that line only**): with conversion on, Git Bash turns
+#     `/MIR` and the other switches into Windows paths first, so robocopy exits 16 (usage) and deletes
+#     nothing;
+#   · both `rd` switches need **doubled slashes**: under the default conversion `//s` reaches cmd as
+#     `/s`, while a bare `/s` is rewritten into a drive path. Quoting the whole command — the form this
+#     used to take — fails too: cmd strips the outer quotes and `rd` reports a syntax error (123).
+#   Both failures were swallowed by `|| true`, so **a wipe that did nothing read as success** — hence
+#   the check below.
 wipe_checkout() {
   local dir="$1" tmp win
   rm -rf "$dir" 2>/dev/null || true
@@ -88,13 +104,24 @@ wipe_checkout() {
     MINGW*|MSYS*|CYGWIN*)
       if command -v robocopy >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then
         tmp="$(mktemp -d)"
-        robocopy "$(cygpath -w "$tmp")" "$(cygpath -w "$dir")" /MIR /NFL /NDL /NJH /NJS /NP >/dev/null 2>&1 || true
+        MSYS_NO_PATHCONV=1 robocopy "$(cygpath -w "$tmp")" "$(cygpath -w "$dir")" \
+          /MIR /NFL /NDL /NJH /NJS /NP >/dev/null 2>&1 || true
         rm -rf "$tmp" 2>/dev/null || true
       fi
       win="$(cygpath -w "$dir" 2>/dev/null || printf '%s' "$dir")"
-      cmd //c "rd /s /q \"$win\"" >/dev/null 2>&1 || true
+      cmd //c rd //s //q "$win" >/dev/null 2>&1 || true
       ;;
   esac
+  # 收尾检查：删不掉就说出来。**不改权威** —— 目标能不能用仍以 `git clone` 为准（见调用处）；这条只是
+  # 把「是哪一步没成」说清楚，别让它以一次看起来无关的克隆失败露面。
+  #
+  # Post-condition: say so when the directory is still there. It does not move the authority — whether
+  # the destination is usable is still `git clone`'s call (see the caller). It just names which step
+  # failed, instead of letting that surface as an unrelated-looking clone failure.
+  if [ -e "$dir" ]; then
+    echo "wipe_checkout: $dir 仍在 —— git clone 会以「非空」拒绝它；请手工删掉再重跑。" >&2
+    echo "wipe_checkout: $dir is still there — git clone will refuse it as non-empty; remove it by hand and re-run." >&2
+  fi
   return 0
 }
 
