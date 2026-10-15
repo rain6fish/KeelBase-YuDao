@@ -106,7 +106,7 @@
           <div class="row-detail">
             <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTool') }}</span><span>{{ toolText(row.toolName) }}</span></div>
             <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colResultType') }}</span><span>{{ row.resultType || '—' }}</span></div>
-            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTargetId') }}</span><span>#{{ row.resultId ?? '—' }}</span></div>
+            <div class="d-row"><span class="d-key">{{ t('keelbase.effects.colTargetId') }}</span><span>{{ idText(row.resultId) }}</span></div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.effects.colTarget') }}</span>
               <span>
@@ -139,7 +139,7 @@
               </el-table-column>
               <el-table-column :label="t('keelbase.effects.businessLogColWhat')" prop="subType" width="140" />
               <el-table-column :label="t('keelbase.effects.businessLogColWho')" width="110">
-                <template #default="{ row: r }">{{ r.userId ?? '—' }}</template>
+                <template #default="{ row: r }">{{ whoText(r) }}</template>
               </el-table-column>
               <el-table-column :label="t('keelbase.effects.businessLogColAction')" prop="action" show-overflow-tooltip />
             </el-table>
@@ -151,7 +151,7 @@
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
         <template #default="{ row }">
-          {{ maskTitle(row.targetTitle) }} <span class="muted">#{{ row.resultId ?? '—' }}</span>
+          {{ maskTitle(row.targetTitle) }} <span class="muted">{{ idText(row.resultId) }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colResultType')" prop="resultType" width="150" />
@@ -206,6 +206,25 @@ function toolText(name: string | null | undefined): string {
   if (!name) return '—'
   const key = toolLabelKey(name)
   return key ? t(key) : name
+}
+
+/**
+ * 宿主那一行记下的调用方：先取它**自己配好的名字**，其次它记下的 id，都没有则**如实留空**。
+ *
+ * 不说得比宿主多：这一列是「宿主为这次写记下了谁」，故名字由**它**给（它的操作日志页本就拿自己的用户表
+ * 译过一遍），控制台不另发一次查询去凑一个更好看的名字。宿主没记的那些行 —— 本次改动之前写下的、以及它确实
+ * 说不出调用方的那些 —— 留一个破折号，而不是拿别的轨上的 id 去补。
+ */
+function whoText(row: BusinessLogRow): string {
+  if (row.userName) return row.userName
+  return row.userId === null || row.userId === undefined ? '—' : String(row.userId)
+}
+
+/**
+ * 记录编号：有编号时给 `#id`，没有时给一个破折号 —— **不给占位符配井号**（那读起来像个坏掉的 id）。
+ */
+function idText(value: number | string | null | undefined): string {
+  return value === null || value === undefined ? '—' : `#${value}`
 }
 
 /** Whether the record this write landed on is still there — read off the row, never re-derived. */

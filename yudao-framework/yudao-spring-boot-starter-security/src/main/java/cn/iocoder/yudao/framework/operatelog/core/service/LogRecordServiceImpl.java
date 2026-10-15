@@ -11,6 +11,7 @@ import com.mzt.logapi.service.ILogRecordService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 
@@ -26,6 +27,12 @@ public class LogRecordServiceImpl implements ILogRecordService {
 
     @Resource
     private OperateLogCommonApi operateLogApi;
+
+    /**
+     * 请求自己说不出调用方时，由它作答；宿主没有提供时它是 {@code null}，行为与从前一致。
+     */
+    @Autowired(required = false)
+    private OperateLogOperatorSource operatorSource;
 
     @Override
     public void record(LogRecord logRecord) {
@@ -47,14 +54,24 @@ public class LogRecordServiceImpl implements ILogRecordService {
         }
     }
 
-    private static void fillUserFields(OperateLogCreateReqDTO reqDTO) {
+    private void fillUserFields(OperateLogCreateReqDTO reqDTO) {
         // 使用 SecurityFrameworkUtils。因为要考虑，rpc、mq、job，它其实不是 web；
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        if (loginUser == null) {
+            // 请求自己的身份为空：问那条接缝。AI 的工具路径跑在安全过滤器链之外，它的调用方由别处发布 ⇒
+            // 少了这一步，AI 写下的那行日志在「谁」这一列上是空的，而那正是审计最要的一列。
+            loginUser = actingOperator();
+        }
         if (loginUser == null) {
             return;
         }
         reqDTO.setUserId(loginUser.getId());
         reqDTO.setUserType(loginUser.getUserType());
+    }
+
+    /** 宿主那条接缝说的操作者；宿主没提供时给 {@code null}。 */
+    private LoginUser actingOperator() {
+        return operatorSource == null ? null : operatorSource.currentOperator();
     }
 
     public static void fillModuleFields(OperateLogCreateReqDTO reqDTO, LogRecord logRecord) {

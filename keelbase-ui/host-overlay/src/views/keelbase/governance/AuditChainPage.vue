@@ -71,7 +71,7 @@
           <div class="row-detail">
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colWho') }}</span>
-              <span>{{ callerName(row.userId) }} <span class="muted">#{{ row.userId ?? '—' }}</span></span>
+              <span>{{ callerName(row.userId) }} <span v-if="row.userId" class="muted">#{{ row.userId }}</span></span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colTime') }}</span>
@@ -134,7 +134,8 @@
       <el-table-column :label="t('keelbase.audit.colWho')" width="170">
         <template #default="{ row }">
           <div>{{ callerName(row.userId) }}</div>
-          <div class="muted">#{{ row.userId ?? '—' }}</div>
+          <!-- 没有 id 的行**不画那一行**：`#—` 读起来像一个坏掉的 id，而不是「这次没人可挂」。 -->
+          <div v-if="row.userId" class="muted">#{{ row.userId }}</div>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colWhat')" min-width="240">

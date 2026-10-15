@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,254 @@
+@@ -1,4 +1,277 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -84,7 +84,7 @@ index 96269a8..2611a9b 100644
 +      statePresent: 'still there',
 +      stateDeleted: 'deleted (recoverable from the recycle bin)',
 +      stateGone: 'no longer there',
-+      businessLogHint: 'Writes the host logged for this object, newest first — a correlation by object id and time, not a hard link.',
++      businessLogHint: 'Writes the host logged for this object, newest first — a correlation by object id and time, not a hard link. "Who" is the caller the host recorded on its own row; a row it logged with nobody stays blank.',
 +      businessLogEmpty: 'The host logged no write for this object.',
 +      businessLogUnmapped: 'This result type maps to no host-side module here.',
 +      businessLogColWhen: 'When',
@@ -154,6 +154,7 @@ index 96269a8..2611a9b 100644
 +      roleAdmin: 'Administrator',
 +      roleUser: 'User',
 +      revision: 'revision {r}',
++      toolDeclared: 'Tool declares: {text}',
 +    },
 +    tool: {
 +      list_yudao_users: 'List admin users',
@@ -172,6 +173,28 @@ index 96269a8..2611a9b 100644
 +      mark_all_notify_messages_read: 'Mark all messages read',
 +      list_generated_products: 'List products',
 +      create_generated_products: 'Create a product',
++    },
++    // A tool's one-line purpose in the reader's language: the policy centre reads off this, so the
++    // table is legible without knowing a registered name. Each line is a translation of **what that
++    // tool declares it does** (`/ai/tools` answers a description per tool), not a guess from spelling;
++    // a tool that is not here falls back to its registered name and its own declared words.
++    toolDesc: {
++      list_yudao_users: 'List this host’s admin users; id, nickname and status only, no contact fields.',
++      analyze_customer_risk: 'Analyse the risk level of a customer.',
++      create_followup: 'Add a follow-up note to a customer.',
++      escalate_customer: 'Escalate a customer to a management review.',
++      list_my_oa_leaves: 'List the caller’s own leave requests in this host’s BPM module.',
++      approve_oa_leave: 'Approve a leave request (held for a human); a row outside the caller’s scope is refused after approval.',
++      navigate_console_page: 'Open a page of the administration console, by one of the page keys it lists.',
++      list_crm_customers: 'List the customers in this host’s CRM module; only rows the caller is party to, no contact fields.',
++      create_crm_customer: 'Create a customer in this host’s own CRM module; the engine holds it for a human.',
++      update_crm_customer: 'Update a customer (held for a human); a row outside the caller’s scope is refused after approval.',
++      list_my_notify_messages: 'List the in-app messages this host’s system module holds for the caller, scoped to their own user id and type.',
++      get_notify_message: 'Read one in-app message by id; someone else’s reads as a failure rather than as empty.',
++      mark_notify_message_read: 'Mark one in-app message read (held for a human); someone else’s message matches nothing.',
++      mark_all_notify_messages_read: 'Mark every unread in-app message read (held for a human), scoped to the caller.',
++      list_generated_products: 'List the products of the module Yudao’s code generator produced; the caller’s own rows only.',
++      create_generated_products: 'Create a product through the module Yudao’s code generator produced.',
 +    },
 +    meaning: {
 +      attempted: 'Only the attempt is recorded — its outcome is the row next to it',
@@ -261,7 +284,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,254 @@
+@@ -1,4 +1,276 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -343,7 +366,7 @@ index 35f1e1a..856d201 100644
 +      statePresent: '还在',
 +      stateDeleted: '已删除（回收站可恢复）',
 +      stateGone: '已不在',
-+      businessLogHint: '宿主为这个对象记下的写，最新在前 —— 按对象 id 与时间的相关，不是硬链接。',
++      businessLogHint: '宿主为这个对象记下的写，最新在前 —— 按对象 id 与时间的相关，不是硬链接。「谁」是宿主那一行自己记下的调用方；它没记的行如实留空。',
 +      businessLogEmpty: '宿主没有为这个对象记下任何写。',
 +      businessLogUnmapped: '这个结果类型在本部署里没有对应的宿主模块。',
 +      businessLogColWhen: '何时',
@@ -413,6 +436,7 @@ index 35f1e1a..856d201 100644
 +      roleAdmin: '管理员',
 +      roleUser: '普通用户',
 +      revision: '版本 {r}',
++      toolDeclared: '工具自述：{text}',
 +    },
 +    tool: {
 +      list_yudao_users: '查看管理员用户',
@@ -431,6 +455,27 @@ index 35f1e1a..856d201 100644
 +      mark_all_notify_messages_read: '全部标记已读',
 +      list_generated_products: '查询产品',
 +      create_generated_products: '新建产品',
++    },
++    // 工具的一行用途，用读者的语言 —— 策略中心靠它，让人不认得工具名也读得懂那张表。
++    // 每条都是**那个工具自己声明的用途**（`/ai/tools` 逐个答了描述）的译文，不是从名字猜的。
++    // 这里没有的工具，策略中心回落到它的注册名与它自己的声明。
++    toolDesc: {
++      list_yudao_users: '列出本宿主的管理端用户；只返回 id、昵称与状态，不投影联系方式。',
++      analyze_customer_risk: '分析某个客户的风险等级。',
++      create_followup: '在某个客户下记一条跟进。',
++      escalate_customer: '把某个客户升级到管理层会审。',
++      list_my_oa_leaves: '列出本宿主 BPM 模块里该调用方自己的请假单；范围由模块按申请人定。',
++      approve_oa_leave: '批准一条请假单（引擎会先扣下等人）；不在调用方范围内的行，批准之后照样被拒。',
++      navigate_console_page: '打开管理控制台的一页并让控制台跳过去；页键只能取它列出的那些之一。',
++      list_crm_customers: '列出本宿主 CRM 模块里的客户；只返回调用方有份的那些行，不投影联系人字段。',
++      create_crm_customer: '在本宿主已有的 CRM 模块里新建客户；引擎会先扣下等人。',
++      update_crm_customer: '更新本宿主 CRM 模块里的客户（引擎会先扣下等人）；不在调用方范围内的行，批准之后照样被拒。',
++      list_my_notify_messages: '列出本宿主系统模块发给该调用方的站内消息；范围按调用方自己的用户 id 与类型定。',
++      get_notify_message: '按 id 读该调用方的一条站内消息；不是他的消息读不到，按失败报出、不报成空。',
++      mark_notify_message_read: '把该调用方的一条站内消息标为已读（引擎会先扣下等人）；不是他的消息一条也匹配不上。',
++      mark_all_notify_messages_read: '把该调用方所有未读站内消息标为已读（引擎会先扣下等人）；范围由模块按调用方定。',
++      list_generated_products: '列出芋道代码生成器产出的那个模块里的产品；只返回调用方自己的那些行。',
++      create_generated_products: '通过芋道代码生成器产出的那个模块新建产品。',
 +    },
 +    meaning: {
 +      attempted: '只记「试过」—— 它的结局在相邻那一行',

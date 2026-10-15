@@ -51,10 +51,15 @@
     </div>
 
     <el-table v-loading="loading" :data="rows" stripe>
-      <el-table-column :label="t('keelbase.toolInv.colTool')" min-width="240">
+      <el-table-column :label="t('keelbase.toolInv.colTool')" min-width="320">
         <template #default="{ row }">
-          <div>{{ row.name }} <el-tag v-if="row.override" size="small" type="warning" effect="plain">{{ t('keelbase.policy.overrideTag') }}</el-tag></div>
-          <div class="muted">{{ row.description }}</div>
+          <!-- 业务读者认得那个中文名，工程师仍看得见注册名：两者都给，不让谁给谁让路。 -->
+          <div>{{ toolText(row.name) }} <el-tag v-if="row.override" size="small" type="warning" effect="plain">{{ t('keelbase.policy.overrideTag') }}</el-tag></div>
+          <div class="muted">{{ row.name }}</div>
+          <!-- 一行**读者语言**的用途：这张表是要被人读着做决定的，不该逼人先认得工具名。 -->
+          <div class="muted">{{ toolDescription(row.name, row.description) }}</div>
+          <!-- 工具**自己**说它做什么 —— 是它的声明，不是我们对它的概括（与 AI 审计页同一口径）。 -->
+          <div v-if="row.description" class="muted">{{ t('keelbase.policy.toolDeclared', { text: row.description }) }}</div>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.toolInv.colRisk')" width="120">
@@ -123,7 +128,7 @@ import {
   type ToolPolicyOverride,
 } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
-import { gateLabelKey } from '@/keelbase/labels'
+import { gateLabelKey, toolDescriptionKey, toolLabelKey } from '@/keelbase/labels'
 
 defineOptions({ name: 'KeelbaseGovernancePolicyCenter' })
 
@@ -179,6 +184,18 @@ const rows = computed<Row[]>(() =>
 function gateText(gate: string | null | undefined): string {
   const key = gateLabelKey(gate)
   return key ? t(key) : (gate ?? '—')
+}
+
+/** 工具名，用读者的语言；控制台不认识它时保留注册名（诚实，不是编造）。 */
+function toolText(name: string): string {
+  const key = toolLabelKey(name)
+  return key ? t(key) : name
+}
+
+/** 工具的一行用途，用读者的语言；控制台不认识它时回落到**工具自己声明**的那句。 */
+function toolDescription(name: string, declared: string | null): string {
+  const key = toolDescriptionKey(name)
+  return key ? t(key) : (declared ?? '—')
 }
 
 /** Every edit goes through here, so an override that was there stays there. */

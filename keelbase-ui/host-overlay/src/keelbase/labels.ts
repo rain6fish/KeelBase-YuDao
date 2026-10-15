@@ -145,6 +145,18 @@ export function toolLabelKey(name: string | null | undefined): string | null {
 }
 
 /**
+ * 工具**读者语言那一行用途**的 i18n key；控制台不认识它时为 null。
+ *
+ * 名字与用途是**两条** key，不是一个：名字是一行标题里的词，用途是政策页上让人**不用打开工具**就知道它
+ * 会做什么的那一句。两者的中文都是**对工具自己声明的用途的翻译**（`/ai/tools` 逐个答了描述），不是从名字
+ * 猜的；控制台不认识某个工具时两条都回落到**它的注册名与它自己的声明**，那是诚实，不是编造。
+ */
+export function toolDescriptionKey(name: string | null | undefined): string | null {
+  const code = inSet(TOOLS, name)
+  return code ? `keelbase.toolDesc.${code}` : null
+}
+
+/**
  * The i18n key for **what an outcome means**, one line — the thing a reader who is not an engineer needs
  * and a single word cannot carry. "Pending" is a state; 「还没真的写入，等有人批准」is what it means to
  * the business.

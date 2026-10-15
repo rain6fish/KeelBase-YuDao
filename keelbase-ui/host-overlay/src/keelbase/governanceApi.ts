@@ -310,6 +310,11 @@ export interface BusinessLogRow {
   bizId: number | null
   action: string | null
   userId: number | null
+  /**
+   * 宿主自己给 `userId` 配的名字 —— 它的操作日志页拿管理端用户表把 id 译出来，故这个名字随行一起到，
+   * 不必再发一次查询就说得出一行的调用方。
+   */
+  userName: string | null
   createTime: string
 }
 
