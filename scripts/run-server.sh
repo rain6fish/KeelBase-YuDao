@@ -34,12 +34,22 @@ PG_URL="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
 
 # KeelBase's model loop is **off unless a key is given**, and that default is the point rather than a
 # convenience: the scenario gates assert *which* tool ran (`list_crm_customers`, and so on), which a
-# model would turn into a guess. Present a key and the runtime's rule-based planner stands down in
-# favour of the model-driven one on `/ai/chat`, and `/ai/task` gains the governed multi-step loop.
-# The key is read from the environment, never written here.
+# model would turn into a guess. With a key, two things change. `/ai/task` gains the governed multi-step
+# loop. And on `/ai/chat` the model becomes the **last** planner in this host's chain — behind the
+# host's own routes and behind the runtime's rules, so a phrase either of those already knows never
+# reaches a model at all. It is *not* that the rule-based planner stands down: that is the shape a
+# deployment with no planner of its own gets, and this one is not that. `YudaoToolFaceConfiguration`
+# deliberately takes the single `ToolCallPlanner` slot so the runtime's router yields — and taking it
+# suppresses the model-backed planner by the same condition, which is why this host composes the model
+# into its fallback explicitly (see `ModuleRoutePlanner`'s constructor). The key is read from the
+# environment, never written here.
 # KeelBase 的模型回路**不给 key 就不开**，而这个默认是**要点**、不是图省事：场景门禁断言的是**哪个**工具跑了
-# （`list_crm_customers` 之类），换成模型就把这件事变成猜。给了 key，运行时那个规则版 planner 就让位给 `/ai/chat`
-# 上的模型版，而 `/ai/task` 也拿到那条受治理的多步循环。key 从环境读，**不写在这里**。
+# （`list_crm_customers` 之类），换成模型就把这件事变成猜。给了 key 会变两件事：`/ai/task` 拿到那条受治理的多步
+# 循环；而 `/ai/chat` 上模型成为本宿主那条链的**最后一环** —— 排在宿主自己的路由与运行时的规则**之后**，故这两者
+# 认得出来的短语**根本不问模型**。这里**不是**「规则版 planner 让位给模型版」——那是**自己没有规划器**的部署拿到的
+# 形状，而本部署不是：`YudaoToolFaceConfiguration` **刻意**占住那唯一一个 `ToolCallPlanner` 槽（好让运行时的规则
+# 路由器让位），而**占住它按同一条条件把模型版也一并顶掉**了 —— 所以本宿主把模型**显式**组合进自己的兜底
+# （见 `ModuleRoutePlanner` 的构造参数）。key 从环境读，**不写在这里**。
 AI_ARGS=()
 if [ -n "${KEELBASE_MODEL_API_KEY:-}" ]; then
   # The builder the model loop needs is the host's **own** bean (`YudaoChatClientConfiguration`), not
