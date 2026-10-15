@@ -27,6 +27,15 @@
 // **跟着调用方走**。
 //
 // ⚠ 这道闸刻意写成**不可能在一张忙的库上侥幸通过**：每个读数都挂在**本轮自己的标记**上，绝不数整张表。
+//
+// **它造的东西，它收回去** —— 包括它建的**那个租户与那个用户**（`GateTenant` 自本轮起不再留在库里复用；
+// 代价是下一次运行要重新建、并等过宿主那一分钟的租户缓存）。收尾只按本轮的三个标记删业务行，
+// 租户名下则按 `tenant_id` 收、表名现查。**审计行刻意不动**：哈希链，剪它一环比凌乱更坏。
+//
+// Everything it creates, it removes again — including the **tenant and user it creates** (`GateTenant` is no
+// longer left in the database for reuse, at the cost of recreating it next run and waiting out the host's
+// one-minute tenant cache). The business rows go by this run's three markers; the tenant's own rows go by
+// `tenant_id`, with the table list read from `information_schema`. Audit rows are deliberately left alone.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -172,17 +181,64 @@ check('[root] 看不到 gate 那笔', 0, Number(psql(`select count(*) from crm_c
 
 // ── 4) the declared fallback, read rather than asserted ──────────────────────────────────────────
 console.log('== 场景 5 · 读数（非断言）：不给租户头时会怎样 ==');
+let noheaderMarker = '';
 {
-  const marker = `tenantgate-noheader-${Date.now()}`;
+  noheaderMarker = `tenantgate-noheader-${Date.now()}`;
   const res = await fetch(`${HOST}/ai/chat`, {
     method: 'POST', headers: headers(tenantToken, null),
-    body: JSON.stringify({ message: `新建客户 ${marker}`, conversationId: `tenant-gate-noheader-${Date.now()}` })
+    body: JSON.stringify({ message: `新建客户 ${noheaderMarker}`, conversationId: `tenant-gate-noheader-${Date.now()}` })
   });
   const body = await res.json();
   note('不带租户头的 /ai/chat', `HTTP ${res.status} ${JSON.stringify(body).slice(0, 160)}`);
-  note('它有没有落库', psql(`select id, tenant_id from crm_customer where name like '%${marker}%'`) || '(no row)');
+  note('它有没有落库', psql(`select id, tenant_id from crm_customer where name like '%${noheaderMarker}%'`) || '(no row)');
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// **这一道比别的多一层**：它不只造业务行，还**建了一个租户与一个用户**。收尾因此分两半。
+//
+// ① 业务行：本轮的标记**不是一个、是三个**（`root` / `gate` / `noheader` 各一个 —— 它们在 `makeCustomer`
+//    里每次现造）。三个都点名，按名删，故够不到别的轮次的行。
+// ② 租户与它名下的一切：**平台自己的 `deleteTenant` 只删 `system_tenant` 那一行**（`TenantServiceImpl`：
+//    `tenantMapper.deleteById`），名下的用户、角色、菜单授权一概留下。所以这里自己按 `tenant_id` 收 ——
+//    而且**表名是现查的**（`information_schema`），不是写死一串：写死的那串会在上游加表之后安静地漏掉它。
+//
+// **代价，用户拍过板**：租户不再留着复用，故下一次运行要**重新建**，而宿主把「这个租户有效吗」缓存一分钟 ——
+// 那一次要等它过去（本文件上面那个重试循环就是为此）。换来的是控制台的租户管理与用户管理里不留 `GateTenant`。
+//
+// **审计行刻意不动**：那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// This gate builds one layer more than its siblings: besides business rows it **creates a tenant and a user**, so
+// putting things back has two halves. (1) The business rows: this run has **three** markers rather than one
+// (`root` / `gate` / `noheader`), each minted inside `makeCustomer`, and all three are named — so the delete
+// cannot reach another run's rows. (2) The tenant and everything under it: the platform's own `deleteTenant`
+// removes only the `system_tenant` row and leaves the tenant's users, roles and menu grants behind, so they are
+// collected here by `tenant_id` — with the **table list read from `information_schema`** rather than written out,
+// because a hard-coded list goes quiet the first time upstream adds a table. The tenant is therefore no longer
+// reused, and the next run pays the host's one-minute tenant cache by recreating it — the trade the user chose,
+// so that the console's tenant and user pages do not keep a `GateTenant`. Audit rows are deliberately left alone.
+console.log('== 收尾 · 把本轮造的东西收回去 ==');
+try {
+  const markers = [a.marker, b.marker, noheaderMarker].filter(Boolean);
+  const byName = markers.map((m) => `name like '%${m}%'`).join(' or ');
+  const byArgs = markers.map((m) => `args_json like '%${m}%'`).join(' or ');
+  const tenantTables = (psql(`select string_agg(table_name, ',') from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id'`) || '')
+    .split(',')
+    .filter(Boolean);
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName}))`,
+      `delete from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName})`,
+      `delete from confirmation_requests where ${byArgs}`,
+      `delete from crm_customer where ${byName}`,
+      ...tenantTables.map((t) => `delete from ${t} where tenant_id = ${tenantId}`),
+      `delete from system_tenant where id = ${tenantId}`,
+    ].join('; '),
+  );
+  ok(`本轮的行已收回，闸租户 ${tenantId}（${GATE_TENANT_NAME}）及其名下 ${tenantTables.length} 张表已清（审计行刻意留着）`);
+} catch (e) {
+  bad('收尾', '本轮的行与闸租户都已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);
-console.log(`note: 闸租户 id=${tenantId}（${GATE_TENANT_NAME}）—— 它留在本机库里供复用，不删。`);
 process.exitCode = fail === 0 ? 0 : 1;

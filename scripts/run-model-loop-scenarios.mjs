@@ -42,6 +42,13 @@
 //   * `/ai/task` 上的一次任务走了**不止一步**，而**要写**的那一步回来时是**被扣下等人、带着它的 token**——
 //     运行器决定**调什么、按什么顺序**，从不决定**能不能跑**，所以 `create_crm_customer` 到达引擎、在那里被拦住，
 //     而不是由模型决定。本门禁把那枚 token 拒掉，并检查那一行**始终没落**。
+//
+// **它留下的那一笔待确认，它收回去** —— 实参里带着本轮的标记，故够不到别的轮次的行。业务行今天一行都不落
+// （两处断言都是 `count = 0`），收尾那句仍然写上，好让「哪一轮真落了」也不至于漏收。**审计行刻意不动**。
+//
+// The one **pending write** it leaves behind, it removes again — its arguments carry this run's marker, so the
+// delete cannot reach another run's rows. No business row lands today, but the delete is written anyway so that
+// a run which somehow does land one is not silently left out. Audit rows are deliberately left alone.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -127,6 +134,33 @@ if (token) {
   const outcome = decided.data || decided;
   check('拒绝被受理', true, outcome.status !== 'executed');
   check('拒绝之后那一行仍不落', 0, psql(`select count(*) from ${CUSTOMER} where name like '%${marker}%'`));
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 本门禁**刻意不让那一行落库**（两处断言都是 `count = 0`），所以它留下的是**那一笔待确认**（实参里带着本轮的
+// 标记），不是业务行。业务行那一句仍然写上：它今天空着跑（本轮的标记一行都不在），但如果哪一轮真落了，
+// 收尾不该跟着一起失灵。台账同理。
+// **审计行刻意不动** —— 那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// This gate **deliberately keeps the row from landing** (both assertions are `count = 0`), so what it leaves
+// behind is the **pending write** — whose arguments carry this run's marker — rather than a business row. The
+// business-row delete is still written: today it matches nothing for this run, but if a run ever does land a row
+// the cleanup should not be the thing that silently fails to notice. Same for the ledgers. Audit rows are
+// deliberately left alone: that is a hash chain, and cutting a link to tidy up is worse than the untidiness.
+console.log('== 收尾 · 把本轮造的东西收回去 ==');
+try {
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from ${CUSTOMER} where name like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮留下的那一笔待确认已收回（审计行刻意留着）');
+} catch (e) {
+  bad('收尾', '本轮留下的那一笔待确认已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);

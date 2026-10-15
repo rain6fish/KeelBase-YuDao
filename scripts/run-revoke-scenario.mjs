@@ -35,6 +35,12 @@
 //
 // ⚠ **这道闸绝不能断言「被拒」**。今天发生的是拒绝；缝一开它就不再发生，而把断言写成「被拒」会让它**为了那个
 // 恰恰是要点的改动**而转红。两种结局作为**择一**断言，是刻意的。
+//
+// **它造的东西，它收回去** —— 按本轮的标记删那一行与它对应的台账；**审计行刻意不动**（撤销在案正是本门禁要证的
+// 东西，剪它一环比凌乱更坏）。
+//
+// Everything it creates, it removes again — the row and its ledger entries go by this run's marker. Audit rows are
+// deliberately left alone: that the withdrawal is on the record is precisely what this gate exists to prove.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -226,6 +232,32 @@ console.log('== 场景 4 · 撤销不是删审计 ==');
   const verify = await (await fetch(`${HOST}/audit/verify`, { headers: { Authorization: `Bearer ${admin}` } })).json();
   check('链校验通过', true, verify.data && verify.data.valid);
   check('试着撤销之后仍至少有一行审计', true, revokeRows() >= 0);
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 按**本轮自己的标记**删；标记里那串 13 位时间戳是别人不会含的，故它够不到别的轮次的行。
+// 台账跟着业务行一起撤：这一轮那笔写与随后那次撤销，指的是同一行。
+// **审计行刻意不动** —— 撤销在案**正是本门禁要证的东西**，为了收拾凌乱去剪它一环，比凌乱更坏。
+//
+// Delete by this run's own marker (the 13-digit stamp inside `revoke-<timestamp>` is one no other run's marker
+// contains), so it cannot reach another run's rows. The ledgers go with the business row, because this run's
+// write and the withdrawal that followed it point at the same row. The audit rows are deliberately left alone —
+// that the withdrawal is on the record is precisely what this gate exists to prove, and cutting a link to tidy
+// up is worse than the untidiness.
+console.log('== 收尾 · 把本轮造的行收回去 ==');
+try {
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from ${CUSTOMER} where name like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮那一行已收回（审计行刻意留着）');
+} catch (e) {
+  bad('收尾', '本轮那一行已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);
