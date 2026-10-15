@@ -314,7 +314,7 @@ html body .v-menu .el-menu .el-menu-item.is-active::before {
   right: 0;
   border-radius: 0 999px 999px 0;
   background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--keel-sidebar-active-shadow);
 }
 html body .v-menu .el-menu .el-menu-item.is-active:hover {
   background-color: transparent !important;
@@ -347,7 +347,7 @@ html body .v-menu .el-menu.el-menu--vertical .el-sub-menu .el-menu-item.is-activ
   right: 0;
   border-radius: 0 999px 999px 0;
   background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--keel-sidebar-active-shadow);
 }
 html body .v-menu .el-menu.el-menu--vertical .el-sub-menu .el-menu-item.is-active:hover::before {
   background: linear-gradient(90deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
@@ -447,4 +447,25 @@ html body .el-avatar:not(:has(> img)) {
 }
 html body .el-avatar > .el-icon {
   visibility: hidden !important;
+}
+
+// ── the collapsed sidebar's submenu, which is not inside `.v-menu` ──────────────────────────────────
+//
+// Collapsed, yudao moves the submenu into a **popper** — teleported out of `.v-menu` into the body. Every
+// menu rule above is anchored on `.v-menu`, so none of them reaches it, and yudao's own
+// `.v-menu-popper--* .el-menu-item:hover` keeps painting the hovered label with
+// `--left-menu-text-active-color`. This theme sets that variable to white — it belongs to the *active*
+// band, which is the blue gradient — so in the collapsed sidebar the hovered label was white on the
+// popper's light ground: a label nobody can read. Measured 2026-10-15.
+//
+// 收起态的侧边栏把子菜单移进一个 **popper**——它被 teleport 出了 `.v-menu`、落到 body 上。上面每条菜单规则
+// 都锚在 `.v-menu` 上，故没有一条够得到它；而 yudao 自己的 `.v-menu-popper--* .el-menu-item:hover` 照旧用
+// `--left-menu-text-active-color` 给悬停标签上色。本主题把那个变量设成白色——它属于**选中**色块，那块是蓝色
+// 渐变——于是在收起态的侧边栏里，悬停的标签是白字落在 popper 的浅底上：一个读不出来的标签。2026-10-15 实测。
+html body .v-menu-popper--vertical .el-menu-item:hover,
+html body .v-menu-popper--vertical .el-sub-menu__title:hover,
+html body .v-menu-popper--horizontal .el-menu-item:hover,
+html body .v-menu-popper--horizontal .el-sub-menu__title:hover {
+  color: var(--el-text-color-primary) !important;
+  background-color: transparent !important;
 }
