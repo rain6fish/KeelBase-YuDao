@@ -344,11 +344,14 @@ public class CrmCustomerTools {
         @Override
         public Map<String, Object> args(Map<String, Object> context) {
             Map<String, Object> args = new LinkedHashMap<>();
+            // 要改的那一行是本轮点到的那一行；运行时解析它、以 `targetId` 交过来——那是请求唯一声明的结构化槽位，
+            // 而它现在是**通用**的（从前叫 `customerId`）。
+            //
             // The row to change is the one the turn named; the runtime resolves it and hands it over as
-            // `customerId`, which is the only structured slot the request declares.
-            // 要改的那一行是本轮点到的那一行；运行时解析它、以 `customerId` 交过来——那是请求唯一声明的结构化槽位。
-            if (context.get("customerId") != null) {
-                args.put("id", context.get("customerId"));
+            // `targetId`, the only structured slot the request declares — generic now, it used to be
+            // `customerId`.
+            if (context.get("targetId") != null) {
+                args.put("id", context.get("targetId"));
             }
             // A placeholder for argument extraction, as the host's routes are: the typed text names the row.
             // 参数抽取的占位，与宿主的那些路由一样：用户所写的文字就是新名字。

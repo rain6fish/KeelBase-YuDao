@@ -262,10 +262,12 @@ public class SystemNotifyMessageTools {
         @Override
         public Map<String, Object> args(Map<String, Object> context) {
             Map<String, Object> args = new LinkedHashMap<>();
-            // The row travels as `customerId` — the runtime's one structured slot, named for CRM.
-            // 那一行以 `customerId` 传递——运行时唯一的结构化槽位、以 CRM 命名。
-            if (context.get("customerId") != null) {
-                args.put("id", context.get("customerId"));
+            // 那一行以 `targetId` 传递——运行时唯一的结构化槽位，而它现在是**通用**的（从前叫 `customerId`、以 CRM 命名）。
+            //
+            // The row travels as `targetId` — the runtime's one structured slot, generic now; it used to be
+            // `customerId`, named for CRM.
+            if (context.get("targetId") != null) {
+                args.put("id", context.get("targetId"));
             }
             return args;
         }
@@ -345,8 +347,8 @@ public class SystemNotifyMessageTools {
         @Override
         public Map<String, Object> args(Map<String, Object> context) {
             Map<String, Object> args = new LinkedHashMap<>();
-            if (context.get("customerId") != null) {
-                args.put("id", context.get("customerId"));
+            if (context.get("targetId") != null) {
+                args.put("id", context.get("targetId"));
             }
             return args;
         }

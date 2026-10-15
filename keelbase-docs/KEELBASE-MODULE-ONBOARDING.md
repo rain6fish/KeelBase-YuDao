@@ -205,12 +205,18 @@ wrote, there is no Spec to write — see §2.
 4. **The abstraction boundary is not settled.** `YD-T7` is open, and the cross-host evidence note
    nominates `ActingCaller`, `ModuleRoute` and the fallback planner as promotion candidates. Seams
    written now may later move package, because the sample is still two hosts.
-5. **The runtime's request shape names one module's field.** The chat request
+5. **The runtime's request shape names one module's field — and no longer does.** The chat request
    (`cn.com.keelbase.runtime.web.ChatRequest`) declares `message`, `conversationId` and **`customerId`**
    — one structured slot, and it is named for CRM. A second module's rows have no slot of their own, so
    BPM's route puts the leave id into `customerId`. It works, it is recorded in the tool face's class
    comment rather than dressed up, and it is the first cost this line has found that lives **outside**
    the module. Generalising the slot is a runtime change and lands on the platform line, not here.
+
+   **⚠ Corrected 2026-10-15 (`YD-35`): the slot is generic now, and the paragraph above no longer
+   describes the runtime.** The component is `targetId`; a route states its own row id there, and both
+   the BPM and the system-message routes read that key. The old name still binds, as a JSON alias,
+   because the callers are not all in this repository — a route written against `customerId` keeps
+   working; it is simply not the name to write new code against.
 
 ## 5. What this file does not claim
 

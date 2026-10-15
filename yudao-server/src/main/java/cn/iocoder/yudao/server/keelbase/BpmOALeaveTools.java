@@ -33,11 +33,11 @@ import org.springframework.context.annotation.Configuration;
  *   <li><b>The create path has no tool.</b> This module's create calls the process engine and this host
  *       has nothing runnable, so the face declares the read and the approve write and leaves create to
  *       the module's own REST path. Declaring a tool that could only fail would be worse than not.</li>
- *   <li><b>The row to act on has to travel as {@code customerId}.</b> The runtime's chat request
- *       ({@code cn.com.keelbase.runtime.web.ChatRequest}) declares exactly one structured slot besides
- *       the message, and it is named for CRM. A second module's rows have no slot of their own, so this
- *       route puts the leave id into that one. It works, and it is recorded rather than dressed up: a
- *       platform whose request shape names one module's field makes the next module pay for it.</li>
+ *   <li><b>The row to act on travels as {@code targetId}.</b> The runtime's chat request
+ *       ({@code cn.com.keelbase.runtime.web.ChatRequest}) declares one generic structured slot, and
+ *       this route states the leave id in it. It used to be called {@code customerId} — named for CRM —
+ *       and this bullet said a second module had to borrow it. **That is no longer true**: the slot was
+ *       renamed generically, so the field written here is one this route may use as its own.</li>
  * </ul>
  *
  * BPM 的工具面，跑在**上游已经发布**的模块上：一读一写，各配路由。这是本宿主的第二个这样的面，而它要说明的是：
@@ -50,10 +50,10 @@ import org.springframework.context.annotation.Configuration;
  *       不只是「能拿到」——差别落在**通知那一侧**，不在这里。</li>
  *   <li><b>创建那条路没有工具。</b>本模块的创建调**流程引擎**，而本宿主没有可跑的东西，故本面只声明读与审批写、把创建
  *       留给模块自己的 REST 路径。声明一个只会失败的工具，比不声明更糟。</li>
- *   <li><b>要作用的那一行只能以 {@code customerId} 传递。</b>运行时的聊天请求
- *       （{@code cn.com.keelbase.runtime.web.ChatRequest}）除消息外**只声明一个**结构化槽位，而它是**以 CRM 命名**的。
- *       第二个模块的行**没有自己的槽位**，故本路由把请假单 id 放进那一个。它能跑，而这是**记下来**的、不是粉饰过去的：
- *       一个把某个模块的字段名写进请求形状的平台，会让下一个模块为此付账。</li>
+ *   <li><b>要作用的那一行以 {@code targetId} 传递。</b>运行时的聊天请求
+ *       （{@code cn.com.keelbase.runtime.web.ChatRequest}）声明一个**通用**的结构化槽位，而本路由把请假单 id 放进去。
+ *       它从前叫 {@code customerId} —— **以 CRM 命名** —— 而这一条当时写着「第二个模块只能借它」。**那句现在不成立了**：
+ *       槽位已改成通用名，故本路由写的这个字段是**它自己可以用**的。</li>
  * </ul>
  */
 @Configuration
@@ -227,12 +227,13 @@ public class BpmOALeaveTools {
         @Override
         public Map<String, Object> args(Map<String, Object> context) {
             Map<String, Object> args = new LinkedHashMap<>();
-            // The row to approve travels as `customerId`: that is the one structured slot the runtime's
-            // chat request declares, and it is named for CRM. See the class comment.
-            // 要审批的那一行以 `customerId` 传递：那是运行时的聊天请求**唯一**声明的结构化槽位，而它**以 CRM 命名**。
-            // 见类注释。
-            if (context.get("customerId") != null) {
-                args.put("id", context.get("customerId"));
+            // 要审批的那一行以 `targetId` 传递：那是运行时的聊天请求唯一的结构化槽位，而它现在是**通用**的
+            // （从前叫 `customerId`、以 CRM 命名）。见类注释。
+            //
+            // The row to approve travels as `targetId`: the one structured slot the runtime's chat request
+            // declares, generic now (it used to be `customerId`, named for CRM). See the class comment.
+            if (context.get("targetId") != null) {
+                args.put("id", context.get("targetId"));
             }
             return args;
         }
