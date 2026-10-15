@@ -6,6 +6,7 @@ import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.common.util.spring.SpringUtils;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -43,13 +44,22 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
 
         // 打印 request 日志
         if (!SpringUtils.isProd()) {
-            Map<String, String> queryString = ServletUtils.getParamMap(request);
-            String requestBody = ServletUtils.getBody(request);
-            if (CollUtil.isEmpty(queryString) && StrUtil.isEmpty(requestBody)) {
-                log.info("[preHandle][开始请求 URL({}) 无参数]", request.getRequestURI());
-            } else {
-                log.info("[preHandle][开始请求 URL({}) 参数({})]", request.getRequestURI(),
-                        StrUtil.blankToDefault(requestBody, queryString.toString()));
+            // 一段 ERROR 派发**不是第二次请求**：容器正在渲染一次**已经处理过**的请求的失败结果，而那次请求的
+            // 体可能已经被读过（KeelBase 运行时那些路径就在控制器里读它）。这里再读一次会抛
+            // `IllegalStateException: getInputStream() has already been called for this request`，
+            // 而这个异常**会把真正的状态码顶掉** —— 一个本该 401 的调用，客户端看到的是 500「系统异常」。
+            // 所以这一段派发只跳过「读体」，计时与后面照旧（`afterCompletion` 仍拿得到 StopWatch）。
+            //
+            // YD-37：判据是「未知/已撤销令牌打 /ai/chat 回 401，且日志里不再出现那行异常」。
+            if (request.getDispatcherType() != DispatcherType.ERROR) {
+                Map<String, String> queryString = ServletUtils.getParamMap(request);
+                String requestBody = ServletUtils.getBody(request);
+                if (CollUtil.isEmpty(queryString) && StrUtil.isEmpty(requestBody)) {
+                    log.info("[preHandle][开始请求 URL({}) 无参数]", request.getRequestURI());
+                } else {
+                    log.info("[preHandle][开始请求 URL({}) 参数({})]", request.getRequestURI(),
+                            StrUtil.blankToDefault(requestBody, queryString.toString()));
+                }
             }
             // 计时
             StopWatch stopWatch = new StopWatch();
