@@ -352,6 +352,9 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
 // **台账跟着业务行一起撤。** 副作用与幂等占用指的是**这一轮删掉的那些行**；留着它们，只会让控制台抽屉里
 // 「我最近的写」指着一批已经不在的记录 —— 而那正是这条门禁跑完留下的凌乱里，看得见的那一份。
 //
+// **挂起的确认收掉、已决的留着**：没人会去决的那种是残行；而「有人决过」是一条**记录**，本线的应用符合性记录
+// （`run-app-conformance.mjs` 的 Confirmation 栏）读的正是它。面板只列挂起的，故已决的那些也不占界面。
+//
 // Everything this gate creates carries the run's own marker (`gate-<timestamp>`), so putting it back is a
 // delete by that marker: it cannot reach another run's rows, which is the same property the counting
 // assertions above need in order to survive two gates running at once. The audit rows are deliberately left
@@ -359,13 +362,18 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
 // untidiness. The effect and idempotency ledgers go with the business rows: they point at the rows this run
 // is removing, and leaving them only makes the console drawer's "recent writes" card name records that are
 // gone — which is the visible half of the untidiness this gate used to leave behind.
+//
+// **Hanging confirmations go; decided ones stay**: a row nobody will ever act on is residue, while a decision
+// having been made is a **record** — which is what the line's application-conformance record reads (the
+// Confirmation column in `run-app-conformance.mjs`). The panel lists only pending ones, so the decided rows
+// take no room on screen either.
 console.log('== 收尾 · 把本轮造的行收回去 ==');
 try {
   psql(
     [
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
-      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from confirmation_requests where args_json like '%${marker}%' and status = 'pending'`,
       `delete from ${CUSTOMER} where name like '%${marker}%'`,
     ].join('; '),
   );

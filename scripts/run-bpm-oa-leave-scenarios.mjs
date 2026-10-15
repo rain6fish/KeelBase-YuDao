@@ -265,12 +265,14 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
 //
 // 按**本轮自己的标记**删（`reason` 里都带着它），故够不到别的轮次的行 —— 与上面那些断言是同一条纪律。
 // **审计行刻意不动**：哈希链，为收拾凌乱去剪它一环，比凌乱更坏。台账跟着业务行一起撤：它们指的是这一轮
-// 删掉的那些行，留着只会让控制台里那几张卡指着一批已经不在的记录。
+// 删掉的那些行，留着只会让控制台里那几张卡指着一批已经不在的记录。**挂起的确认收掉、已决的留着** ——
+// 没人会去决的那种是残行，「有人决过」则是一条记录（本线应用符合性记录的 Confirmation 栏读它）。
 //
 // Delete by this run's own marker — every row this gate inserts carries it in `reason` — so it cannot reach
 // another run's rows, the same discipline the assertions above follow. The audit rows are deliberately left
 // alone (a hash chain; cutting a link to tidy up is worse than the untidiness). The ledgers go with the
-// business rows, because they point at the rows this run is removing.
+// business rows, because they point at the rows this run is removing. **Hanging confirmations go; decided ones
+// stay** — a row nobody will act on is residue, while a decision having been made is a record.
 console.log('== 收尾 · 把本轮造的行收回去 ==');
 try {
   // 把手的选取：**本轮的实参里带的是行的编号**（`{"id":25}`），不是本轮的标记 —— 而那个编号是本轮
@@ -284,7 +286,7 @@ try {
   const idAlt = runIds.split(',').join('|');
   psql(
     [
-      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)'`,
+      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)' and status = 'pending'`,
       `delete from write_claims where effect_id in (select id from side_effects where result_id in (${runIds}))`,
       `delete from side_effects where result_id in (${runIds})`,
       `delete from ${LEAVE} where reason like '%${marker}%'`,

@@ -220,19 +220,22 @@ console.log('== 场景 4 · 审计链 ==');
 //
 // 按**本轮自己的标记**删，故它够不到别的轮次的行 —— 与上面那两处计数断言要的是同一个性质。
 // **审计行刻意不动**：那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
-// 台账（副作用 / 幂等占用）跟着业务行一起撤：它们指的是这一轮删掉的那些行。
+// 台账（副作用 / 幂等占用）跟着业务行一起撤：它们指的是这一轮删掉的那些行。**挂起的确认收掉、已决的留着** ——
+// 没人会去决的那种是残行，「有人决过」则是一条记录（本线应用符合性记录的 Confirmation 栏读它）。
 //
 // Delete by this run's own marker, so it cannot reach another run's rows — the same property the counting
 // assertions above need. The audit rows are deliberately left alone: that is a hash chain, and cutting a link
 // to tidy up after a gate is a worse act than the untidiness. The effect and idempotency ledgers go with the
-// business rows, because they point at the rows this run is removing.
+// business rows, because they point at the rows this run is removing. **Hanging confirmations go; decided ones
+// stay** — a row nobody will act on is residue, while a decision having been made is a record, which is what the
+// application-conformance record's Confirmation column reads.
 console.log('== 收尾 · 把本轮造的行收回去 ==');
 try {
   psql(
     [
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%')`,
-      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from confirmation_requests where args_json like '%${marker}%' and status = 'pending'`,
       `delete from ${MODULE} where name like '%${marker}%'`,
     ].join('; '),
   );
