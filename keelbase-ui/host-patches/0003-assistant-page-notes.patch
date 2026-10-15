@@ -1,0 +1,183 @@
+-- SPDX-License-Identifier: Apache-2.0
+--
+-- 助手管理台七页的文字说明，以及模型那一页——每页挂一条 AssistantPageNote。
+--
+-- 上游把这些页面交出来时不带任何说明：字段标签就是全部文字，而其中几个光看标签不够（`模型标识` 看着像
+-- 显示名，实际是发给模型服务的那串名字）。文字本体住在覆盖层的
+-- `src/views/keelbase/assistant/AssistantPageNote.vue` 里，本补丁只负责把它挂上去——故改措辞只改那一处，
+-- 这里八行不用动。
+--
+-- 每页两处：`<script setup>` 之后加一条 import，模板里加一个元素。七页放在 `<template>` 之后（整页级提示，
+-- 正好在内容卡片之上）；**会话页例外**——那是一套全高的聊天布局，内容之上没有放整块提示的地方，故它的说明
+-- 走紧凑模式、放进右侧标题栏。
+--
+-- 与其它补丁同理：应用不上就响亮失败。上游挪动 `<template>` 或 `</el-header>` 的位置，这里就会报出来。
+--
+-- The assistant console's seven pages, plus the model page, each mounting an AssistantPageNote.
+--
+-- Upstream ships these pages without a word of explanation: the field labels are all the text there is, and
+-- several of them do not say enough on their own (`模型标识` reads like a display name; it is the string sent
+-- to the model service). The prose itself lives in the overlay, at
+-- `src/views/keelbase/assistant/AssistantPageNote.vue` — this patch only mounts it, so a wording change is one
+-- edit over there and these eight hunks stay put.
+--
+-- Two insertions per page: an import after `<script setup>`, and the element in the template. Seven go right
+-- after `<template>` (a page-level note, above the content cards); **the session page is the exception** — it
+-- is a full-height chat layout with no room for a block above the content, so it uses the compact rendering
+-- inside the right-hand header.
+--
+-- Same rule as the other patches: a section that no longer applies fails loudly rather than being skipped.
+
+diff --git a/src/views/ai1/home/index.vue b/src/views/ai1/home/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/home/index.vue
++++ b/src/views/ai1/home/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="home" />
+   <!-- 头部 -->
+   <div
+     class="mb-16px flex flex-wrap items-center justify-between gap-16px border border-[var(--el-border-color-light)] border-solid rounded-8px bg-[var(--el-bg-color)] p-16px"
+@@ -32,6 +33,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import Ai1HomeSummaryCards from './components/Ai1HomeSummaryCards.vue'
+ import Ai1HomeMessageTrendChart from './components/Ai1HomeMessageTrendChart.vue'
+ import Ai1HomeMessageAgentChart from './components/Ai1HomeMessageAgentChart.vue'
+
+diff --git a/src/views/ai1/model/provider/index.vue b/src/views/ai1/model/provider/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/model/provider/index.vue
++++ b/src/views/ai1/model/provider/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="provider" />
+   <ContentWrap>
+     <!-- 搜索工作栏 -->
+     <el-form
+@@ -134,6 +135,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { getIntDictOptions, DICT_TYPE } from '@/utils/dict'
+ import { isEmpty } from '@/utils/is'
+ import { dateFormatter } from '@/utils/formatTime'
+
+diff --git a/src/views/ai1/model/index.vue b/src/views/ai1/model/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/model/index.vue
++++ b/src/views/ai1/model/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="model" />
+   <!-- 头部 -->
+   <ContentWrap>
+     <el-page-header @back="close">
+@@ -140,6 +141,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { getIntDictOptions, DICT_TYPE } from '@/utils/dict'
+ import { isEmpty } from '@/utils/is'
+ import { dateFormatter } from '@/utils/formatTime'
+
+diff --git a/src/views/ai1/agent/index.vue b/src/views/ai1/agent/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/agent/index.vue
++++ b/src/views/ai1/agent/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="agent" />
+   <ContentWrap>
+     <!-- 搜索工作栏 -->
+     <el-form
+@@ -144,6 +145,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { isEmpty } from '@/utils/is'
+ import { dateFormatter } from '@/utils/formatTime'
+ import { AgentApi, Agent } from '@/api/ai1/agent'
+
+diff --git a/src/views/ai1/knowledge/index.vue b/src/views/ai1/knowledge/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/knowledge/index.vue
++++ b/src/views/ai1/knowledge/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="knowledge" />
+   <ContentWrap>
+     <!-- 搜索工作栏 -->
+     <el-form
+@@ -142,6 +143,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { getIntDictOptions, DICT_TYPE } from '@/utils/dict'
+ import { isEmpty } from '@/utils/is'
+ import { dateFormatter } from '@/utils/formatTime'
+
+diff --git a/src/views/ai1/mcp/index.vue b/src/views/ai1/mcp/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/mcp/index.vue
++++ b/src/views/ai1/mcp/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="mcp" />
+   <ContentWrap>
+     <!-- 搜索工作栏 -->
+     <el-form
+@@ -125,6 +126,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { getIntDictOptions, DICT_TYPE } from '@/utils/dict'
+ import { isEmpty } from '@/utils/is'
+ import { jsonParseObject } from '@/utils'
+
+diff --git a/src/views/ai1/skill/index.vue b/src/views/ai1/skill/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/skill/index.vue
++++ b/src/views/ai1/skill/index.vue
+@@ -1,4 +1,5 @@
+ <template>
++  <AssistantPageNote page="skill" />
+   <ContentWrap>
+     <!-- 搜索工作栏 -->
+     <el-form
+@@ -121,6 +122,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { getIntDictOptions, DICT_TYPE } from '@/utils/dict'
+ import { isEmpty } from '@/utils/is'
+ import { dateFormatter } from '@/utils/formatTime'
+
+diff --git a/src/views/ai1/session/index.vue b/src/views/ai1/session/index.vue
+index 0000000..1111111 100644
+--- a/src/views/ai1/session/index.vue
++++ b/src/views/ai1/session/index.vue
+@@ -37,6 +37,7 @@
+         <div class="text-18px font-bold truncate">
+           {{ activeSession?.title || (activeAgent ? '新会话' : 'Agent 会话') }}
+         </div>
++      <AssistantPageNote page="session" compact />
+       </el-header>
+ 
+       <!-- 消息区 -->
+@@ -109,6 +110,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import AssistantPageNote from '@/views/keelbase/assistant/AssistantPageNote.vue'
+ import { useFullscreen } from '@vueuse/core'
+ import { useCache } from '@/hooks/web/useCache'
+ import { AgentApi, Agent } from '@/api/ai1/agent'
