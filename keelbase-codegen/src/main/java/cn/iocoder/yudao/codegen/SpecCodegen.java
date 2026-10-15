@@ -191,7 +191,29 @@ public final class SpecCodegen {
             "sql/keelbase-trace-menu.sql",
             "sql/keelbase-operation-audit-menu.sql",
             "sql/keelbase-policy-menu.sql",
-            "sql/keelbase-file-storage.sql");
+            "sql/keelbase-file-storage.sql",
+            // 助手那一对：它的常驻 agent（模型链 + 系统提示词）写成**种子**、而不是手敲的三步，故
+            // 「改了可评审、部署可复现」；密钥不进仓——provider 的 `api_key` 是嵌套默认值，落到本部署
+            // 已经在传的那个模型 key 上。它的授权把 `ai1:session:my` 给普通角色：ai1 从来不带界面，
+            // 故这条权限此前**一行都不存在**，而宿主的权限清单是从被授予的菜单行上读的。
+            //
+            // The assistant pair: its resident agent — the model chain and the system prompt — as a seed
+            // rather than a hand-typed three-step, so a change to it is reviewable and a deployment
+            // reproducible; the key stays out of the repository, because the provider's `api_key` is a
+            // nested default that falls back to the model key this deployment already passes. The grant
+            // hands `ai1:session:my` to the ordinary role: `ai1` ships no menus, so that permission had
+            // no row at all before it, and the host reads its permission list off granted menu rows.
+            "sql/keelbase-assistant-agent.sql",
+            "sql/keelbase-assistant-role-grants.sql",
+            // 本部署自己的名字与状态，写成文件而不是散改上游的种子：自带 AI 模块的**应用面**在菜单层
+            // 关停（只关菜单，不删代码、不删表），以及「MySQL 监控」改名「数据库监控」、那一格随 Hikari 写。
+            //
+            // This deployment's own names and state, as files rather than edits scattered through
+            // upstream's seed: the built-in AI module's application surface switched off at the menu
+            // layer (menus only — no code and no table is deleted), and the monitor page renamed with
+            // that cell following Hikari.
+            "sql/keelbase-ai-app-surface-off.sql",
+            "sql/keelbase-monitor-rename.sql");
 
     private SpecCodegen() {
     }
