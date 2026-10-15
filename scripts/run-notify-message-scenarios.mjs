@@ -49,6 +49,14 @@
 //     失败。故本接缝上的**四条通知全部**被本脚本跑到，且各自跑在**本模块上可观测**的一条路上。
 //
 // 那个差别**就是发现本身**、不是门禁的缺口：它说这里的逐模块活**塌到了身份桥上**，因为上游的代码本来就有那个形状。
+//
+// **它造的东西，它收回去** —— 按那个**本轮唯一**的标记（`template_content` 里带着它），故收尾够不到别的轮次的行。
+// **审计行不在此列**：那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// Everything it creates, it removes again — by that run-scoped marker, which every row it seeds carries in
+// `template_content`, so the cleanup cannot reach another run's rows either. It does **not** remove audit
+// rows: those are a hash chain, and cutting a link to tidy up after a gate would be a worse act than the
+// untidiness.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -328,6 +336,50 @@ console.log('== 场景 7 · 审计链 ==');
   // 按 id 读的收束留下的是**失败**、不是拒绝——它在情境 6 被断言，在这里被计数。
   note('写路径上没有拒绝可记', `refusals on record = ${psql("select count(*) from ai_audit_logs where tool = 'mark_notify_message_read' and outcome = 'refused'")}`);
   note('按 id 读的收束在案', `get_notify_message -> fail = ${psql("select count(*) from ai_audit_logs where tool = 'get_notify_message' and outcome = 'failed'")}`);
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 按**本轮自己的标记**删（`template_content` 里都带着它），故够不到别的轮次的行 —— 与上面那些断言是同一条
+// 纪律。**审计行刻意不动**：哈希链，为收拾凌乱去剪它一环，比凌乱更坏。
+//
+// Delete by this run's own marker — every row this gate seeds carries it in `template_content` — so it cannot
+// reach another run's rows, the same discipline the assertions above follow. The audit rows are deliberately
+// left alone: that is a hash chain, and cutting a link to tidy up after a gate is a worse act than the
+// untidiness.
+console.log('== 收尾 · 把本轮造的行收回去 ==');
+try {
+  // 把手：`mark_notify_message_read` 的实参里带的是**行的编号**（`{"id":143}`），而那个编号是本轮自己
+  // 造的行，故它同样只有本轮够得到；台账按这些编号收。
+  //
+  // **有一笔收不到的，说出来而不是装作收干净了**：`mark_all_notify_messages_read` 的实参只有
+  // `{"requestedAt": …}`（那是为了让它可以被调用**不止一次**才加的），而它那条副作用落的是
+  // `notify_mailbox` + **调用方自己的编号** —— 都不是本轮造的行。⇒ 每次跑会留下一行副作用与一行已决的
+  // 确认。要收它就得按「调用方 + 时间窗」删，而那会**删掉并排另一次运行的**行 —— 那正是本门禁上面那些
+  // 断言刻意免疫的东西，故这里选择留一行、不换掉那条性质。
+  //
+  // The handle: `mark_notify_message_read`'s arguments carry the **row's number** (`{"id":143}`), and that
+  // number names a row this run created, so it is just as run-scoped; the ledgers go by those numbers.
+  //
+  // **One write this cannot reach, said rather than papered over**: `mark_all_notify_messages_read`'s
+  // arguments carry only `{"requestedAt": …}` (added so it can run more than once), and its effect lands on
+  // `notify_mailbox` with the **caller's own number** — neither names a row this run made. So each run leaves
+  // one effect row and one decided confirmation behind. Reaching them would mean deleting by caller and time
+  // window, which would delete a **side-by-side run's** rows — exactly what the assertions above are built to
+  // survive. So one row is left instead of trading that property away.
+  const runIds = (psql(`select string_agg(id::text, ',') from ${MESSAGE} where template_content like '%${marker}%'`) || '').trim() || '0';
+  const idAlt = runIds.split(',').join('|');
+  psql(
+    [
+      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)'`,
+      `delete from write_claims where effect_id in (select id from side_effects where result_id in (${runIds}))`,
+      `delete from side_effects where result_id in (${runIds})`,
+      `delete from ${MESSAGE} where template_content like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮那几行已收回（审计行刻意留着；`mark_all` 那一笔见注释）');
+} catch (e) {
+  bad('收尾', '本轮那几行已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);

@@ -17,6 +17,13 @@
 //
 // 每条断言都用**本次唯一的名字**收束，故这道门禁**在一个已经跑过的库上**、**以及跟它自己的另一次运行并排**时都
 // **照样成立**——与兄弟宿主那些场景同一条纪律；那条纪律的实测把唯一一处整表计数去掉了。
+//
+// **它造的东西，它收回去** —— 用的还是那个**本轮唯一**的标记，故收尾同样够不到别的轮次的行。**审计行不在此列**：
+// 那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// Everything it creates, it removes again — by that same run-scoped marker, so the cleanup cannot reach
+// another run's rows either. It does **not** remove audit rows: those are a hash chain, and cutting a link
+// to tidy up after a gate would be a worse act than the untidiness.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -176,7 +183,11 @@ console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
   // `run-crm-customer-scenarios.mjs`: a delta reads correctly only while nothing else writes.
   // 按**本轮自己的标记**计数，不用整表增量——理由同 `run-crm-customer-scenarios.mjs` 里那条注记：
   // 增量只在**没有别人写**的时候读起来对。
-  const writeMarker = `gate-write-${Date.now()}`;
+  // 写成**本轮标记的后缀**、而不是另起一个前缀：收尾时按一个标记就能把本轮造的行一次删干净（见文件末尾），
+  // 而它作为「本轮唯一名」的用处一点没变。
+  // Written as a suffix of this run's marker rather than under a prefix of its own: the cleanup at the end
+  // can then reach everything this run created with one marker, and it is just as unique as it was.
+  const writeMarker = `${marker}-write`;
   const own = () => Number(psql(`select count(*) from ${MODULE} where name like '%${writeMarker}%'`));
   const held = pendingCount(secondId);
   await chat(second, `新建产品 ${writeMarker}`);
@@ -203,6 +214,31 @@ console.log('== 场景 4 · 审计链 ==');
   check('审计行在（>0）', true, rows > 0);
   const verify = await (await fetch(`${HOST}/audit/verify`, { headers: { Authorization: `Bearer ${admin}` } })).json();
   check('链校验通过', true, verify.data && verify.data.valid);
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 按**本轮自己的标记**删，故它够不到别的轮次的行 —— 与上面那两处计数断言要的是同一个性质。
+// **审计行刻意不动**：那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
+// 台账（副作用 / 幂等占用）跟着业务行一起撤：它们指的是这一轮删掉的那些行。
+//
+// Delete by this run's own marker, so it cannot reach another run's rows — the same property the counting
+// assertions above need. The audit rows are deliberately left alone: that is a hash chain, and cutting a link
+// to tidy up after a gate is a worse act than the untidiness. The effect and idempotency ledgers go with the
+// business rows, because they point at the rows this run is removing.
+console.log('== 收尾 · 把本轮造的行收回去 ==');
+try {
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from ${MODULE} where name like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮那几行已收回（审计行刻意留着）');
+} catch (e) {
+  bad('收尾', '本轮那几行已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);

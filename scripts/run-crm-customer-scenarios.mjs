@@ -17,6 +17,10 @@
 // by side it failed `落库 — expected [11], got [12]`, and the failure pointed at this gate rather than
 // at the other writer.
 //
+// Everything it creates, it removes again — by that same run-scoped marker, so the cleanup cannot reach
+// another run's rows either. It does **not** remove audit rows: those are a hash chain, and cutting a
+// link to tidy up after a gate would be a worse act than the untidiness.
+//
 // YD-2 的门禁：治理一个**上游写的**模块，而不是适配器生成的那个。
 //
 //   bash scripts/run-server.sh &            # 一套跑着的栈：PostgreSQL + redis
@@ -29,6 +33,9 @@
 // 每条断言都用**本次唯一的名字**收束——**不**按整张表计数——故本门禁**在一个已经跑过的库上**、**以及跟它自己的
 // 另一次运行并排**时都成立。曾经按整表计数的那一处是**实测出来**的：两次并排跑时它报
 // `落库 — expected [11], got [12]`，而那个失败看上去指着本门禁、不指着另一个写手。
+//
+// **它造的东西，它收回去** —— 用的还是那个**本轮唯一**的标记，故收尾同样够不到别的轮次的行。**审计行不在此列**：
+// 那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -322,6 +329,38 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
   // 说的是这是哪一类事件（`tool_call`）；本断言的**第一版**查错了列，把一次通过读成了失败。
   const refusals = Number(psql(`select count(*) from ai_audit_logs where tool = 'update_crm_customer' and outcome = 'refused'`));
   check('被拒的那次写在案', true, refusals > 0);
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 本门禁造的行**都带着本轮的标记**（`gate-<时间戳>`），故「收回去」就是按那个标记删 —— 它够不到别的轮次的
+// 行，这正是上面那两处**按标记计数**的断言所需要的同一个性质（两道门禁同时跑也相容）。
+//
+// **审计行刻意不动**：那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// **台账跟着业务行一起撤。** 副作用与幂等占用指的是**这一轮删掉的那些行**；留着它们，只会让控制台抽屉里
+// 「我最近的写」指着一批已经不在的记录 —— 而那正是这条门禁跑完留下的凌乱里，看得见的那一份。
+//
+// Everything this gate creates carries the run's own marker (`gate-<timestamp>`), so putting it back is a
+// delete by that marker: it cannot reach another run's rows, which is the same property the counting
+// assertions above need in order to survive two gates running at once. The audit rows are deliberately left
+// alone — that is a hash chain, and cutting a link to tidy up after a gate is a worse act than the
+// untidiness. The effect and idempotency ledgers go with the business rows: they point at the rows this run
+// is removing, and leaving them only makes the console drawer's "recent writes" card name records that are
+// gone — which is the visible half of the untidiness this gate used to leave behind.
+console.log('== 收尾 · 把本轮造的行收回去 ==');
+try {
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from ${CUSTOMER} where name like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮那几行已收回（审计行刻意留着）');
+} catch (e) {
+  bad('收尾', '本轮那几行已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);

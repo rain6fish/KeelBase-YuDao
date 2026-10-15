@@ -39,6 +39,13 @@
 //   * 属主**列**是 `user_id`，不是 `owner_user_id`；
 //   * **创建**那条路调**流程引擎**，而本宿主没有部署任何流程定义，故**没有**为它声明工具、本文件任何情境也够不到它
 //     ——记下，而不是绕过去不看。
+//
+// **它造的东西，它收回去** —— 按那个**本轮唯一**的标记（`reason` 里带着它），故收尾够不到别的轮次的行。
+// **审计行不在此列**：那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
+//
+// Everything it creates, it removes again — by that run-scoped marker, which every row it inserts carries in
+// `reason`, so the cleanup cannot reach another run's rows either. It does **not** remove audit rows: those
+// are a hash chain, and cutting a link to tidy up after a gate would be a worse act than the untidiness.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -252,6 +259,40 @@ console.log('== 场景 5 · 审计链与被记下的拒绝 ==');
   check('链校验通过', true, verify.data && verify.data.valid);
   const refusals = Number(psql(`select count(*) from ai_audit_logs where tool = 'approve_oa_leave' and outcome = 'refused'`));
   check('被拒的那次写在案', true, refusals > 0);
+}
+
+// ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
+//
+// 按**本轮自己的标记**删（`reason` 里都带着它），故够不到别的轮次的行 —— 与上面那些断言是同一条纪律。
+// **审计行刻意不动**：哈希链，为收拾凌乱去剪它一环，比凌乱更坏。台账跟着业务行一起撤：它们指的是这一轮
+// 删掉的那些行，留着只会让控制台里那几张卡指着一批已经不在的记录。
+//
+// Delete by this run's own marker — every row this gate inserts carries it in `reason` — so it cannot reach
+// another run's rows, the same discipline the assertions above follow. The audit rows are deliberately left
+// alone (a hash chain; cutting a link to tidy up is worse than the untidiness). The ledgers go with the
+// business rows, because they point at the rows this run is removing.
+console.log('== 收尾 · 把本轮造的行收回去 ==');
+try {
+  // 把手的选取：**本轮的实参里带的是行的编号**（`{"id":25}`），不是本轮的标记 —— 而那个编号是本轮
+  // 自己造的那两行，故它同样**只有本轮**够得到。台账（副作用 / 幂等占用）按这些编号收；待确认按
+  // `args_json` 里那个编号收。**审计行刻意不动**。
+  //
+  // The handle: this run's arguments carry the **row's number** (`{"id":25}`), not the marker — and that
+  // number names the rows this run created, so it is just as run-scoped. The ledgers go by those numbers, and
+  // the confirmations by the number inside `args_json`. The audit rows are deliberately left alone.
+  const runIds = (psql(`select string_agg(id::text, ',') from ${LEAVE} where reason like '%${marker}%'`) || '').trim() || '0';
+  const idAlt = runIds.split(',').join('|');
+  psql(
+    [
+      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)'`,
+      `delete from write_claims where effect_id in (select id from side_effects where result_id in (${runIds}))`,
+      `delete from side_effects where result_id in (${runIds})`,
+      `delete from ${LEAVE} where reason like '%${marker}%'`,
+    ].join('; '),
+  );
+  ok('本轮那两行已收回（审计行刻意留着）');
+} catch (e) {
+  bad('收尾', '本轮那两行已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);
