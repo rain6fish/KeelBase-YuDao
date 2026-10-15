@@ -213,7 +213,17 @@ public final class SpecCodegen {
             // layer (menus only — no code and no table is deleted), and the monitor page renamed with
             // that cell following Hikari.
             "sql/keelbase-ai-app-surface-off.sql",
-            "sql/keelbase-monitor-rename.sql");
+            "sql/keelbase-monitor-rename.sql",
+            // 本部署的**样例业务数据**（六家客户、三位联系人、三条跟进、六个产品）。**带外灌入**：它不属于
+            // 「表 + 菜单」的部署引导，而是给某一套开发/演示环境看的样例。固定 id（9xxx 段）+ 缺了才插，故重跑
+            // 不翻倍 —— 正是这一点让它值得留在仓里，而不是某一次手敲的 INSERT。
+            //
+            // This deployment's **sample business data** — six customers, three contacts, three follow-up
+            // records and six products. Applied **out of band**: it is not part of the tables-and-menus
+            // bootstrap every deployment runs, but sample data for one development/demo environment. Fixed
+            // ids in the 9xxx band and inserted only when absent, so rerunning it does not double the rows —
+            // which is exactly why it belongs in the repository rather than in a one-off hand-typed INSERT.
+            "sql/keelbase-demo-data.sql");
 
     private SpecCodegen() {
     }
