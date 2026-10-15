@@ -79,6 +79,7 @@ import { ContentWrap } from '@/components/ContentWrap'
 import { conversationApi, type ConversationData, type ConversationTrace } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { traceStepLabelKey } from '@/keelbase/labels'
+import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceConversationTrace' })
 
@@ -98,10 +99,6 @@ const error = ref('')
 const trace = ref<ConversationTrace | null>(null)
 const traceError = ref('')
 const opening = ref<string | null>(null)
-
-function timeText(v: string | null | undefined): string {
-  return v ? String(v).replace('T', ' ').slice(0, 19) : '—'
-}
 
 async function load() {
   loading.value = true

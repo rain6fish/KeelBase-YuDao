@@ -125,6 +125,7 @@ import { operationAuditApi, type OperationAuditRow } from '@/keelbase/governance
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { opActionLabelKey, statusTagType } from '@/keelbase/labels'
 import { resolveCallerNames } from '@/keelbase/callerNames'
+import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceOperationAudit' })
 
@@ -156,10 +157,6 @@ function actionText(action: string | null | undefined): string {
 function resultText(row: OperationAuditRow): string {
   if (row.statusCode === null || row.statusCode === undefined) return '—'
   return row.statusCode >= 400 ? t('keelbase.opAudit.failed') : t('keelbase.opAudit.ok')
-}
-
-function timeText(v: string | null | undefined): string {
-  return v ? String(v).replace('T', ' ').slice(0, 19) : '—'
 }
 
 async function load() {

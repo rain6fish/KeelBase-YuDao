@@ -75,7 +75,7 @@
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colTime') }}</span>
-              <span>{{ timeFormatter(row) }}</span>
+              <span>{{ timeText(row.createdAt) }}</span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colWhat') }}</span>
@@ -129,7 +129,7 @@
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colTime')" width="175">
-        <template #default="{ row }">{{ timeFormatter(row) }}</template>
+        <template #default="{ row }">{{ timeText(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colWho')" width="170">
         <template #default="{ row }">
@@ -202,7 +202,7 @@
         <div class="chain">
           <div v-for="n in verify.chain" :key="n.id" class="chain-node" :class="{ broken: n.broken }">
             <span class="chain-id">#{{ n.id }}</span>
-            <span class="chain-time">{{ chainTime(n.createdAt) }}</span>
+            <span class="chain-time">{{ timeText(n.createdAt) }}</span>
             <span class="chain-action">{{ n.action || '—' }}</span>
             <code class="chain-hash">{{ short(n.prevHash) }} → {{ short(n.hash) }}</code>
             <el-tag v-if="n.broken" type="danger" size="small">{{ t('keelbase.audit.broken') }}</el-tag>
@@ -238,6 +238,7 @@ import {
 import { resolveCallerNames } from '@/keelbase/callerNames'
 import { maskTitle } from '@/keelbase/mask'
 import { resolveRecordName } from '@/keelbase/recordNames'
+import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
 
@@ -442,14 +443,6 @@ const overview = computed(() => {
   const scope = t('keelbase.audit.overviewScope', { tools, callers })
   return `${head}${parts.length ? '：' + parts.join(' · ') : ''} ｜ ${scope}`
 })
-
-function timeFormatter(row: AuditRow): string {
-  return row.createdAt ? row.createdAt.replace('T', ' ').slice(0, 19) : '—'
-}
-
-function chainTime(v: string | null | undefined): string {
-  return v ? String(v).replace('T', ' ').slice(0, 19) : '—'
-}
 
 function short(v: string | null | undefined): string {
   return (v || '—').slice(0, 10)

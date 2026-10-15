@@ -114,6 +114,7 @@ import { effectApi, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { resolveCallerNames } from '@/keelbase/callerNames'
 import { toolLabelKey } from '@/keelbase/labels'
+import { timeText } from '@/keelbase/time'
 import { maskTitle } from '@/keelbase/mask'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
@@ -146,10 +147,6 @@ const userId = ref('')
 /** The name behind the id being filtered, when the directory knows one. */
 /** 正在筛选的那个 id 背后的名字，当名录认识一个时。 */
 const filteredName = ref('')
-
-function timeText(v: string | null | undefined): string {
-  return v ? v.replace('T', ' ').slice(0, 19) : '—'
-}
 
 async function load() {
   loading.value = true

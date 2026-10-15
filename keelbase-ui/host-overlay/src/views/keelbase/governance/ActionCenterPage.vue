@@ -195,6 +195,7 @@ import { businessLogApi, confirmationApi, effectApi, type BusinessLogRow, type C
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { toolLabelKey } from '@/keelbase/labels'
 import { maskTitle } from '@/keelbase/mask'
+import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceActionCenter' })
 
@@ -250,10 +251,6 @@ const bizRows = ref<Record<number, BusinessLogRow[]>>({})
 const bizLoaded = ref<Record<number, boolean>>({})
 const bizLoading = ref<Record<number, boolean>>({})
 const bizError = ref<Record<number, string>>({})
-
-function timeText(v: string | null | undefined): string {
-  return v ? v.replace('T', ' ').slice(0, 19) : '—'
-}
 
 function formatArgs(args: Record<string, unknown> | null): string {
   if (!args || Object.keys(args).length === 0) return '—'
