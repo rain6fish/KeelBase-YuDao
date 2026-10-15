@@ -305,13 +305,13 @@ public class CrmCustomerTools {
             row.setName(str(args.get("name")));
             row.setLevel(asInt(args.get("level")));
             row.setSource(asInt(args.get("source")));
+            // 那一行**原先**的样子，在与这次写**同一个身份**下读出，于是轨迹回答的是「这次改了什么」、而不只是
+            // 「它现在是什么样」。它带的是**读工具那份同样的投影**，理由相同：联系方式字段一律不外流，而快照不是例外。
+            //
             // The row as it was, read under the identity the write runs under, so the trail answers
             // "what did this change" and not only "what does it look like now". It carries the same
             // projection the read tool makes, for the same reason: the contact fields leave nothing,
             // and a snapshot is not an exception to that.
-            //
-            // 那一行**原先**的样子，在与这次写**同一个身份**下读出，于是轨迹回答的是「这次改了什么」、而不只是
-            // 「它现在是什么样」。它带的是**读工具那份同样的投影**，理由相同：联系方式字段一律不外流，而快照不是例外。
             String before = ActingCaller.as(principal.userId(),
                     () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> {
                         CrmCustomerDO existing = service.getCustomer(id);

@@ -61,6 +61,35 @@ public class Ai1McpToolFactory {
      * @return 工具集合
      */
     public List<ToolCallback> buildTools(Ai1AgentDO agent) {
+        return buildTools(agent, null);
+    }
+
+    /**
+     * 同上，另带**这一轮属于哪条会话**。
+     *
+     * <p><b>这一处是 KeelBase 的改动，登记在 {@code keelbase-docs/KEELBASE-UPSTREAM.md}。</b>它与上面那个不带
+     * 会话的重载**并存**、不替换：上游自己的调用方与测试照旧走那个，而部署会把会话传进来。会话号**在装配处就在
+     * 作用域里**（正是知道会话的那次生成），而工具真正被调用时那条线程不知道它 —— 与「调用方」是同一条理由。
+     *
+     * <p>它在调用处被发布（见 {@link Ai1ToolCallSession}），于是**受治理的那次调用写下的行说得清自己属于哪一轮**；
+     * 没有它，一行能被读到的最好程度只是「这个调用方最近的调用」。
+     *
+     * The same, carrying **which session this turn belongs to**.
+     *
+     * <p><b>This is KeelBase's change here, registered in {@code keelbase-docs/KEELBASE-UPSTREAM.md}.</b> It sits
+     * beside the session-less overload rather than replacing it: upstream's own callers and tests keep using that
+     * one, and a deployment passes the session in. The id is in scope where the tools are assembled — the
+     * generation that knows the session — while the thread that calls the tool does not know it, the same reason
+     * the caller travels the same way.
+     *
+     * <p>Published at the call site (see {@link Ai1ToolCallSession}), so a governed call's row can say which turn
+     * it came from; without it the most a reader can do is "this caller's recent calls".
+     *
+     * @param agent     Agent
+     * @param sessionId 这一轮的会话号；不属于任何会话时传 {@code null}
+     * @return 工具集合
+     */
+    public List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId) {
         List<ToolCallback> tools = new ArrayList<>();
         if (CollUtil.isEmpty(agent.getMcpIds())) {
             return tools;
@@ -69,7 +98,7 @@ public class Ai1McpToolFactory {
             if (CommonStatusEnum.isDisable(mcp.getStatus())) {
                 continue;
             }
-            tools.addAll(convertList(listTools(agent, mcp), tool -> buildToolCallback(mcp, tool)));
+            tools.addAll(convertList(listTools(agent, mcp), tool -> buildToolCallback(mcp, tool, sessionId)));
         }
         return tools;
     }
@@ -103,10 +132,12 @@ public class Ai1McpToolFactory {
      * 生成里，而模型驱动工具循环用的是一条**从未有过调用方**的线程。没有这一段，那次受治理的调用就在一条没人
      * 放过身份的线程上问身份，因而被拒——而它拒或不拒，过去取决于那条池线程**是否碰巧**在调用方的窗口里被创建。
      */
-    private ToolCallback buildToolCallback(Ai1McpDO mcp, McpSchema.Tool tool) {
+    private ToolCallback buildToolCallback(Ai1McpDO mcp, McpSchema.Tool tool, Long sessionId) {
         Long caller = SecurityFrameworkUtils.getLoginUserId();
+        // 会话与调用方**同一处、同一理由**地随工具走：装配时它在作用域里，而调用落在的那条线程不知道它。
         Function<Map<String, Object>, String> function = arguments ->
-                withCaller(caller, () -> mcpClientTool.callTool(mcp, tool.name(), arguments));
+                withCaller(caller, () -> Ai1ToolCallSession.as(sessionId,
+                        () -> mcpClientTool.callTool(mcp, tool.name(), arguments)));
         Map<String, Object> inputSchema = tool.inputSchema();
         if (MapUtil.isEmpty(inputSchema)) {
             inputSchema = new HashMap<>();

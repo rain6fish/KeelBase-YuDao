@@ -3,6 +3,7 @@ package cn.iocoder.yudao.server.keelbase;
 
 import cn.com.keelbase.runtime.audit.AuditService;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.mcp.Ai1McpDO;
+import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1ToolCallSession;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -87,21 +88,25 @@ public class Ai1McpGovernance {
     public Object govern(ProceedingJoinPoint call) throws Throwable {
         String tool = name(call.getArgs());
         Long caller = callers.current();
+        // 这一轮所属的会话，与「谁在行动」同一条线索：它在装配处被发布（见 `Ai1ToolCallSession`），故这几行
+        // **说得清自己属于哪一轮** —— 直到本次改动之前，它们只能被读成「这个调用方最近的调用」。
+        String conversationId = conversationId();
         if (caller == null || caller == 0L) {
-            audit.append("tool_call", NO_IDENTITY, tool + " refused: no identity", true, "refused", tool);
+            audit.append("tool_call", NO_IDENTITY, tool + " refused: no identity", true, "refused", tool,
+                    conversationId);
             throw new AccessDeniedException("这个工具要在有身份的情况下调用");
         }
         String who = String.valueOf(caller);
         try {
             Object result = call.proceed();
-            audit.append("tool_call", who, tool + " -> ok", false, "executed", tool);
+            audit.append("tool_call", who, tool + " -> ok", false, "executed", tool, conversationId);
             return result;
         } catch (Throwable failure) {
             // A failed call is the half an audit is most useful for, so it is written before the
             // failure is handed on. The failure itself is not swallowed.
             // 失败的调用正是审计最有用的那一半，故在把失败递出去**之前**先写下来。失败本身不被吞掉。
             audit.append("tool_call", who, tool + " failed: " + failure.getClass().getSimpleName(),
-                    true, "failed", tool);
+                    true, "failed", tool, conversationId);
             throw failure;
         }
     }
@@ -119,5 +124,19 @@ public class Ai1McpGovernance {
         String server = args.length > 0 && args[0] instanceof Ai1McpDO mcp ? mcp.getName() : "?";
         String tool = args.length > 1 && args[1] != null ? String.valueOf(args[1]) : "?";
         return server + ":" + tool;
+    }
+
+    /**
+     * 这一轮所属的会话，按引擎自己那一列的叫法；不在任何会话里时为 {@code null}。
+     *
+     * <p>会话号由 {@code Ai1McpToolFactory} 在**装配处**发布（见 {@link Ai1ToolCallSession}），与调用方同一处、
+     * 同一理由：工具真正被调用时那条线程既不知道调用方、也不知道会话。
+     *
+     * The session this turn belongs to, spelled the way the engine's own column spells it, or null when it
+     * belongs to none. Published at assembly by the MCP tool factory, for the same reason the caller is.
+     */
+    private static String conversationId() {
+        Long sessionId = Ai1ToolCallSession.current();
+        return sessionId == null ? null : String.valueOf(sessionId);
     }
 }

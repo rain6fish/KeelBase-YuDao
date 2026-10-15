@@ -233,6 +233,14 @@ if (fail === 0) {
   const auditOf = (tool) => psql(`select count(*) from ai_audit_logs where user_id = '1' and tool = '${server}:${tool}' and outcome = 'executed'`);
   check('回显那一步有审计行且属主是登录用户', true, Number(auditOf('probe_echo')) > 0);
   check('记笔记那一步同样', true, Number(auditOf('probe_note')) > 0);
+  // YD-33：这几行**说得清自己属于哪一轮**。会话号由装配处发布、由切面写进那条列；此前它**恒为 null**，于是凡按
+  // 会话读轨迹的人都看不见 MCP 这条路上的任何调用 —— 而「没显示」与「没发生」在界面上长得一样。
+  //
+  // YD-33: these rows can say which turn they belong to. The session is published at assembly and written onto
+  // the row by the aspect; before this it was always null, so a reader of any per-turn trace could not see a
+  // single call on the MCP face — and "not shown" looks the same as "did not happen".
+  const withSession = psql(`select count(*) from ai_audit_logs where tool like '${server}:%' and conversation_id is not null`);
+  check('MCP 审计行带上了会话号', true, Number(withSession) > 0);
 }
 
 // ── 4) put the scene back ─────────────────────────────────────────────────────────────────────────

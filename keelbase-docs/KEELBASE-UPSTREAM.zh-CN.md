@@ -25,8 +25,9 @@ RuoYi 线那条 `D15`——*绝不碰上游的生成物与 `vm/`*——**不平�
 
 | 文件 | 改的是什么 | 为什么 |
 |---|---|---|
-| `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | 上游在自己线程上设置的安全上下文；**以及它在跑一轮会话之前现在会问的两条缝**（哪个模型、以及部署方自己的工具） | `D32`——调用方必须到达工具那条线程；那两条缝是**部署方**对一个上游本来自己回答的问题的回答 |
-| `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | 工具被**装配**时捕获调用方 | `D32`——同一条缝，在装配那一侧 |
+| `yudao-module-ai1-springai/.../harness/session/Ai1SessionStreamTool.java` | 上游在自己线程上设置的安全上下文；**以及它在跑一轮会话之前现在会问的两条缝**（哪个模型、以及部署方自己的工具）；**以及它交给 MCP 工具面的那个会话号** | `D32`——调用方必须到达工具那条线程；那两条缝是**部署方**对一个上游本来自己回答的问题的回答；而会话号正是让一次 MCP 调用的审计行**逐轮**答得出来的东西 |
+| `yudao-module-ai1-springai/.../harness/mcp/Ai1McpToolFactory.java` | 工具被**装配**时捕获调用方；**并在同一处捕获会话号** | `D32`——同一条缝，在装配那一侧；没有会话号，受治理的 MCP 调用那一行只能被读成「这个调用方最近的调用」 |
+| `yudao-module-ai1-springai/.../harness/mcp/Ai1ToolCallSession.java`（**加在模块里的文件**） | 一次由模型发出的工具调用运行期间，会话号被发布在其中的 holder —— 切面从它读回 | `D32`/`YD-33`——与 `Ai1LocalToolProvider` 同一条缝，给的是那个**本来完全没有会话**的面 |
 | `yudao-module-ai1-springai/.../harness/llm/Ai1LlmChatTool.java` | 它收到的是一个 `ChatClient`、不再是模型快照，也不再自己建 client | 一次会话跑在哪个模型上由**部署方**回答——见 `Ai1ChatModelResolver` |
 | `yudao-module-ai1-springai/.../service/agent/Ai1AgentServiceImpl.java` | 建 agent 时校验模型，问的是**会话所问的同一个**解析器 | 一个本部署够不到的模型在**写 agent 时**被拒，而不是后来表现为一次会话失败 |
 | `yudao-module-ai1-springai/.../harness/llm/Ai1ChatModelResolver.java` + `.../harness/local/Ai1LocalToolProvider.java`（**加在模块里的文件**） | 上面两条所问的那两条缝——工具那一条**除 agent 之外还收会话号** | 模型来自部署方自己的目录，而 agent 够得到运行时那些受治理的工具**且可归属**：没有会话号，受治理调用写下的任何一行都**逐轮读不出来** |

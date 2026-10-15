@@ -704,12 +704,15 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
                 YudaoAi1Properties.Session.AGENT_NAME_PLACEHOLDER, agent.getName());
 
         // 4. 工具（MCP + SKILL + 部署方在进程内交来的）与 RAG Advisor；知识库不可用时降级跳过，并把提示写入思考流
-        List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent));
+        // 会话随工具一起过去 —— MCP 那条路与部署方交来的那条**都算**：正是它让一次受治理的调用归得了**这一轮**、
+        // 而不是笼统地归给调用方。SKILL 那条**不动**：它上面没有治理缝，也就没有行要归位。
+        //
+        // The session travels with the tools — the MCP face and the deployment's own alike: it is what makes a
+        // governed call attributable to *this* turn rather than to the caller in general. The SKILL face is left
+        // alone: nothing governs it, so there is no row to place.
+        List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent, sessionId));
         tools.addAll(skillToolFactory.buildTools(agent));
         if (localToolProvider != null) {
-            // The session travels with the tools: see the seam — it is what makes a governed call
-            // attributable to *this* turn rather than to the caller in general.
-            // 会话随工具一起过去：见那条缝 —— 正是它让一次受治理的调用归得了**这一轮**、而不是笼统地归给调用方。
             tools.addAll(localToolProvider.buildTools(agent, sessionId));
         }
         StringBuilder noticeText = new StringBuilder();

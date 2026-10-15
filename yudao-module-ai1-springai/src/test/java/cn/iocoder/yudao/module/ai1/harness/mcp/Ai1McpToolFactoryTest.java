@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -186,7 +187,58 @@ public class Ai1McpToolFactoryTest extends BaseMockitoUnitTest {
         }
     }
 
+    /**
+     * 会话与调用方**同一条理由、同一处**地随工具走：它在**装配**时就在作用域里，而调用落在一条**从未有过会话**
+     * 的线程上 —— 模型侧那条线程正是这样来的。没有它，一次受治理的调用写下的审计行只能被读成「这个调用方最近的
+     * 调用」，而那是**另一个、也更弱**的问题（`YD-33`）。
+     *
+     * <p>三条断言各挡一种假绿：调用**之前**池线程上没有会话（否则「碰巧继承」也能过）、调用**期间**看得到它、
+     * 装配线程**自己**不被留下痕迹。
+     *
+     * The session travels with the tool for the same reason and from the same place as the caller: it is in
+     * scope at assembly, while the call runs on a thread that never had one — which is what the model-side
+     * thread is. Without it, the audit row a governed call writes can only be read as "this caller's recent
+     * calls", a different and weaker question.
+     *
+     * <p>Three assertions, each closing a different way of passing vacuously: the pool thread has none before
+     * the call, sees it during the call, and the assembling thread is not left holding one afterwards.
+     */
+    @Test
+    public void testBuildTools_sessionTravelsToTheCallThread() throws Exception {
+        // mock 数据：一个 MCP、一个工具
+        Ai1McpDO mcp = buildMcp(1L, "GitHub");
+
+        // 先把那条池线程造出来，**趁还没有会话**
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            pool.submit(() -> { }).get();
+
+            List<ToolCallback> callbacks = buildTools(List.of(mcp), List.of("search"), 42L);
+
+            AtomicReference<Long> sessionSeenOnCallThread = new AtomicReference<>();
+            AtomicBoolean noneBeforeTheCall = new AtomicBoolean();
+            when(mcpClientTool.callTool(any(), anyString(), anyMap())).thenAnswer(invocation -> {
+                sessionSeenOnCallThread.set(Ai1ToolCallSession.current());
+                return "ok";
+            });
+            pool.submit(() -> noneBeforeTheCall.set(Ai1ToolCallSession.current() == null)).get();
+            pool.submit(() -> callbacks.getFirst().call("{}")).get();
+
+            // 断言
+            assertTrue(noneBeforeTheCall.get(), "池线程在调用之前不该带着会话");
+            assertEquals(42L, sessionSeenOnCallThread.get());
+            assertNull(Ai1ToolCallSession.current(), "装配线程自己不该被留下会话");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     private List<ToolCallback> buildTools(List<Ai1McpDO> mcps, List<String> toolNames) {
+        return buildTools(mcps, toolNames, null);
+    }
+
+    /** 带会话的那一支：与上面同形，只多传一个会话号。 */
+    private List<ToolCallback> buildTools(List<Ai1McpDO> mcps, List<String> toolNames, Long sessionId) {
         Ai1AgentDO agent = new Ai1AgentDO().setId(1L).setMcpIds(mcps.stream().map(Ai1McpDO::getId).toList());
         when(mcpService.getMcpList(agent.getMcpIds())).thenReturn(mcps);
         List<McpSchema.Tool> tools = toolNames.stream().map(name -> McpSchema.Tool.builder(name)
@@ -194,7 +246,7 @@ public class Ai1McpToolFactoryTest extends BaseMockitoUnitTest {
         for (Ai1McpDO mcp : mcps) {
             when(mcpClientTool.listTools(mcp)).thenReturn(tools);
         }
-        return mcpToolFactory.buildTools(agent);
+        return mcpToolFactory.buildTools(agent, sessionId);
     }
 
     private static Ai1McpDO buildMcp(Long id, String name) {
