@@ -303,6 +303,17 @@ const hijackMarker = `${marker}-hijack`;
   check('自己那一行确实改了', true,
     psql(`select name from ${CUSTOMER} where id = ${salesRowId}`).includes(ownMarker));
 
+  // YD-31: the ledger keeps the row as it was, so a trace answers "what did this change" and not only
+  // "what is it now". Both halves are asserted because either alone passes vacuously: `before` must
+  // name the OLD value and must not name the new one — a "non-empty" check would not tell them apart.
+  //
+  // YD-31：账本留下那一行**原先**的样子，于是轨迹答得出「这次改了什么」、而不只是「它现在是什么」。两半都要断，
+  // 因为任一半单独都能空过：`before` 必须点名**旧**值、且**不得**点名新值 —— 一条「非空即可」的断言分不出两者。
+  const beforeSnap = psql(`select coalesce(before_snapshot, '') from side_effects`
+    + ` where tool_name = 'update_crm_customer' and result_id = ${salesRowId} order by id desc limit 1`);
+  check('改动前的那一行被记下（含旧值）', true, beforeSnap.includes(salesMarker));
+  check('且记的是改之前、不是改之后', true, !beforeSnap.includes(ownMarker));
+
   // Then the same call against another caller's row. The approval settles the risk question and
   // nothing else: the row-scope question is answered lower down, at the module's own seam.
   // 然后是同一次调用、打向**别人的**行。批准了结的是**风险**问题、仅此而已：行范围的问题在更下面、在模块
