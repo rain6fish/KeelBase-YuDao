@@ -48,6 +48,33 @@ const checkNot = (name, forbidden, got) =>
 const psql = (sql) =>
   execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
 
+// 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
+// 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
+// 宿主停机、一次一条查不到的列的断言），后者留下 3 行。`process.on('exit')` 在**未捕获异常**把进程带走时同样
+// 触发（2026-10-15 实测：`code=1`），而 `psql()` 是同步的，故退出处理器里跑得动。
+//
+// Clean up on the way out as well. The cleanup is held as a **function** and attached at the moment this run
+// creates its first row (see `putBack = …` below), rather than only being assembled at the end of the file —
+// otherwise it is empty on the "created rows, then died" path, which is the one measured twice on this line: two
+// runs died before their closing section (a host outage, and an assertion against a column that did not exist),
+// the second leaving three rows behind. `process.on('exit')` also fires when an uncaught exception takes the
+// process down (measured 2026-10-15: `code=1`), and `psql()` is synchronous, so it runs there.
+let putBack = null;
+function runPutBack() {
+  if (!putBack) return false;
+  const putBackOnce = putBack;
+  putBack = null; // 先清空：收尾自己出错时也不要让它跑第二遍
+  putBackOnce();
+  return true;
+}
+process.on('exit', () => {
+  try {
+    if (runPutBack()) console.log('  note  收尾走了退出路径（本进程在此之前已经出错）');
+  } catch (e) {
+    console.error(`  note  退出路径上的收尾没跑成：${e.message}`);
+  }
+});
+
 async function api(path, { method = 'GET', token, body } = {}) {
   const res = await fetch(`${HOST}/admin-api${path}`, {
     method,
@@ -154,6 +181,20 @@ console.log('== 场景 2 · 列表工具只回本人行 ==');
 const marker = `gate-${Date.now()}`;
 const adminMarker = `${marker}-admin`;
 const salesMarker = `${marker}-sales`;
+// 收尾**在这里**就挂上（见文件上方 `putBack` 那段）：标记一有，把它收回去就成立；下面任何一处崩了，退出
+// 处理器都会替这一轮跑它。本轮的写那一笔另取名（`${marker}-write`），但它**含**这个标记，故一条就够。
+// The cleanup is attached **here** (see the `putBack` note near the top): once the marker exists, putting it back
+// is well-defined, and anything below dying will still have it run by the exit handler. The write's own name is
+// `${marker}-write`, which **contains** this marker, so one marker reaches everything.
+putBack = () =>
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      `delete from ${MODULE} where name like '%${marker}%'`,
+    ].join('; '),
+  );
 // The id comes from the module's sequence and the column has no default — that is the host's own
 // convention (`system_users.id` is the same), so a raw insert has to name it.
 // id 来自模块的序列、而该列没有默认值——那是宿主自己的惯例（`system_users.id` 亦然），故裸插入必须点名它。
@@ -228,14 +269,7 @@ console.log('== 场景 4 · 审计链 ==');
 // business rows, because they point at the rows this run is removing.
 console.log('== 收尾 · 把本轮造的行收回去 ==');
 try {
-  psql(
-    [
-      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%'))`,
-      `delete from side_effects where result_type = '${MODULE}' and result_id in (select id from ${MODULE} where name like '%${marker}%')`,
-      `delete from confirmation_requests where args_json like '%${marker}%'`,
-      `delete from ${MODULE} where name like '%${marker}%'`,
-    ].join('; '),
-  );
+  runPutBack();
   ok('本轮那几行已收回（审计行刻意留着）');
 } catch (e) {
   bad('收尾', '本轮那几行已收回', e.message);

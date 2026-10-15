@@ -56,6 +56,33 @@ const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 const psql = (sql) =>
   execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
 
+// 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
+// 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
+// 宿主停机、一次一条查不到的列的断言），后者留下 3 行。`process.on('exit')` 在**未捕获异常**把进程带走时同样
+// 触发（2026-10-15 实测：`code=1`），而 `psql()` 是同步的，故退出处理器里跑得动。
+//
+// Clean up on the way out as well. The cleanup is held as a **function** and attached at the moment this run
+// creates its first row (see `putBack = …` below), rather than only being assembled at the end of the file —
+// otherwise it is empty on the "created rows, then died" path, which is the one measured twice on this line: two
+// runs died before their closing section (a host outage, and an assertion against a column that did not exist),
+// the second leaving three rows behind. `process.on('exit')` also fires when an uncaught exception takes the
+// process down (measured 2026-10-15: `code=1`), and `psql()` is synchronous, so it runs there.
+let putBack = null;
+function runPutBack() {
+  if (!putBack) return false;
+  const putBackOnce = putBack;
+  putBack = null; // 先清空：收尾自己出错时也不要让它跑第二遍
+  putBackOnce();
+  return true;
+}
+process.on('exit', () => {
+  try {
+    if (runPutBack()) console.log('  note  收尾走了退出路径（本进程在此之前已经出错）');
+  } catch (e) {
+    console.error(`  note  退出路径上的收尾没跑成：${e.message}`);
+  }
+});
+
 // The admin API asks for a tenant; the AI and confirmation paths are the runtime's own and are called
 // with the same header, because **carrying the tenant is the whole point** (D39: the request carries it).
 // A call without that header is deliberately left as a reading below, not as a working path.
@@ -83,8 +110,7 @@ const userIdOf = (username, tenant) =>
 
 // One governed write, taken all the way to a real row: ask, approve, and report what the console said.
 // 一次受治理的写，走到真的落库：提问、批准，并报出控制台说了什么。
-async function makeCustomer({ token, tenant, label, operatorId }) {
-  const marker = `tenantgate-${label}-${Date.now()}`;
+async function makeCustomer({ token, tenant, label, marker, operatorId }) {
   const chatRes = await fetch(`${HOST}/ai/chat`, {
     method: 'POST', headers: headers(token, tenant),
     body: JSON.stringify({ message: `新建客户 ${marker}`, conversationId: `tenant-gate-${label}-${Date.now()}` })
@@ -131,6 +157,35 @@ if (!tenantId) {
 }
 check('闸租户不是 1 号', true, String(tenantId) !== String(ROOT_TENANT));
 
+// 本轮**唯一一个**标记，三个标签都从它派生（`-root` / `-gate` / `-noheader`）—— 早先是每个调用各造一个，
+// 于是「本轮造了什么」在崩溃路径上说不全。收尾也**在这里**就挂上（见文件上方 `putBack` 那段）：租户与标记
+// 一有，把它收回去就成立，而下面任何一处崩了，退出处理器都会替这一轮跑它。租户名下要收哪些表是**调用时**
+// 现查 `information_schema` 的。
+//
+// One marker for this whole run, with all three labels derived from it (`-root` / `-gate` / `-noheader`) — it used
+// to mint one per call, which is why "what did this run create" could not be said in full on a crash path. The
+// cleanup is attached **here** too (see the `putBack` note near the top): once the tenant and the marker exist,
+// putting them back is well-defined, and anything below dying still gets it run by the exit handler. Which tables
+// the tenant owns is read from `information_schema` **when the cleanup is called**.
+const runMarker = `tenantgate-${Date.now()}`;
+putBack = () => {
+  const byName = `name like '%${runMarker}%'`;
+  const byArgs = `args_json like '%${runMarker}%'`;
+  const tenantTables = (psql(`select string_agg(table_name, ',') from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id'`) || '')
+    .split(',')
+    .filter(Boolean);
+  psql(
+    [
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName}))`,
+      `delete from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName})`,
+      `delete from confirmation_requests where ${byArgs}`,
+      `delete from crm_customer where ${byName}`,
+      ...tenantTables.map((t) => `delete from ${t} where tenant_id = ${tenantId}`),
+      `delete from system_tenant where id = ${tenantId}`,
+    ].join('; '),
+  );
+};
+
 // The host caches "is this tenant valid" for a minute, so a tenant created an instant ago still reads as
 // expired for up to that long. Waiting it out is the honest fix; retrying is not the same thing.
 // 宿主把「这个租户有效吗」缓存一分钟，故一个刚建的租户在那一分钟里仍读作已过期。等它过去才是诚实的修法；
@@ -150,7 +205,7 @@ for (let attempt = 1; attempt <= 10; attempt += 1) {
 // ── 1) the same write, made by a caller on each tenant ───────────────────────────────────────────
 console.log('== 场景 1 · 1 号租户的调用方写一笔 ==');
 const rootOp = userIdOf('admin', ROOT_TENANT);
-const a = await makeCustomer({ token: rootToken, tenant: ROOT_TENANT, label: 'root', operatorId: rootOp });
+const a = await makeCustomer({ token: rootToken, tenant: ROOT_TENANT, label: 'root', marker: `${runMarker}-root`, operatorId: rootOp });
 note('[root] /ai/chat', `HTTP ${a.http} · 结局 ${JSON.stringify(a.outcome).slice(0, 120)}`);
 check('[root] 批准后执行', 'executed', a.outcome.status);
 const rowA = psql(`select id, tenant_id, owner_user_id from crm_customer where name like '%${a.marker}%'`);
@@ -159,7 +214,7 @@ check('[root] 本轮那一行已落', true, rowA !== '');
 
 console.log('== 场景 2 · 闸租户的调用方写同一笔 ==');
 const gateOp = userIdOf(GATE_USER, tenantId);
-const b = await makeCustomer({ token: tenantToken, tenant: tenantId, label: 'gate', operatorId: gateOp });
+const b = await makeCustomer({ token: tenantToken, tenant: tenantId, label: 'gate', marker: `${runMarker}-gate`, operatorId: gateOp });
 note('[gate] /ai/chat', `HTTP ${b.http} · 结局 ${JSON.stringify(b.outcome).slice(0, 120)}`);
 check('[gate] 批准后执行', 'executed', b.outcome.status);
 const rowB = psql(`select id, tenant_id, owner_user_id from crm_customer where name like '%${b.marker}%'`);
@@ -183,7 +238,7 @@ check('[root] 看不到 gate 那笔', 0, Number(psql(`select count(*) from crm_c
 console.log('== 场景 5 · 读数（非断言）：不给租户头时会怎样 ==');
 let noheaderMarker = '';
 {
-  noheaderMarker = `tenantgate-noheader-${Date.now()}`;
+  noheaderMarker = `${runMarker}-noheader`;
   const res = await fetch(`${HOST}/ai/chat`, {
     method: 'POST', headers: headers(tenantToken, null),
     body: JSON.stringify({ message: `新建客户 ${noheaderMarker}`, conversationId: `tenant-gate-noheader-${Date.now()}` })
@@ -219,23 +274,8 @@ let noheaderMarker = '';
 // so that the console's tenant and user pages do not keep a `GateTenant`. Audit rows are deliberately left alone.
 console.log('== 收尾 · 把本轮造的东西收回去 ==');
 try {
-  const markers = [a.marker, b.marker, noheaderMarker].filter(Boolean);
-  const byName = markers.map((m) => `name like '%${m}%'`).join(' or ');
-  const byArgs = markers.map((m) => `args_json like '%${m}%'`).join(' or ');
-  const tenantTables = (psql(`select string_agg(table_name, ',') from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id'`) || '')
-    .split(',')
-    .filter(Boolean);
-  psql(
-    [
-      `delete from write_claims where effect_id in (select id from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName}))`,
-      `delete from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName})`,
-      `delete from confirmation_requests where ${byArgs}`,
-      `delete from crm_customer where ${byName}`,
-      ...tenantTables.map((t) => `delete from ${t} where tenant_id = ${tenantId}`),
-      `delete from system_tenant where id = ${tenantId}`,
-    ].join('; '),
-  );
-  ok(`本轮的行已收回，闸租户 ${tenantId}（${GATE_TENANT_NAME}）及其名下 ${tenantTables.length} 张表已清（审计行刻意留着）`);
+  runPutBack();
+  ok(`本轮的行已收回，闸租户 ${tenantId}（${GATE_TENANT_NAME}）及其名下各表已清（审计行刻意留着）`);
 } catch (e) {
   bad('收尾', '本轮的行与闸租户都已收回', e.message);
 }
