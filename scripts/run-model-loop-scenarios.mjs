@@ -141,15 +141,13 @@ if (token) {
 // 本门禁**刻意不让那一行落库**（两处断言都是 `count = 0`），所以它留下的是**那一笔待确认**（实参里带着本轮的
 // 标记），不是业务行。业务行那一句仍然写上：它今天空着跑（本轮的标记一行都不在），但如果哪一轮真落了，
 // 收尾不该跟着一起失灵。台账同理。
-// **审计行刻意不动** —— 那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。**挂起的确认收掉、
-// 已决的留着** —— 没人会去决的那种是残行，「有人决过」则是一条记录（本线应用符合性记录的 Confirmation 栏读它）。
+// **审计行刻意不动** —— 那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
 //
 // This gate **deliberately keeps the row from landing** (both assertions are `count = 0`), so what it leaves
 // behind is the **pending write** — whose arguments carry this run's marker — rather than a business row. The
 // business-row delete is still written: today it matches nothing for this run, but if a run ever does land a row
 // the cleanup should not be the thing that silently fails to notice. Same for the ledgers. Audit rows are
 // deliberately left alone: that is a hash chain, and cutting a link to tidy up is worse than the untidiness.
-// **Hanging confirmations go; decided ones stay** — a row nobody will act on is residue, while a decision having
 // been made is a record.
 console.log('== 收尾 · 把本轮造的东西收回去 ==');
 try {
@@ -157,7 +155,7 @@ try {
     [
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
-      `delete from confirmation_requests where args_json like '%${marker}%' and status = 'pending'`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
       `delete from ${CUSTOMER} where name like '%${marker}%'`,
     ].join('; '),
   );

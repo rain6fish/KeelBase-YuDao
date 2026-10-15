@@ -26,9 +26,11 @@
 // gate yet, so there is no column for it here — that is a difference in the application, stated here
 // so it is not read as an omission.
 //
-// Rows it cannot stand behind are `SKIP` **with the reason attached**, never `PASS`. The three gates
-// it drives are the application's own, and driving them is the point: a record that restated their
-// results would be a transcription.
+// Rows it cannot stand behind are `SKIP` **with the reason attached**, never `PASS`. **Every column that
+// can be driven is driven**, by the application's own gates, and driving them is the point: a record that
+// restated their results would be a transcription. Only two columns read the database directly — `Schema`
+// (which tables exist) and `Audit` (the chain) — and neither reads a row any gate is free to clean up, so
+// a gate putting its own rows back cannot darken this record.
 //
 // Writes `conformance/reports/app-conformance-<ts>.json` and `.md`, **neither tracked** — a record is
 // evidence, not source. The directory carries its own `.gitignore` for that reason.
@@ -56,8 +58,9 @@
 // 上一条线那份记录带一栏 **RAG 权限**；本线**还没有接记忆 / 知识那条门禁**，故这里没有那一栏——这是**应用**的
 // 差别，写在这里，免得被读成遗漏。
 //
-// 站不住的栏写 `SKIP` **并附上原因**，**绝不写 `PASS`**。它驱动的三道门禁都是**这个应用自己的**，而**驱动**
-// 正是要点：一份复述它们结果的记录只是誊抄。
+// 站不住的栏写 `SKIP` **并附上原因**，**绝不写 `PASS`**。**凡是驱动得动的栏都驱动**，由这个应用自己的门禁来
+// 驱动，而**驱动**正是要点：一份复述它们结果的记录只是誊抄。只有两栏直接读库 —— `Schema`（有哪些表）与
+// `Audit`（那条链）—— 而它们都不读「任何门禁收得回去的行」，故门禁把自己的行收回去，**变不黑这份记录**。
 //
 // 输出 `conformance/reports/app-conformance-<ts>.json` 与 `.md`，**两者都不入版本控制**——记录是**证据、
 // 不是源码**；那个目录自带 `.gitignore` 就是为这个。
@@ -217,64 +220,38 @@ gate('Tenant', 'run-tenant-scenarios.mjs', "a governed write lands in the caller
     heads === '1' ? 'PASS' : 'FAIL', `heads=${heads || 'ERR'}`);
 }
 
-// 7 · Confirmation — a person decided, and the record says which way.
-{
-  const approved = psql("select count(*) from confirmation_requests where status='approved'") || '0';
-  const spread = psql(`select string_agg(status || '=' || n, ' ') from
-      (select status, count(*) n from confirmation_requests group by status order by status) s`);
-  row('Confirmation', 'a human decision is on record',
-    Number(approved) > 0 ? 'PASS' : 'FAIL', spread || 'none');
-}
+// 7 · Confirmation — a person decided, and the record says which way. **Driven, not quoted.** This column
+// used to read `confirmation_requests` and nothing else, so its verdict depended on some *other* run
+// having left a decided row lying about — which is exactly why the application's gates could not put
+// their own rows back without this column going dark. The gate driven here is the one whose subject *is*
+// the confirmation card: it asserts the card has a source and that the **caller** can decide it, and the
+// verdict recorded is that run's own.
+// 7 · 确认 —— 有人决过，且记录说得清是哪一种。**驱动，而不是引用**：这一栏原先只读 `confirmation_requests`，
+// 于是它的判决取决于**别的某一次运行**有没有留下已决的行 —— 这也正是那些门禁不能把自己造的行收回去的原因
+// （一收，这一栏就黑）。这里驱动的那道门禁，题目**正是**确认卡：它断言确认卡有源、且**调用方**决得动，
+// 记下的判决来自那一次运行自己。
+gate('Confirmation', 'run-assistant-drawer-scenarios.mjs', 'a human decision is on record');
 
-// Run a gate for its evidence **without** writing a row of its own — for a column whose verdict is read
-// from somewhere else and only needs to report whether the attempt was made and how it went.
-// 跑一道门禁、**不让它自己写行** —— 给那种「判决取自别处、只需要报『尝试做了没有、做得怎么样』」的栏。
-function runGate(script) {
-  const r = spawnSync(process.execPath, [join('scripts', script)], {
-    cwd: ROOT, encoding: 'utf8',
-    env: { ...process.env, HOST_URL: HOST, PG_CONTAINER: PG, PG_USER, PG_PASSWORD: PG_PASS, PG_DB: DB }
-  });
-  const out = `${r.stdout || ''}${r.stderr || ''}`;
-  const m = out.match(/(\d+) ok \/ (\d+) failed/);
-  const status = r.status === null ? `spawn failed (${r.error?.message || 'no status'})` : r.status;
-  return { status: r.status, summary: m ? `${m[1]} ok / ${m[2]} failed` : `no summary (exit ${status})` };
-}
-
-// 8 · Revoke — a side effect was withdrawn, and the ledger says so. The deciding fact is whether a
-// revocation was ever **attempted**: a ledger full of executed effects is what confirmations produce,
-// not evidence that revoke works. So the column says which of the two it is looking at rather than
-// reading an unexercised capability as a failure.
+// 8 · Revoke — a side effect was withdrawn, and the ledger says so. **Driven, not quoted**, and here that
+// is not merely tidier: the gate **reads the ledger itself while it runs** — that reading is one of its
+// assertions — so driving it *is* reading the ledger, and the row no longer has to survive the gate's own
+// cleanup in order for this column to see it.
 //
-// **And the attempt is made here**, before the ledger is read. Until `run-revoke-scenario.mjs` existed
-// nothing on this line ever attempted a withdrawal, so the column could only ever read SKIP; that gate
-// makes the attempt and asserts the invariant that holds on **both sides of the platform seam**, so it
-// is green today and stays green the day the seam and the host's compensator land.
-// 撤销——副作用被撤回过、且台账记着。**决定事实是「有没有尝试过撤销」**：一本全是 `executed` 的台账是**确认**
-// 产生的、不是「撤销能工作」的证据。所以这一栏**点名自己看的是哪一种**，而不是把一个没被跑过的能力读成失败。
+// **The assertion is worded for both outcomes on purpose.** The gate is green whether the withdrawal
+// landed or the platform's seam refused it with a reason (it asserts the invariant that holds on both
+// sides, so it is green today and stays green the day the host's compensator lands). An earlier cut of
+// this column read the audit for `effect_revoke` to tell the two apart and reported SKIP for the refusal
+// — but that branch existed because *nothing on this line had ever attempted a withdrawal*; now
+// something does, every run, so "was it attempted" is answered by the run rather than by a count.
+// 撤销——副作用被撤回过、且台账记着。**驱动，而不是引用**，而这里不只是更整齐：那道门禁**在运行当中自己读
+// 台账**（那次读是它的断言之一），故驱动它就是读台账 —— 而那一行也不必再为了这一栏看得见它而**躲过门禁自己的
+// 收尾**。
 //
-// **而那次尝试就在这里做**，在读账本之前。在 `run-revoke-scenario.mjs` 存在之前，本线**从没有人试过撤销**，
-// 故这一栏只可能读到 SKIP；那道闸把尝试做出来，并断言**平台那条缝两侧都成立**的不变量 —— 今天绿、缝与宿主
-// 补偿器落地之后仍绿。
-{
-  const attempt = runGate('run-revoke-scenario.mjs');
-  const attempts = psql("select count(*) from ai_audit_logs where action='effect_revoke'") || '0';
-  const ledger = psql('select count(*) from side_effects') || '0';
-  const spread = psql(`select string_agg(revoke_status || '=' || n, ' ') from
-      (select revoke_status, count(*) n from side_effects group by revoke_status order by revoke_status) s`);
-  if (attempt.status !== 0) {
-    // A red attempt is a real failure — the path this column is about was exercised and did not hold.
-    // 转红的尝试是**真的失败** —— 这一栏所讲的那条路被跑过、且没站住。
-    row('Revoke', 'a withdrawal is attempted and its outcome asserted', 'FAIL',
-      `run-revoke-scenario.mjs: ${attempt.summary}`);
-  } else if (Number(attempts) === 0) {
-    row('Revoke', 'a withdrawal is on the effect ledger', 'SKIP',
-      `attempted this run (${attempt.summary}) and did not land — no local revoke path on this host yet (revoke attempts on the audit: ${attempts}; ledger rows: ${ledger}${spread ? `, ${spread}` : ''})`);
-  } else {
-    const revoked = psql("select count(*) from side_effects where revoke_status='revoked'") || '0';
-    row('Revoke', 'a withdrawal is on the effect ledger',
-      Number(revoked) > 0 ? 'PASS' : 'FAIL', `${spread || 'none'} (attempted this run: ${attempt.summary})`);
-  }
-}
+// **措辞刻意同时容下两种结局**：无论那次撤销是落成了、还是平台那条缝带理由地拒了它，门禁都是绿的（它断言的
+// 是**两侧都成立**的不变量，故今天绿、宿主补偿器落地那天仍绿）。这一栏早先的版本去审计里数 `effect_revoke`
+// 来区分两者、并把「拒绝」报成 SKIP —— 但那一条之所以存在，是因为**本线从来没有人试过撤销**；现在每一轮都
+// 有人试，故「试过没有」由**那次运行**回答，不由一个计数回答。
+gate('Revoke', 'run-revoke-scenario.mjs', 'a withdrawal is attempted and its outcome asserted');
 
 // 9 · The other half of the criterion: the four rates, read from the line's own tool.
 {

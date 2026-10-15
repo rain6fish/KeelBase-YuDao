@@ -341,14 +341,12 @@ console.log('== 场景 7 · 审计链 ==');
 // ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
 //
 // 按**本轮自己的标记**删（`template_content` 里都带着它），故够不到别的轮次的行 —— 与上面那些断言是同一条
-// 纪律。**审计行刻意不动**：哈希链，为收拾凌乱去剪它一环，比凌乱更坏。**挂起的确认收掉、已决的留着** ——
-// 没人会去决的那种是残行，「有人决过」则是一条记录（本线应用符合性记录的 Confirmation 栏读它）。
+// 纪律。**审计行刻意不动**：哈希链，为收拾凌乱去剪它一环，比凌乱更坏。
 //
 // Delete by this run's own marker — every row this gate seeds carries it in `template_content` — so it cannot
 // reach another run's rows, the same discipline the assertions above follow. The audit rows are deliberately
 // left alone: that is a hash chain, and cutting a link to tidy up after a gate is a worse act than the
-// untidiness. **Hanging confirmations go; decided ones stay** — a row nobody will act on is residue, while a
-// decision having been made is a record.
+// untidiness.
 console.log('== 收尾 · 把本轮造的行收回去 ==');
 try {
   // 把手：`mark_notify_message_read` 的实参里带的是**行的编号**（`{"id":143}`），而那个编号是本轮自己
@@ -373,7 +371,7 @@ try {
   const idAlt = runIds.split(',').join('|');
   psql(
     [
-      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)' and status = 'pending'`,
+      `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)'`,
       `delete from write_claims where effect_id in (select id from side_effects where result_id in (${runIds}))`,
       `delete from side_effects where result_id in (${runIds})`,
       `delete from ${MESSAGE} where template_content like '%${marker}%'`,

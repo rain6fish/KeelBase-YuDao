@@ -35,9 +35,7 @@
 // Everything it creates, it removes again — including the **tenant and user it creates** (`GateTenant` is no
 // longer left in the database for reuse, at the cost of recreating it next run and waiting out the host's
 // one-minute tenant cache). The business rows go by this run's three markers; the tenant's own rows go by
-// `tenant_id`, with the table list read from `information_schema`. Audit rows are deliberately left alone, and
-// **hanging confirmations go while decided ones stay** — a row nobody will act on is residue, while a decision
-// having been made is a record (the application-conformance record's Confirmation column reads it).
+// `tenant_id`, with the table list read from `information_schema`. Audit rows are deliberately left alone.
 import { execFileSync } from 'node:child_process';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -208,8 +206,7 @@ let noheaderMarker = '';
 // **代价，用户拍过板**：租户不再留着复用，故下一次运行要**重新建**，而宿主把「这个租户有效吗」缓存一分钟 ——
 // 那一次要等它过去（本文件上面那个重试循环就是为此）。换来的是控制台的租户管理与用户管理里不留 `GateTenant`。
 //
-// **审计行刻意不动**：那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。**挂起的确认收掉、
-// 已决的留着** —— 没人会去决的那种是残行，「有人决过」则是一条记录（本线应用符合性记录的 Confirmation 栏读它）。
+// **审计行刻意不动**：那是一条哈希链，为了收拾凌乱去剪断它一环，是比凌乱更坏的一件事。
 //
 // This gate builds one layer more than its siblings: besides business rows it **creates a tenant and a user**, so
 // putting things back has two halves. (1) The business rows: this run has **three** markers rather than one
@@ -232,7 +229,7 @@ try {
     [
       `delete from write_claims where effect_id in (select id from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName}))`,
       `delete from side_effects where result_type = 'crm_customer' and result_id in (select id from crm_customer where ${byName})`,
-      `delete from confirmation_requests where (${byArgs}) and status = 'pending'`,
+      `delete from confirmation_requests where ${byArgs}`,
       `delete from crm_customer where ${byName}`,
       ...tenantTables.map((t) => `delete from ${t} where tenant_id = ${tenantId}`),
       `delete from system_tenant where id = ${tenantId}`,

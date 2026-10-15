@@ -236,39 +236,45 @@ console.log('== 场景 4 · 撤销不是删审计 ==');
 
 // ── 收尾：把本轮造的东西收回去 ─────────────────────────────────────────────────────────────────────
 //
-// 按**本轮自己的标记**删；标记里那串 13 位时间戳是别人不会含的，故它够不到别的轮次的行。
+// 按**本轮自己的标记**删；标记里那串 13 位时间戳是别人不会含的，故它够不到别的轮次的行。业务行、台账与确认
+// 一起收 —— 它们都指着一行这一轮就要删掉的记录。
 //
-// **这笔撤销的台账，刻意不收** —— 它是本门禁**要产出的那件东西**，而不是它发明出来的残行。本线的应用符合性
-// 记录（`scripts/run-app-conformance.mjs` 的 Revoke 栏）正是**先跑这道门禁、再读 `side_effects` 里
-// `revoke_status='revoked'` 的那一行**：把它删掉，等于让**一条能用的撤销路径被读成「本部署还没有这条路」**。
-// 实测过一次：收掉它之后那一栏从 PASS 变 FAIL。
+// **审计行刻意不动** —— 撤销在案**正是本门禁要证的东西**，为了收拾凌乱去剪它一环，比凌乱更坏。那条记录在
+// **链上**是持久的；台账那一行不是记录，是一个指着即将消失的行的副本。
 //
-// **已决的确认也留着**（只收还没人决的那些）：同一条记录里，Confirmation 那栏要的是「有人决过」的**记录**，
-// 不是**悬着没人管的**。挂起的那种才是残行 —— 面板现在也只列挂起的。
-//
-// 发明出来的东西收掉：那张客户行、以及没有人会去决的那笔待确认。**审计行刻意不动** —— 哈希链，剪它一环更坏。
+// **一个曾经的例外，以及它为什么取消了**：这一栏早先**特意留着**那笔撤销的台账，因为本线的应用符合性记录
+// （`run-app-conformance.mjs` 的 Revoke 栏）当时是**先跑这道门禁、再读** `side_effects` 里
+// `revoke_status='revoked'` 的那一行 —— 收掉它，会让一条能用的撤销路径被读成「本部署还没有这条路」（实测
+// 由 PASS 变 FAIL）。那一栏现在改成**驱动这道门禁、读它自己的判决**了，于是这行不必再为它而活着；而门禁
+// 在**运行当中**读台账的那次断言，就是「撤销落在账本上」这件事的证据。
 //
 // Delete by this run's own marker; the 13-digit stamp inside it is one no other run's marker contains, so it
-// cannot reach another run's rows.
+// cannot reach another run's rows. The business row, its ledger entries and its confirmation all go — each of them
+// points at a row this run is about to remove.
 //
-// **This run's withdrawal entry is deliberately NOT removed.** It is the thing this gate exists to produce, not a
-// leftover it invented: the line's application-conformance record (`run-app-conformance.mjs`, the Revoke column)
-// **runs this gate and then reads the `side_effects` row with `revoke_status='revoked'`**. Removing it makes a
-// working revoke path read as one this deployment does not have — measured: that column went from PASS to FAIL.
-// **Decided confirmations stay too** (only the undecided ones go): that column wants the record of a human having
-// decided, not a row nobody will ever act on. What is invented is removed — the customer row and the hanging
-// confirmation. Audit rows are deliberately left alone: a hash chain, and cutting a link is worse.
+// **Audit rows are deliberately left alone**: that the withdrawal is on the record is precisely what this gate
+// exists to prove, and cutting a link to tidy up is worse than the untidiness. That record lives on the **chain**;
+// the ledger row is not a record but a copy pointing at a row that is about to disappear.
+//
+// **One exception this used to carry, and why it is gone**: this gate used to keep its withdrawal entry on the
+// ledger, because the line's application-conformance record (`run-app-conformance.mjs`, the Revoke column) **ran
+// this gate and then read** the `side_effects` row with `revoke_status='revoked'` — removing it made a working
+// revoke path read as one this deployment does not have (measured: PASS to FAIL). That column now **drives this
+// gate and records its verdict**, so the row no longer has to live on for it; and the assertion the gate makes
+// *while it runs* — reading the ledger — is the evidence that the withdrawal landed on the ledger.
 console.log('== 收尾 · 把本轮造的东西收回去 ==');
 try {
   psql(
     [
-      `delete from confirmation_requests where args_json like '%${marker}%' and status = 'pending'`,
+      `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
+      `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
+      `delete from confirmation_requests where args_json like '%${marker}%'`,
       `delete from ${CUSTOMER} where name like '%${marker}%'`,
     ].join('; '),
   );
-  ok('本轮那行与没人决的那笔待确认已收回（撤销台账与已决确认刻意留着）');
+  ok('本轮那一行与它的台账已收回（审计行刻意留着）');
 } catch (e) {
-  bad('收尾', '本轮那行与没人决的那笔待确认已收回', e.message);
+  bad('收尾', '本轮那一行与它的台账已收回', e.message);
 }
 
 console.log(`\n${pass} ok / ${fail} failed`);
