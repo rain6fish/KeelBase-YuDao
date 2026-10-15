@@ -152,6 +152,29 @@ const pendingCount = (operatorId) =>
 const ranAs = (tool) =>
   Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
+// 「谁」：宿主为这一次写记下的那行操作日志，它的 `user_id` 必须是调用方。
+//
+// 这一腿的调用方**只能**来自运行时发布的那一个 —— 引擎的工具路径跑在请求的安全过滤器链**之外**，
+// `SecurityFrameworkUtils` 在那里答不出人（宿主那条接缝 `OperateLogOperatorSource` 正是为此存在）。
+// 这里为空，就是审计的「谁」那一列空着的原因，而审计最需要「谁」的恰恰是 AI 写下的那些行。
+//
+// 读法是**有窗口的**：这一行由宿主**异步**写下（`createOperateLogAsync`），故给它一小段窗口；窗口内该出现，
+// 始终没出现就是**失败**，而不是「读得慢」——窗口只是不让异步把一条真断言读成假红。
+//
+// Who: the row the host logged for this write must carry the caller in `user_id`. The caller on this leg
+// can only come from what the runtime publishes — the engine's tool path runs outside the request's
+// security filter chain, where `SecurityFrameworkUtils` answers nobody (that seam exists for exactly
+// this). An empty id here is why an auditor's "who" was blank, and those are the rows that need it most.
+async function hostLoggedWho(actionLike) {
+  for (let i = 0; i < 12; i += 1) {
+    const who = psql(`select coalesce(user_id::text, '<null>') from system_operate_log`
+      + ` where type = 'CRM 客户' and action like '%${actionLike}%' order by id desc limit 1`);
+    if (who) return who;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return '';
+}
+
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 // The audit chain is signed with `keelbase.audit.hmac-key`, so rows written under a different key can
@@ -254,6 +277,9 @@ const writeMarker = `${marker}-write`;
   // 属主由治理通知盖章、不由工具点名——保存 VO 带着那一列，客户端本可以把它指到别人身上。
   check('新行的属主 = 调用方', secondId,
     psql(`select owner_user_id from ${CUSTOMER} where name like '%${writeMarker}%'`));
+  // The host's own leg: the row it logged for this write has to name the caller (see `hostLoggedWho`).
+  // 宿主那一腿：它为这次写记下的那行，必须说出调用方（见 `hostLoggedWho`）。
+  check('宿主操作日志记下了调用方', secondId, await hostLoggedWho(writeMarker));
 }
 
 console.log('== 场景 4 · 越权写：批准也买不到 ==');
