@@ -4,6 +4,14 @@
 // No tool of ours may be handed to Spring AI as a bean.
 //
 //   node scripts/check-ungoverned-tool-beans.mjs
+//   node scripts/check-ungoverned-tool-beans.mjs --json          # the boundary as data, on stdout
+//   node scripts/check-ungoverned-tool-beans.mjs --emit <path>   # …and written where the UI build reads it
+//
+// `--json` / `--emit` exist for `YD-27`: the governance console is supposed to *present* this boundary —
+// which AI paths are held back and which are not — and to do that from **the same computation the gate
+// runs**, not from a description written by hand next to it. The deployment carries a jar and no sources,
+// so the boundary has to be settled when the artefact is built; this is where it settles.
+// They do not change the exit code: a violation still fails, and it still fails loudly.
 //
 // `YD-T14` (D42) ruled that this host keeps a boundary rather than a guard: `yudao-module-ai` carries a
 // model-to-tool path of its own — its chat takes a role's `toolIds`, resolves the registered names
@@ -31,6 +39,12 @@
 // 我们自己写的工具，一个都不许以 bean 的形式交给 Spring AI。
 //
 //   node scripts/check-ungoverned-tool-beans.mjs
+//   node scripts/check-ungoverned-tool-beans.mjs --json          # 边界的数据形态，打到标准输出
+//   node scripts/check-ungoverned-tool-beans.mjs --emit <路径>    # ……并写到 UI 构建要去读的地方
+//
+// `--json` / `--emit` 是为 `YD-27` 加的：治理控制台要**呈现**这条边界（哪些 AI 路径会被扣下、哪些不会），
+// 且必须由**门禁跑的那同一次计算**给出，而不是旁边手写一段描述。部署物是 jar、没有源码，故边界只能在**构建
+// 产物时**定型；这里就是它定型的地方。两者**都不改退出码**：有违反仍然失败，且仍然响亮地失败。
 //
 // `YD-T14`（`D42`）裁的是**记边界**而不是加守卫：`yudao-module-ai` 自带一条模型→工具的路——它的 chat 取角色的
 // `toolIds`、经 Spring AI 自己的 `ToolCallbackResolver` 把注册名解析成 callback 交给模型——而 KeelBase 的治理
@@ -49,7 +63,7 @@
 //   - 读的是**形状**不是名字：`@Bean` 方法的**声明返回类型**交出 `ToolCallback`（或 `FunctionCallback` /
 //     `ToolCallbacks`）。仅仅**返回**一个的方法——`Ai1McpToolFactory.buildTools` 就是——**不是 bean**、永不被按名
 //     解析，**不得**被报出来：本线所倚的那条缝正是走那个方法的。
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
@@ -97,6 +111,61 @@ for (const file of javaFiles) {
   })
 }
 
+// 边界的**数据形态** —— `YD-27` 的页面原样渲染这个对象，而它上面那两半正是门禁自己查到的东西。`computed`
+// 由本次运行推出（射程、发现、结论）；`stated` 是这次运行只能**确认**、推不出来的**设计事实**：运行时的缝扣住
+// 哪些路径、以及上游自己那条路为什么无害。两样都留在这里就是要点 —— CI 与控制台于是读的是**同一个对象**。
+//
+// The boundary as data — `YD-27`'s page renders this object as it stands, and the two halves above are
+// what the gate itself found. `computed` comes out of this run (scope, findings, verdict); `stated` is the
+// design fact a run can only *confirm*, never derive: which paths the runtime's seam holds, and why
+// upstream's own path stays harmless. Keeping both here is the point — CI and the console then read one
+// object rather than two descriptions of it.
+const boundary = {
+  schema: 'keelbase-governance-boundary/1',
+  computed: {
+    scope: {
+      roots: ROOTS,
+      filesScanned: javaFiles.length,
+      excluded: {
+        path: 'yudao-module-ai',
+        why: '上游自带它自己的模型→工具路，且那个示例 bean 正是本边界所倚的事实 —— 它不在我们该改的范围里，故不扫',
+      },
+    },
+    reads: '@Bean 方法**声明返回类型**是否交出 ToolCallback / FunctionCallback / ToolCallbacks',
+    offenders: offenders.map((o) => ({ file: o.file, line: o.line })),
+    verdict: offenders.length === 0 ? 'ok' : 'violated',
+  },
+  stated: {
+    held: {
+      id: 'runtime-seam',
+      what: '本线的工具经运行时那条缝交给模型：装配走 Ai1McpToolFactory.buildTools，执行点切在 Ai1McpClientTool.callTool',
+      holds: ['权限判定', '身份代入', '确认门控', '审计行', '副作用账本'],
+    },
+    notHeld: {
+      id: 'upstream-resolver',
+      what: '上游 yudao-module-ai 自己那条路：chat 取角色的 toolIds，经 Spring AI 的 ToolCallbackResolver 把注册名解析成 callback 交给模型 —— 本线治理看不见它',
+      whyHarmlessNow: '本构建里唯一的 ToolCallback bean 是上游自己的示例 ⇒ 解析器找不到我们的东西',
+      oneBeanAway: '一个交出自己的 ToolCallback 的 @Bean，就会让那条路可被模型够到 —— 不经引擎、不经身份、不经确认、不留审计',
+    },
+  },
+}
+
+const args = process.argv.slice(2)
+const emitArg = args.indexOf('--emit') >= 0 ? args[args.indexOf('--emit') + 1] : null
+// With `--json` stdout carries the object **and nothing else**: a reader that parses it must not have to
+// skip a line of prose, and the prose is worth keeping — so it moves to stderr rather than being dropped.
+// `--json` 时 stdout 只承载那个对象、**别无他物**：解析它的人不该先跳掉一行散文；而散文本身值得留着，故它
+// 挪到 stderr，而不是被丢掉。
+const jsonOnly = args.includes('--json')
+const say = (...line) => (jsonOnly ? console.error(...line) : console.log(...line))
+if (args.includes('--json') || emitArg) {
+  const text = `${JSON.stringify(boundary, null, 2)}\n`
+  // A path that is already absolute is taken as given; anything else is relative to the repository root.
+  // 已经是绝对路径的按原样用；其余一律按仓库根相对。
+  if (emitArg) writeFileSync(/^([A-Za-z]:[\\/]|[\\/])/.test(emitArg) ? emitArg : join(ROOT, emitArg), text)
+  if (args.includes('--json')) process.stdout.write(text)
+}
+
 if (offenders.length > 0) {
   for (const o of offenders) {
     console.error(`  UNGOVERNED  ${o.file}:${o.line}  <- a @Bean hands tools to Spring AI by name`)
@@ -104,10 +173,10 @@ if (offenders.length > 0) {
   console.error()
   console.error(`${offenders.length} bean(s) would make our tools reachable by a model without KeelBase`
     + ' seeing the call. Route them through the runtime instead (see YD-T14 / D42).')
-  console.log(`0 ok / ${offenders.length} failed`)
+  say(`0 ok / ${offenders.length} failed`)
   process.exit(1)
 }
 
-console.log(`no bean in our own sources hands tools to Spring AI`
+say(`no bean in our own sources hands tools to Spring AI`
   + ` (${javaFiles.length} file(s) over ${ROOTS.length} root(s))`);
-console.log(`1 ok / 0 failed`);
+say(`1 ok / 0 failed`);
