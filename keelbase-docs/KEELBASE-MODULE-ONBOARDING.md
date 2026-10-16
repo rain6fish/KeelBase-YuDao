@@ -240,4 +240,33 @@ wrote, there is no Spec to write — see §2.
 | How to get a running checkout, and the traps on the way | `KEELBASE-DEV.md` |
 | The same problem on the frozen RuoYi host, in more detail | `../../KeelBase-RuoYi/keelbase-docs/KEELBASE-AI-GUIDE.md` |
 | What a module's gate asserts | `scripts/run-crm-customer-scenarios.mjs` |
+| What a whole business loop looks like, and the gate that holds it | `scripts/run-flagship-crm-scenarios.mjs` (below) |
 | Which files a Spec owns, and which are hand-written | `bash scripts/gen-from-spec.sh --check-boundary` |
+
+## 7. The flagship loop, as a worked example
+
+Everything above says how to bring **a module** under governance. This section points at what the
+pieces look like when they are assembled into **one business loop a person can actually run**, which is
+the thing a new developer should copy from rather than the pieces separately.
+
+The loop is `CrmFollowUpTools` plus the gate that holds it:
+
+- **A read that supplies a judgement rather than making one.** `crm_follow_up_queue` (R1) returns at
+  most ten of the caller's own customers, each with a reason computed from the module's own fields —
+  when it was last contacted, when it is next due, whether it is marked for follow-up, whether it
+  closed. Contact details and contact **content** are not projected. That is what "limited and
+  explainable" means here: a cap, and a `why` per row.
+- **A write that goes through the module's own object.** `record_crm_followup` (R3) calls
+  `CrmFollowUpRecordService`, is held for a human, and settles ownership by reading the customer first
+  — a read the module's own advice already scopes, so "not found" and "not yours" get the same answer.
+- **A withdrawal that reaches the module.** The result type is registered with a compensator in
+  `YudaoLocalCompensators`; without one the runtime refuses the revocation and says which piece is
+  missing.
+- **A gate that says what it does not assert.** `scripts/run-flagship-crm-scenarios.mjs` walks the eight
+  steps and is explicit that the queue's *contents* are not on the wire — so its green line means "the
+  loop ran under this caller", never "the ranking was right".
+
+Two fixture lessons are written into that gate and worth reading before writing another: a customer
+seeded by raw SQL needs its `crm_permission` owner row, or the module's own delete refuses a
+withdrawal it should have allowed; and an audit row carries the conversation id the **runtime issued**,
+not the one the caller sent.
