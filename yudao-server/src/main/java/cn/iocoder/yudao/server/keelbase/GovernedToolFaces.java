@@ -9,10 +9,12 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p><b>它补的是登记处过去数不到的那一半。</b>登记处过去只装模块（{@link GovernedModule}）；而 AI 在本宿主上还经**工具**
  * 到达执行——把可调用物交给引擎或模型的地方。这些地方过去**一个都没登记**，于是「本宿主被数全了吗」在模块那一栏之外
- * 无从问起。这里有十处：八个**工具面**（声明 {@code @Bean AiTool} 的配置、或直接 {@code implements AiTool} 的组件）、
- * 以及两条**工具路**（把工具交给模型/引擎的缝：本部署自己的引擎工具面 {@code YudaoGovernedAgentTools}，与 MCP 那条路的
- * 治理切面 {@code Ai1McpGovernance}）。{@code scripts/check-governance-registry.mjs} 读源码里这些形状，拒掉一个没在这里
- * 列出的——故这份目录**漂不了**：它是「登记处计数、检查让数诚实」里被检查的那一半。
+ * 无从问起。这里有十二处：八个**工具面**（声明 {@code @Bean AiTool} 的配置、或直接 {@code implements AiTool} 的组件）、
+ * 两条**工具路**（把工具交给模型/引擎的缝：本部署自己的引擎工具面 {@code YudaoGovernedAgentTools}，与 MCP 那条路的
+ * 治理切面 {@code Ai1McpGovernance}）、以及 {@code ai1} 那两条**装配端**（{@code Ai1McpToolFactory} 与
+ * {@code Ai1SkillToolFactory}——它们在本机上**装配**模型可调的工具，见下面 SKILL 那条的警示）。
+ * {@code scripts/check-governance-registry.mjs} 读源码里这些形状，拒掉一个没在这里列出的——故这份目录**漂不了**：
+ * 它是「登记处计数、检查让数诚实」里被检查的那一半。
  *
  * <p><b>为什么工具是**一份手写目录**，而模块是**在自己类上自报**。</b>这是刻意的不对称，理由只有一条：工具面里有一个是
  * **生成的**——`generated/ProductsTools`（来自 `specs/products.json`）。生成的文件不许手改，而让生成器给它发出声明是
@@ -22,7 +24,9 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p><b>⚠ 它不做的事。</b>列在这里**不等于**这条路径受治理。工具面经引擎执行、受确认与审计管住；MCP 那条路只由它自己的
  * 切面管身份与审计、**不经引擎、不扣人**（`YD-T22` 的「丙」）——它的**posture 不在本声明里**，而在线上的那道边界
- * （`scripts/check-ungoverned-tool-beans.mjs` 的边界对象）与 MCP 门禁里。此处只回答「这条路存在、有人枚举过它」。
+ * （`scripts/check-ungoverned-tool-beans.mjs` 的边界对象）与 MCP 门禁里。**SKILL 那条更空：它上面一条缝都没有**
+ * ——没有身份、没有审计、没有确认、没有拒绝，而它造的 `ShellTools` 在**这台服务器上**跑 shell。它进这份目录只是
+ * **被数到了**，不是被管住了。此处只回答「这条路存在、有人枚举过它」。
  *
  * <p>The declaration of every <em>tool face</em> on this host: the places where the AI reaches execution,
  * listed one by one.
@@ -30,13 +34,15 @@ import org.springframework.context.annotation.Configuration;
  * <p><b>It fills the half the registry could not count.</b> The registry used to hold modules alone
  * ({@link GovernedModule}); the AI also reaches execution here through <em>tools</em> — the places that
  * hand callables to the engine or to a model. None of those places was declared, so beyond the module
- * column "is this host accounted for?" had no answer. There are ten: eight <b>tool faces</b> (a
- * {@code @Configuration} declaring {@code @Bean AiTool}, or a component that {@code implements AiTool})
- * and two <b>tool paths</b> (the seams that hand tools to a model or the engine: this deployment's own
+ * column "is this host accounted for?" had no answer. There are twelve: eight <b>tool faces</b> (a
+ * {@code @Configuration} declaring {@code @Bean AiTool}, or a component that {@code implements AiTool}),
+ * two <b>tool paths</b> (the seams that hand tools to a model or the engine: this deployment's own
  * engine face {@code YudaoGovernedAgentTools}, and the MCP path's governance aspect
- * {@code Ai1McpGovernance}). {@code scripts/check-governance-registry.mjs} reads those shapes in the
- * sources and refuses one not listed here — so this catalogue <b>cannot drift</b>: it is the half the
- * check keeps honest.
+ * {@code Ai1McpGovernance}), and `ai1`'s two <b>assembling ends</b> ({@code Ai1McpToolFactory} and
+ * {@code Ai1SkillToolFactory} — they **assemble** the model-callable tools on this machine; see the
+ * warning on the SKILL one below). {@code scripts/check-governance-registry.mjs} reads those shapes in
+ * the sources and refuses one not listed here — so this catalogue <b>cannot drift</b>: it is the half
+ * the check keeps honest.
  *
  * <p><b>Why tools are a <em>hand-written catalogue</em> while modules <em>declare themselves</em>.</b>
  * A deliberate asymmetry, for one reason: one tool face is <b>generated</b> — `generated/ProductsTools`
@@ -51,8 +57,10 @@ import org.springframework.context.annotation.Configuration;
  * through the engine and are held by confirmation and audit; the MCP path is held by its own aspect for
  * identity and audit alone, <b>without the engine, without holding a call for a person</b> (`YD-T22`'s
  *「丙」) — its posture is not in this declaration but on the boundary the gate reads
- * (`scripts/check-ungoverned-tool-beans.mjs`'s boundary object) and in the MCP gate. This answers only
- * "the path exists and someone enumerated it".
+ * (`scripts/check-ungoverned-tool-beans.mjs`'s boundary object) and in the MCP gate. **The SKILL path is
+ * emptier still: it has no seam at all** — no identity, no audit, no confirmation, no refusal — and the
+ * `ShellTools` it builds runs shell **on this server**. Being in this catalogue means it is *counted*,
+ * not that it is *held*. This answers only "the path exists and someone enumerated it".
  */
 @Configuration
 public class GovernedToolFaces {
@@ -115,6 +123,18 @@ public class GovernedToolFaces {
     @Bean
     GovernedPath ai1McpGovernance() {
         return new ToolFace("Ai1McpGovernance");
+    }
+
+    /** `ai1` 把工具装配给一次会话的地方之一：MCP 那条路的**装配端**；同一条路的**治理端**是上面那条切面。 / One of `ai1`'s tool assemblers — the MCP path's **assembling end**; that same path's governed end is the aspect above. */
+    @Bean
+    GovernedPath ai1McpToolFactory() {
+        return new ToolFace("Ai1McpToolFactory");
+    }
+
+    /** ⚠ **本目录里唯一一条「完全没有治理」的路径**：`ai1` 的 SKILL 装配端。它造六个工具，含 `ShellTools`（**在这台服务器上跑 shell**）与 `FileSystemTools`（读写文件）；它没有身份、没有审计、没有拒绝，而**宿主侧没有可切的 public 方法**（调用发生在第三方库内部）⇒ 要治理它，只能在装配处包一层，那是**另一个工作项**。列在这里只说明「这条路存在、有人枚举过它」。 / ⚠ **The one path in this catalogue with no governance at all**: `ai1`'s SKILL assembling end. It builds six tools, including `ShellTools` (**runs shell on this server**) and `FileSystemTools` (reads and writes files); no identity, no audit, no refusal — and there is **no host-side public method to advise** (the calls happen inside a third-party library), so governing it would mean wrapping it at the assembly site, which is **another work item**. Listed here means only that the path exists and someone enumerated it. */
+    @Bean
+    GovernedPath ai1SkillToolFactory() {
+        return new ToolFace("Ai1SkillToolFactory");
     }
 
     /**

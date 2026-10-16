@@ -15,28 +15,36 @@
 //
 // ## 怎么数：射程与四条形状
 //
-// 射程是**写明的**：只扫 `yudao-server` 自己的 `cn.iocoder.yudao.server.keelbase` 树（含 `generated/`）。上游的模块不扫
-// ——我们不治理它们，是它们被我们治理。
+// 射程是**写明的**，两半：`yudao-server` 自己的 `cn.iocoder.yudao.server.keelbase` 树（含 `generated/`），
+// 加上 `yudao-module-ai1-springai` 自己的 `…/module/ai1/harness` 树。**上游的模块不扫**——我们不治理它们，
+// 是它们被我们治理；`ai1` 树里也只读**我们那一层**，不读它的 controller / service / dal。
 //
-// **射程为何到此（依据，不是省略）。** 两条。① **方向**：治理接口（`GovernedPath`）住在 `yudao-server`，而
-// `yudao-module-ai1-springai` **不能反向依赖它** ⇒ 那个模块里的类**实现不了**本接口，自报这条路对它们根本不通。
-// ② **那一层自称什么**：`ai1` 的 `harness/`，按它自己的 `package-info.java`，是**平台去调用**大模型、MCP 服务、知识库
-// 与 SKILL 的**客户端与工厂**——原文是「**不是**注册给模型调用的 function tool」。故本集合装的是**本线自己声明的路径**，
-// 落在 keelbase 树内；`harness/` 那一层整层属**出站**，不入本射程。
+// **`harness` 为什么进来，又只认它的一种形状。** 那一层里有一处是**入站**的：它为一次会话**装配工具**，而装出来的
+// 东西**在本机上执行**（`ShellTools` 在服务器上跑 shell、`FileSystemTools` 读写文件）——那是 AI 够到**这台机器**的
+// 地方，必须数得到，故它的**装配端**是一种形状。另一半是**出站**的：按那一层自己的 `package-info.java`，它是
+// 「平台**去调用**大模型、MCP 服务、知识库与 SKILL 的客户端与工厂」，原文「**不是**注册给模型调用的 function tool」
+// ——出站不认形状，所以 `harness` 只多出「装配端」这一种。
 //
-// **一处张力，如实记、不掩。** 那份手写目录里的 `Ai1McpGovernance` 切的是 `Ai1McpClientTool.callTool`——那是**出站**
-// （宿主作为 MCP 客户端去调外部服务端），与 `harness/` 里那些**同方向**的装配者分处两侧。故这条边界判的是**「归谁声明」**，
-// 不是「入站还是出站」；把它读成后者，这一条会看起来自相矛盾。
+// **为什么这些载体只能手写登记。** 治理接口（`GovernedPath`）住在 `yudao-server`，而 `ai1` **不能反向依赖它**
+// ⇒ 那个模块里的类**实现不了**本接口，自报这条路对它们根本不通。故它们走那份手写目录
+// （`GovernedToolFaces.java`），与生成的 `ProductsTools` 同一个办法。
 //
-// 一条**AI 执行路径** = 本宿主上一处「AI 能到达执行」的载体，按下面四条形状判定（读的是**形状**、不是名字）：
+// **一处张力，如实记、不掩。** 目录里的 `Ai1McpGovernance` 切的是 `Ai1McpClientTool.callTool`——那是**出站**。
+// 故这条边界判的不是「入站还是出站」，而是「**归谁声明、且 AI 够不够得到本机**」：MCP 那条登记的是它的**治理端**，
+// SKILL 那条登记的是它的**装配端**，两者都不是「一条路的全部」。读成「只装入站」或「只装出站」，都有反例。
+//
+// 一条**AI 执行路径** = 本宿主上一处「AI 能到达执行」的载体，按下面五条形状判定（读的是**形状**、不是名字）：
 //
 //   * `module`  —— 自己的 `@Around` pointcut 点了 `cn.iocoder.yudao.module.<x>.service.` 的切面。它是一处**业务模块**，
 //      且拿模块自己的 service 层当接缝；它必须 `implements GovernedModule`，且它报的名字**必须**是它 pointcut 里的 `<x>`。
-//   * `tool`    —— 把可调用物交给**引擎或模型**的地方，读三种子形状：① 声明 `@Bean` 且**声明返回类型**是 `AiTool` 的方法
+//   * `tool`    —— 把可调用物交给**引擎或模型**的地方，读五种子形状：① 声明 `@Bean` 且**声明返回类型**是 `AiTool` 的方法
 //      （工具面）；② `implements AiTool` 的类（单工具）；③ `implements Ai1LocalToolProvider` 的类（本部署自己的引擎工具面）；
 //      ④ 一处**不是模块 service** 的切面（`@Aspect` + `@Around`，但 pointcut 不走 `module.<x>.service.`）—— 那是打**工具路**
-//      的治理（本宿主上就是 MCP 那条）。它必须**登记**：或者自己 `implements GovernedPath`（`kind()` 为 `TOOL`），或者在
-//      `GovernedToolFaces.java` 这份手写目录里被按类名列出（生成面走这条，见那份文件的类注释）。
+//      的治理（本宿主上就是 MCP 那条）；⑤ 声明 `public List<…> buildTools(…)` 的类——`ai1` 的 `harness` 里**把工具装配给
+//      一次会话**的地方（本宿主上两条：MCP 那条的装配端，与 SKILL 那条）。它必须**登记**：或者自己 `implements GovernedPath`
+//      （`kind()` 为 `TOOL`），或者在 `GovernedToolFaces.java` 这份手写目录里被按类名列出（生成面与 `ai1` 那两处走这条）。
+//      **⚠ ⑤ 只读「装配端」。** 那两处装出来的工具交给模型调，而**调用发生在库内部、宿主侧没有可切的 public 方法**
+//      ⇒ 「这条路受不受治理」**不在**这个形状里：SKILL 那条（`ShellTools` 在服务器上跑 shell）**今天一条治理缝都没有**。
 //   * `workflow` / `scheduled-task` —— 今天本宿主上**一条都没有**；形状写在下面，空缺**明说**而不是省略。一条流程若出现，
 //      它应 `implements GovernedPath` 并报 `WORKFLOW`；一个定时任务同理报 `SCHEDULED_TASK`。
 //
@@ -58,34 +66,47 @@
 // requires a **declaration**: every carrier a shape picks out must declare itself in the registry (or be
 // listed in the hand-written catalogue); a miss is red.
 //
-// Scope is stated, not implied: only `yudao-server`'s own `cn.iocoder.yudao.server.keelbase` tree
-// (including `generated/`). Upstream's modules are not scanned; we do not govern them, they are governed
-// by us.
+// Scope is stated, in two halves: `yudao-server`'s own `cn.iocoder.yudao.server.keelbase` tree
+// (including `generated/`), plus `yudao-module-ai1-springai`'s own `…/module/ai1/harness` tree.
+// **Upstream's modules are not scanned** — we do not govern them, they are governed by us; and inside
+// the `ai1` module only **our own layer** is read, not its controller / service / dal.
 //
-// **Why the scope ends here (a reason, not an omission).** Two of them. (1) **Direction**: the
-// governance interface (`GovernedPath`) lives in `yudao-server`, and `yudao-module-ai1-springai`
-// **cannot depend back on it** — so a class in that module **cannot** implement the interface and
-// declaring itself is not open to it at all. (2) **What that layer says it is**: `ai1`'s `harness/`, by
-// its own `package-info.java`, is the **client and factory side** that calls out to models, MCP,
-// knowledge bases and SKILL — in its words, "**not** a function tool registered for the model to call".
-// So this set holds **the paths this line declares itself**, inside the keelbase tree; `harness/` is
-// outbound as a whole and stays outside the scope.
+// **Why `harness` is in, and why only one of its shapes is.** That layer holds one thing that is
+// **inbound**: it **assembles tools** for a session, and what it assembles **runs on this machine**
+// (`ShellTools` runs shell on the server, `FileSystemTools` reads and writes files) — a place the AI
+// reaches *this host*, so it has to be countable, and its **assembling end** is therefore a shape. The
+// other half is **outbound**: by that layer's own `package-info.java` it is "the client and factory side
+// that calls out to models, MCP, knowledge bases and SKILL", in its words "**not** a function tool
+// registered for the model to call" — outbound carries no shape, so the assembling end is all `harness`
+// adds.
 //
-// **One tension, recorded rather than hidden.** The hand-written catalogue's `Ai1McpGovernance` advises
-// `Ai1McpClientTool.callTool` — an **outbound** call (this host as an MCP client reaching an external
-// server), on the far side from the same-direction assemblers in `harness/`. So this boundary judges
-// **"who declares it"**, not "inbound or outbound"; read as the latter, this one line looks
-// self-contradictory.
+// **Why these carriers can only be listed by hand.** The governance interface (`GovernedPath`) lives in
+// `yudao-server`, and `ai1` **cannot depend back on it** — so a class in that module **cannot** implement
+// the interface, and declaring itself is not open to it. They go through the hand-written
+// `GovernedToolFaces.java` instead, the same way the generated `ProductsTools` does.
 //
-// An **AI execution path** is a carrier of one of four shapes — read as shapes, not names:
+// **One tension, recorded rather than hidden.** The catalogue's `Ai1McpGovernance` advises
+// `Ai1McpClientTool.callTool` — an **outbound** call. So this boundary does not split on "inbound or
+// outbound" but on "**who declares it, and can the AI reach this host through it**": the MCP path is
+// here through its **governed end**, the SKILL path through its **assembling end**, and neither is "the
+// whole of one path". Read as "inbound only" or "outbound only", it has counter-examples either way.
+//
+// An **AI execution path** is a carrier of one of five shapes — read as shapes, not names:
 //
 //   * `module`  — an aspect whose `@Around` pointcut names `cn.iocoder.yudao.module.<x>.service.`. It must
 //       `implements GovernedModule`, and the name it declares has to be the `<x>` own pointcuts name.
-//   * `tool`    — a place that hands callables to the engine or a model, read as three sub-shapes: a
+//   * `tool`    — a place that hands callables to the engine or a model, read as five sub-shapes: a
 //       `@Bean` method whose declared return type is `AiTool`; a class that `implements AiTool`; a class
-//       that `implements Ai1LocalToolProvider`; and an aspect that governs a **tool path** rather than a
-//       module's `service.` layer. It must declare itself (`implements GovernedPath`, `kind()` = `TOOL`)
-//       or be listed by class name in the hand-written `GovernedToolFaces.java` catalogue.
+//       that `implements Ai1LocalToolProvider`; an aspect that governs a **tool path** rather than a
+//       module's `service.` layer; and a class declaring `public List<…> buildTools(…)` — `ai1`'s
+//       `harness` shape, the place that **assembles tools for a session** (two here: the MCP path's
+//       assembling end, and the SKILL path). It must declare itself (`implements GovernedPath`,
+//       `kind()` = `TOOL`) or be listed by class name in the hand-written `GovernedToolFaces.java`
+//       catalogue (the generated face, and those two, go this way).
+//       **⚠ ⑤ reads the assembling end only.** What it assembles is handed to a model, and **the call
+//       happens inside a library, with no host-side public method to advise** — so "is this path
+//       governed?" is *not* in this shape: the SKILL path (`ShellTools` runs shell on the server) has
+//       **no governance seam at all** today.
 //   * `workflow` / `scheduled-task` — there are none on this host today; the shapes are stated and the
 //       emptiness is said rather than omitted.
 //
@@ -97,6 +118,12 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OWN = 'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase'
+// The other half of the scope — this module's own `harness` tree. Only its **assembling** end carries a
+// shape (see the scope note and sub-shape ⑤ below): that is the inbound half, the one whose tools run on
+// this machine. The outbound half stays out, by that layer's own `package-info.java`.
+// 射程的另一半——本模块自己的 `harness` 树。只有它的**装配端**带形状（见上面的射程说明与子形状 ⑤）：那是
+// **入站**的那一半，装出来的工具跑在**本机**上。**出站**那一半留在外面，依据是那一层自己的 `package-info.java`。
+const AI1_HARNESS = 'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness'
 // The one hand-written catalogue a tool face may be listed in instead of declaring itself. Read as data,
 // so a face added to the sources without an entry here turns this check red.
 // 工具面可以**不**自报、改为在这份手写目录里被列出（生成面走这条）。当数据读：源码里加了面而这里没加，即红。
@@ -118,6 +145,11 @@ const KIND_METHOD = /Kind\s*\.\s*(MODULE|TOOL|WORKFLOW|SCHEDULED_TASK)/
 /** A class that hands tools to the engine or a model, as a shape in the source. */
 const IMPLEMENTS_AI_TOOL = /\bclass\s+\w+[^{;]*\bimplements\b[^{;]*\bAiTool\b/
 const IMPLEMENTS_LOCAL_PROVIDER = /\bclass\s+\w+[^{;]*\bimplements\b[^{;]*\bAi1LocalToolProvider\b/
+/** The assembler that hands tools to a session — `ai1`'s `harness` shape (sub-shape ⑤). `public` is what
+ *  keeps an interface's own `buildTools` declaration out of it: a contract is not a path.
+ *  把工具装配给**一次会话**的装配端——`ai1` 的 `harness` 形状（子形状 ⑤）。`public` 正是把**接口自己的**
+ *  `buildTools` 声明挡在外面的那一下：契约不是路径。 */
+const DECLARES_BUILD_TOOLS = /\bpublic\s+List<[^>]+>\s+buildTools\s*\(/
 /** Is this source line a comment? A shape lives in code, not in prose about it. / 这一行是注释吗？形状长在代码里、不长在讲它的散文里。 */
 const IS_COMMENT_LINE = /^\s*(\*|\/\/|\/\*)/
 
@@ -136,6 +168,7 @@ const walk = (dir) => {
   }
 }
 walk(join(ROOT, OWN))
+walk(join(ROOT, AI1_HARNESS))
 
 /** The class a file primarily declares, as the check names it: the file's base name. */
 const classNameOf = (file) => file.split(/[\\/]/).pop().replace(/\.java$/, '')
@@ -214,6 +247,7 @@ for (const file of javaFiles) {
   // ---- tool shape ---------------------------------------------------------------------------------
   const toolShape = declaresAiToolBean(text) || IMPLEMENTS_AI_TOOL.test(text)
     || IMPLEMENTS_LOCAL_PROVIDER.test(text)
+    || DECLARES_BUILD_TOOLS.test(text)
     || (/@Aspect\b/.test(text) && /@Around\b/.test(text) && !HAS_MODULE_SERVICE.test(text))
   if (!toolShape) continue
 
@@ -267,5 +301,5 @@ if (offenders.length > 0) {
 console.log(`\n${total} AI execution path(s) declared — ` +
   `${declared.module.length} module, ${declared.tool.length} tool, ` +
   `${declared.workflow.length} workflow, ${declared.scheduledTask.length} scheduled-task ` +
-  `(${javaFiles.length} file(s) under ${OWN})`)
+  `(${javaFiles.length} file(s) under ${OWN} + ${AI1_HARNESS})`)
 console.log(`${total} ok / 0 failed`)
