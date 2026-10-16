@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,277 @@
+@@ -1,4 +1,304 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -110,6 +110,33 @@ index 96269a8..2611a9b 100644
 +      none: 'none',
 +      emptyNote:
 +        '“Allowed roles” is empty and this runtime reports no permissions, because its gate decides on the risk level alone — it has no role allowlist and no policy toggles. An empty column here is a fact about this deployment, not something that failed to load.',
++    },
++    boundary: {
++      title: 'Governance boundary',
++      verdictOk: 'Nothing of ours is outside governance',
++      verdictViolated: '{n} path(s) would escape governance',
++      scope: 'Read {files} file(s) over {roots} root(s)',
++      reads: 'What is read: a {\'@\'}Bean method whose declared return type hands out {types}',
++      excluded: 'Deliberately not read: {paths} — upstream keeps its own model-to-tool path there, and its sample bean is the very fact this boundary rests on',
++      heldTitle: 'Held by the runtime',
++      heldWhat: "Our tools reach a model through the runtime's seam, so every call meets these first:",
++      holds: {
++        authorization: 'authorization',
++        identity: 'acting identity',
++        confirmation: 'confirmation',
++        audit: 'audit rows',
++        'side-effect-ledger': 'side-effect ledger',
++      },
++      notHeldTitle: 'Not held by it',
++      notHeldWhat: "Upstream's own path: chat resolves a role's tool ids through Spring AI's own resolver and hands the callbacks to the model. This line's governance does not see it.",
++      notHeldWhy: 'Harmless today: the only ToolCallback bean in this build is upstream’s own sample, so the resolver has nothing of ours to find.',
++      notHeldOneBean: 'One {\'@\'}Bean of ours handing out a ToolCallback is all it takes: the model would reach it with no engine, no identity, no confirmation and no audit row.',
++      offendersTitle: 'Beans that would escape it',
++      colFile: 'File',
++      colLine: 'Line',
++      none: 'none',
++      missing: 'This build carries no boundary record — the UI was laid down without it',
++      loadFailed: 'The boundary could not be read',
 +    },
 +    trace: {
 +      title: 'Conversation trace',
@@ -284,7 +311,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,276 @@
+@@ -1,4 +1,303 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -392,6 +419,33 @@ index 35f1e1a..856d201 100644
 +      none: '无',
 +      emptyNote:
 +        '「允许角色」是空的，本运行时也不报权限清单——因为它的门**只看风险级**：它没有角色白名单、也没有策略开关。这里一个空列是**本部署的一条事实**，不是有什么东西没加载出来。',
++    },
++    boundary: {
++      title: '治理边界',
++      verdictOk: '我们的东西没有一样在治理之外',
++      verdictViolated: '有 {n} 条路径会绕过治理',
++      scope: '读了 {roots} 个根下的 {files} 个文件',
++      reads: '读的是 `{\'@\'}Bean` 的**声明返回类型**是否交出 {types}',
++      excluded: '**有意不读**：{paths} —— 上游在那里留着自己的模型→工具路，而它那个示例 bean 正是本边界所倚的事实',
++      heldTitle: '运行时会扣住的',
++      heldWhat: '我们的工具经运行时那条缝交给模型，故每一次调用都先遇到这些：',
++      holds: {
++        authorization: '权限判定',
++        identity: '身份代入',
++        confirmation: '确认门控',
++        audit: '审计行',
++        'side-effect-ledger': '副作用账本',
++      },
++      notHeldTitle: '它扣不住的',
++      notHeldWhat: '上游自己那条路：chat 取角色的 toolIds、经 Spring AI 自己的解析器把 callback 交给模型 —— 本线治理看不见它。',
++      notHeldWhy: '今天无害：本构建里唯一的 `ToolCallback` bean 是**上游自己的示例**，故解析器找不到我们的东西。',
++      notHeldOneBean: '只差**一个**我们自己的 `{\'@\'}Bean` 交出 `ToolCallback` —— 模型就够得到它：不经引擎、不经身份、不经确认、不留审计行。',
++      offendersTitle: '会绕过它的 bean',
++      colFile: '文件',
++      colLine: '行',
++      none: '无',
++      missing: '本构建没有带边界记录 —— 界面是没带它铺下去的',
++      loadFailed: '读不到这条边界',
 +    },
 +    trace: {
 +      title: '决策轨迹',

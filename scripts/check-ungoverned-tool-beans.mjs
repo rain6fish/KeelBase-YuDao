@@ -120,32 +120,39 @@ for (const file of javaFiles) {
 // design fact a run can only *confirm*, never derive: which paths the runtime's seam holds, and why
 // upstream's own path stays harmless. Keeping both here is the point — CI and the console then read one
 // object rather than two descriptions of it.
+// 边界的**数据形态** —— `YD-27` 的页面读它。**这里不放散文**：管理台双语是红线，词必须由控制台按读者语言
+// 给，故产物只带**标识与枚举**（`verdict` / 路径 id / `holds` 的每一格 / `offenders` 的坐标），散文的落点
+// 是控制台的 i18n。`computed` 由本次运行推出；`stated` 是运行只能**确认**、推不出来的**设计事实**。
+//
+// The boundary as data, for `YD-27`'s page. **No prose lives here**: the console is bilingual by a standing
+// rule, so its words have to come from its own i18n and this object carries identifiers and enums only —
+// `verdict`, the path ids, each entry in `holds`, and the coordinates of any offender. `computed` comes out
+// of this run; `stated` is the design fact a run can only *confirm*, never derive.
 const boundary = {
   schema: 'keelbase-governance-boundary/1',
   computed: {
     scope: {
+      // The roots are read from the same constant the walk uses, so the page cannot report a scope the
+      // check did not actually visit. / 射程取自上面那次遍历用的同一个常量，故页面报不出门禁没真扫过的范围。
       roots: ROOTS,
       filesScanned: javaFiles.length,
-      excluded: {
-        path: 'yudao-module-ai',
-        why: '上游自带它自己的模型→工具路，且那个示例 bean 正是本边界所倚的事实 —— 它不在我们该改的范围里，故不扫',
-      },
+      excludedPaths: ['yudao-module-ai'],
     },
-    reads: '@Bean 方法**声明返回类型**是否交出 ToolCallback / FunctionCallback / ToolCallbacks',
+    // What the check reads, as an enum rather than a sentence. / 门禁读的是什么，用枚举而不是一句话。
+    reads: 'declared-return-type',
+    readsTypes: ['ToolCallback', 'FunctionCallback', 'ToolCallbacks'],
     offenders: offenders.map((o) => ({ file: o.file, line: o.line })),
     verdict: offenders.length === 0 ? 'ok' : 'violated',
   },
   stated: {
     held: {
       id: 'runtime-seam',
-      what: '本线的工具经运行时那条缝交给模型：装配走 Ai1McpToolFactory.buildTools，执行点切在 Ai1McpClientTool.callTool',
-      holds: ['权限判定', '身份代入', '确认门控', '审计行', '副作用账本'],
+      holds: ['authorization', 'identity', 'confirmation', 'audit', 'side-effect-ledger'],
     },
     notHeld: {
       id: 'upstream-resolver',
-      what: '上游 yudao-module-ai 自己那条路：chat 取角色的 toolIds，经 Spring AI 的 ToolCallbackResolver 把注册名解析成 callback 交给模型 —— 本线治理看不见它',
-      whyHarmlessNow: '本构建里唯一的 ToolCallback bean 是上游自己的示例 ⇒ 解析器找不到我们的东西',
-      oneBeanAway: '一个交出自己的 ToolCallback 的 @Bean，就会让那条路可被模型够到 —— 不经引擎、不经身份、不经确认、不留审计',
+      whyHarmlessNow: 'no-tool-callback-bean-of-ours',
+      oneBeanAway: true,
     },
   },
 }

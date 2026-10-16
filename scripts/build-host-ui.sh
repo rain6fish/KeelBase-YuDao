@@ -58,6 +58,7 @@ THEME_SCSS="$REPO_ROOT/keelbase-ui/theme/element-theme.scss"
 HOST_SCSS="$REPO_ROOT/keelbase-ui/theme/host-yudao.scss"
 THEME_CSS_NAME="keelbase-theme.css"
 HOST_CSS_NAME="keelbase-host.css"
+BOUNDARY_NAME="keelbase-governance-boundary.json"
 MARKER="<!-- keelbase-theme -->"
 HOST_MARKER="<!-- keelbase-host -->"
 if [[ ! -f "$HOST_SCSS" ]]; then HOST_CSS_NAME=""; fi
@@ -562,6 +563,35 @@ awk -v theme_css="$THEME_CSS_NAME" -v host_css="$HOST_CSS_NAME" -v prefix="$BASE
 ' "$INDEX" > "$tmp"
 mv "$tmp" "$INDEX"
 
+# --- 5b. the governance boundary, carried as data ---------------------------------------------------
+# `YD-27`: the console has to *present* which AI paths this deployment's governance holds and which it
+# does not, and to do that from the same computation CI runs rather than from a description written
+# beside it. That computation is `scripts/check-ungoverned-tool-beans.mjs`, and its `--emit` is written
+# straight into the artefact — nothing is hand-copied and there is no committed copy to go stale. It runs
+# here, beside the theme layer, so what ships is the boundary of the sources this build was made from.
+#
+# A violation is **recorded, not fatal here**. This build's job is to carry the record; a build that
+# stopped would take away the very page that shows a reader the violation. CI is where it fails loudly.
+#
+# `YD-27`：控制台要**呈现**本部署的治理扣住哪些 AI 路径、哪些不扣，且必须来自 CI 跑的那同一次计算，而不是
+# 旁边手写的一段描述。那次计算就是 `scripts/check-ungoverned-tool-beans.mjs`，它的 `--emit` 直接写进产物
+# —— 没有一处是手抄的，也没有一份会烂掉的提交副本。它在这里跑、与主题层并列，故随产物出去的是**这个构建所用
+# 源码**的那条边界。
+#
+# 有违反是**记录下来、不在这里致命**。这次构建的职责是把记录带出去；停下来会把「把违反展示给读者」的那一页
+# 一并带走。响亮失败的地方是 CI。
+if [[ -f "$REPO_ROOT/scripts/check-ungoverned-tool-beans.mjs" ]]; then
+  set +e
+  node "$REPO_ROOT/scripts/check-ungoverned-tool-beans.mjs" --emit "$DIST/$BOUNDARY_NAME"
+  boundary_rc=$?
+  set -e
+  if [[ "$boundary_rc" != "0" ]]; then
+    echo "note: the governance boundary recorded a violation in $BOUNDARY_NAME; CI is where that fails" >&2
+  else
+    echo "wrote $BOUNDARY_NAME into $DIST (the boundary of the sources this build was made from)"
+  fi
+fi
+
 # --- 6. assert, rather than report ------------------------------------------------------------------
 assert_one() {
   local marker="$1" href="$2" count
@@ -577,6 +607,17 @@ assert_one() {
 }
 assert_one "$MARKER" "$BASE_PREFIX$THEME_CSS_NAME"
 if [[ -n "$HOST_CSS_NAME" ]]; then assert_one "$HOST_MARKER" "$BASE_PREFIX$HOST_CSS_NAME"; fi
+
+# 这份记录必须在：没有它那一页什么都不画，而「文件不在」与「端点拒绝」是两种不同的坏法 —— 这次构建正是能
+# 注意到它的地方。
+#
+# The record has to be there: the page renders nothing without it, and a missing file is a different
+# failure from a refused endpoint — this build is where that gets noticed.
+if [[ ! -s "$DIST/$BOUNDARY_NAME" ]]; then
+  echo "missing $DIST/$BOUNDARY_NAME — the console's boundary page would render nothing" >&2
+  echo "  (scripts/check-ungoverned-tool-beans.mjs writes it; if that gate is gone, that is why)" >&2
+  exit 1
+fi
 
 echo "linked $BASE_PREFIX$THEME_CSS_NAME${HOST_CSS_NAME:+ and $BASE_PREFIX$HOST_CSS_NAME} into $INDEX"
 echo "note: the layer is in the artefact only — the UI's own dev server renders upstream's look."
