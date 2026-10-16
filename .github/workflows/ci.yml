@@ -117,6 +117,14 @@ jobs:
       - name: Every page the assistant offers must be one the menus compose
         run: node scripts/check-console-pages.mjs
 
+      # The deployment's own seed list is reconciled with what it serves: a menu file for a keelbase-ui
+      # page that is not on the list, or a top-level path the scope file does not keep, is the silent way
+      # a page becomes unreachable (that is how YD-41's pages were lost). Pure Node.
+      # 部署自己的种子清单与它服务的东西对账：一份给 keelbase-ui 页面用的菜单文件不在清单上、或一条顶级路径
+      # 不在保留清单里，就是「页面变得到不了」的那种安静方式（YD-41 那几页就是这样丢的）。纯 Node。
+      - name: The deployment's seed list must carry every menu its pages need
+        run: node scripts/check-seed-list.mjs
+
   generator:
     name: The generated files are still a Spec's output
     runs-on: ubuntu-latest

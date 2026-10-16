@@ -54,13 +54,31 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-assistant-agent.sql"
   "$REPO_ROOT/sql/keelbase-assistant-role-grants.sql"
   "$REPO_ROOT/sql/keelbase-assistant-menus.sql"
-  # 治理边界页那条菜单行 + 它旁边那条授予（`YD-27` 的页）—— 它挂在治理目录（`20001`）下，而那个目录的授予
-  # 来自 `keelbase-governance-menu-grants.sql`：**那份不在本清单里**，所以照本清单从零重建仍需要它先跑
-  # （已登记成 `YD-41`）。
-  # The boundary console page's menu row and its grant: it hangs under the governance directory (`20001`),
-  # whose grant comes from `keelbase-governance-menu-grants.sql` — **that file is not in this list**, so a
-  # from-scratch run still needs it first (recorded as `YD-41`).
+  # 治理控制台的菜单行（`YD-41` 把这份清单补全）：先目录、再授予、再各页。**依赖顺序**：`governance-menus`
+  # 建目录 `20001` 与它下面三页；`governance-menu-grants` 把目录与其中两页授予普通角色——**子项没有父项可挂
+  # 就进不了侧栏**；其余各页全挂在 `20001` 下，故必须排在目录之后。少了它们，从零重建后整个治理区**一条都到
+  # 不了**（页面在产物里、库里没有行）。
+  # The governance console's menu rows (`YD-41` completes this list): directory first, then its grants, then
+  # the pages. **Dependency order**: `governance-menus` creates the directory `20001` and the three pages
+  # under it; `governance-menu-grants` hands the directory and two of those pages to the ordinary role — a
+  # child with no parent to hang from stays out of the sidebar; every other page hangs under `20001`, so it
+  # must follow the directory. Without them a from-scratch run cannot reach the governance area at all (the
+  # pages are in the artefact, the rows are not).
+  "$REPO_ROOT/sql/keelbase-governance-menus.sql"
+  # 授予：目录 `20001` + 行动中心 + 写入台账，发给普通角色（role 2）。**必须在目录之后**。
+  # Grants: the directory `20001` plus the action centre and the write ledger, to the ordinary role (id 2).
+  # **Must come after the directory.**
+  "$REPO_ROOT/sql/keelbase-governance-menu-grants.sql"
+  # 其余治理页（都挂在 `20001` 下）：边界（连同它的授予）· 决策轨迹（连同授予）· 对抗证明 · 工具清单 ·
+  # 操作审计 · 策略中心。
+  # The remaining governance pages (all under `20001`): boundary (with its grant), conversation trace (with
+  # its grant), security showcase, tool inventory, operation audit, policy centre.
   "$REPO_ROOT/sql/keelbase-boundary-menu.sql"
+  "$REPO_ROOT/sql/keelbase-trace-menu.sql"
+  "$REPO_ROOT/sql/keelbase-showcase-menu.sql"
+  "$REPO_ROOT/sql/keelbase-tool-inventory-menu.sql"
+  "$REPO_ROOT/sql/keelbase-operation-audit-menu.sql"
+  "$REPO_ROOT/sql/keelbase-policy-menu.sql"
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
   "$REPO_ROOT/sql/keelbase-local-images.sql"
