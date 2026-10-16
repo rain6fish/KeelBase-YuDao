@@ -194,7 +194,21 @@ public final class SpecCodegen {
             // bootstrap every deployment runs, but sample data for one development/demo environment. Fixed
             // ids in the 9xxx band and inserted only when absent, so rerunning it does not double the rows —
             // which is exactly why it belongs in the repository rather than in a one-off hand-typed INSERT.
-            "sql/keelbase-demo-data.sql");
+            "sql/keelbase-demo-data.sql",
+            // 控制台菜单行，补登记：助手管理台七页（`sql/keelbase-assistant-menus.sql`，`0aa847201c` 引入）与
+            // 治理边界页那条菜单行 + 授予（`sql/keelbase-boundary-menu.sql`，`23e32af967` 引入）。两者都是**手写**、
+            // 任何 Spec 都不产出，引入时漏了在此声明 ⇒ 边界检查自那时起一直把两者报成 UNDECLARED。补声明 = 让声明
+            // **追上事实**；这道检查的判据一字未松，只是它终于知道了这两份文件的存在。
+            //
+            // Two more hand-written files, declared here at last: the assistant console's seven menu rows
+            // (`sql/keelbase-assistant-menus.sql`, landed in `0aa847201c`) and the governance boundary page's
+            // menu row plus its grant (`sql/keelbase-boundary-menu.sql`, landed in `23e32af967`). Both are
+            // hand-written and produced by no Spec; they simply were not declared here when they landed, so
+            // the boundary check has called each of them UNDECLARED ever since. Declaring them lets the
+            // declaration catch up with fact — not one of the check's judgements is relaxed; it merely now
+            // knows these two files exist.
+            "sql/keelbase-assistant-menus.sql",
+            "sql/keelbase-boundary-menu.sql");
 
     private SpecCodegen() {
     }
