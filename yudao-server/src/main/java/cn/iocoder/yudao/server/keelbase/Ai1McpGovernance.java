@@ -3,10 +3,14 @@ package cn.iocoder.yudao.server.keelbase;
 
 import cn.com.keelbase.runtime.audit.AuditService;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.mcp.Ai1McpDO;
+import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpClientTool;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1ToolCallSession;
+import io.modelcontextprotocol.spec.McpSchema;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
@@ -61,9 +65,33 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>参数不写进审计。</b>工具的入参是调用方可能无权留存的数据，故那一行只写**工具**与**结果**、从不写载荷。管理端那条红线是
  * 身份字段**输出时掩码**；审计留什么，同一个直觉适用。
+ *
+ * <p><b>写：明确声明是写的，一律拒绝（`YD-T22` 的「丙」，2026-10-16）。</b>这条路由 Spring AI 的工具循环驱动、
+ * 不经过引擎，故**扣下来等人**在这条路上没有落点：批准之后没有谁能执行它（引擎只执行注册表里的工具，而 MCP 工具是按
+ * agent 动态发现的、进不去那张表）。于是本层选**拒绝**而不是**假确认**：一个**明确声明**了自己是写的工具
+ * （MCP 的 `destructiveHint: true`，或 `readOnlyHint: false`）**当场被拒**，既不执行、也不留存任何载荷。
+ *
+ * <p><b>⚠ 覆盖面 = 服务端声明的质量，这是刻意的。</b>**没有声明**的工具照旧放行（即今天的行为）—— 若按 MCP 规范
+ * 的缺省值（「未声明即非只读」）去拒，那些不声明的服务里**连读都会一起被拒**，那是把一个安全收紧做成了功能停摆。
+ * 故此处取**宽松**一侧：只拒**明确说过**自己是写的。拿不到工具清单时**同样不拒**（记一条告警）—— 一次元数据抖动不该
+ * 变成一次拒绝。
+ *
+ * <p><b>The write case: an explicitly declared write is refused (`YD-T22`'s「丙」, 2026-10-16).</b> This path is
+ * driven by Spring AI's tool loop and does not pass through the engine, so holding a call for a person has nowhere
+ * to land here: after approval nothing could execute it (the engine runs only tools in its registry, and MCP tools
+ * are discovered per agent and cannot enter it). So this layer **refuses** rather than **fakes a confirmation**: a
+ * tool that **explicitly declares itself** a write (`destructiveHint: true`, or `readOnlyHint: false`) is refused
+ * on the spot — nothing runs, and no payload is retained.
+ *
+ * <p><b>⚠ The coverage equals the quality of the servers' declarations, deliberately.</b> A tool that declares
+ * **nothing** is still allowed (today's behaviour). Refusing on the MCP spec's defaults ("undeclared is not
+ * read-only") would refuse **reads too** on servers that declare nothing — turning a security tightening into an
+ * outage. Hence the lenient side: only an **explicit** claim of being a write is refused. When the tool list cannot
+ * be read it likewise does not refuse (a warning is logged) — a metadata hiccup must not become a refusal.
  */
 @Aspect
 @Component
+@Slf4j
 public class Ai1McpGovernance {
 
     /**
@@ -78,10 +106,23 @@ public class Ai1McpGovernance {
 
     private final YudaoCallerId callers;
     private final AuditService audit;
+    private final Ai1McpClientTool mcpClientTool;
 
-    public Ai1McpGovernance(YudaoCallerId callers, AuditService audit) {
+    /**
+     * 写策略：`refuse`（缺省）＝**明确声明**自己是写的调用一律拒绝；`allow` ＝ 回到今天的行为（不拒）。
+     * 做成一条开关而不是一次改码：部署要**临时放行**时不必改代码。
+     *
+     * The write policy: `refuse` (default) refuses calls whose tool **explicitly** declares itself a write;
+     * `allow` restores today's behaviour. A switch rather than a code change, so a deployment can lift it
+     * temporarily without editing anything.
+     */
+    @Value("${keelbase.mcp.write-policy:refuse}")
+    private String writePolicy;
+
+    public Ai1McpGovernance(YudaoCallerId callers, AuditService audit, Ai1McpClientTool mcpClientTool) {
         this.callers = callers;
         this.audit = audit;
+        this.mcpClientTool = mcpClientTool;
     }
 
     @Around("execution(* cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpClientTool.callTool(..))")
@@ -97,6 +138,14 @@ public class Ai1McpGovernance {
             throw new AccessDeniedException("这个工具要在有身份的情况下调用");
         }
         String who = String.valueOf(caller);
+        // 明确声明是写的 ⇒ 拒（见文件头）。**在**身份之后：无身份那条判据仍是第一位的、措辞不变。
+        if (declaredWrite(call.getArgs())) {
+            audit.append("tool_call", who, tool + " refused: declared a write, and this path does not confirm",
+                    true, "refused", tool, conversationId);
+            throw new AccessDeniedException("拒绝：这个 MCP 工具明确声明了自己是写操作，而本运行时的这条路径不提供"
+                    + "确认（扣下来等人在这条路上没有落点 —— 批准之后没有谁能执行它）。"
+                    + "请改走受治理的工具面；若它其实是只读的，让该服务把它声明为 readOnlyHint。");
+        }
         try {
             Object result = call.proceed();
             audit.append("tool_call", who, tool + " -> ok", false, "executed", tool, conversationId);
@@ -120,6 +169,43 @@ public class Ai1McpGovernance {
      * 审计该怎么称呼它：MCP 服务 + 该服务上的那个工具。工厂自己拼的名字是它私有的；这里读方法拿到的两个入参，
      * 故那一行指向的东西，与人在 MCP 配置里会看到的是同一个。
      */
+    /**
+     * **明确声明**自己是写的工具：`destructiveHint: true`，或 `readOnlyHint: false`。**没声明的不算** ——
+     * 覆盖面的上限是刻意的（见文件头）。工具清单取自与装配处**同一个缓存**，故这一步不额外打网络。
+     *
+     * A tool that **explicitly** declares itself a write: `destructiveHint: true`, or `readOnlyHint: false`.
+     * Declaring nothing does not count — the coverage limit is deliberate (see the header). The list comes from
+     * the same cache the assembly reads, so this adds no round trip.
+     */
+    private boolean declaredWrite(Object[] args) {
+        if (!"refuse".equals(writePolicy)) {
+            return false;
+        }
+        if (args.length < 2 || !(args[0] instanceof Ai1McpDO mcp) || args[1] == null) {
+            return false;
+        }
+        String name = String.valueOf(args[1]);
+        try {
+            for (McpSchema.Tool tool : mcpClientTool.listTools(mcp)) {
+                if (!name.equals(tool.name())) {
+                    continue;
+                }
+                McpSchema.ToolAnnotations declared = tool.annotations();
+                if (declared == null) {
+                    return false;
+                }
+                return Boolean.TRUE.equals(declared.destructiveHint())
+                        || Boolean.FALSE.equals(declared.readOnlyHint());
+            }
+        } catch (RuntimeException unreadable) {
+            // 读不到清单 ⇒ **不拒**，只记一条：一次元数据抖动不该变成一次拒绝（而今天的行为本就是放行）。
+            // Unreadable list -> do **not** refuse, only warn: a metadata hiccup must not become a refusal, and
+            // today's behaviour lets it through anyway.
+            log.warn("[declaredWrite][读不到 MCP({}) 的工具清单，本条按放行处理]", mcp.getName(), unreadable);
+        }
+        return false;
+    }
+
     private static String name(Object[] args) {
         String server = args.length > 0 && args[0] instanceof Ai1McpDO mcp ? mcp.getName() : "?";
         String tool = args.length > 1 && args[1] != null ? String.valueOf(args[1]) : "?";
