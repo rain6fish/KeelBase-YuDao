@@ -125,7 +125,25 @@ wipe_checkout() {
   return 0
 }
 
-if [[ "$SKIP_BUILD" == "0" && ! -d "$UI_DIR/.git" ]]; then
+# 这个目录**自己**是不是一个检出？`-d "$UI_DIR/.git"` 不够 —— 一次「清完了、克隆没成」会留下一个
+# **不完整的** `.git`（2026-10-16 在本仓实测：那个目录里只剩它，于是 git **向上**解析到本仓）。那时本步
+# 会跳过克隆、对着一个并不存在的树做复位，死在 `pathspec '.' did not match any file(s) known to git` 上
+# —— 那句话既不说成因、也不说办法。故判据问 git 自己：只有当它的答案就是它自己时，才算一个检出。
+#
+# Is this directory its own checkout? `-d "$UI_DIR/.git"` is not enough: a wipe that finished while its
+# clone did not leaves an incomplete `.git` behind (measured in this repository on 2026-10-16 — that
+# directory held nothing else, so git resolved upward to this repository). The step then skips the clone
+# and resets a tree that is not there, dying on `pathspec '.' did not match any file(s) known to git`,
+# which names neither the cause nor the fix. So the test asks git: this is a checkout only when git's
+# answer is itself.
+is_own_checkout() {
+  [ -n "$1" ] && [ -d "$1" ] || return 1
+  local top
+  top="$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  [ -n "$top" ] && [ "$(cd "$top" 2>/dev/null && pwd -P)" = "$(cd "$1" && pwd -P)" ]
+}
+
+if [[ "$SKIP_BUILD" == "0" ]] && ! is_own_checkout "$UI_DIR"; then
   # Clear whatever is there before cloning, and do not gate that on a test of the directory. A
   # half-deleted checkout is one that `[[ -e ]]` can report as absent while `git clone` still refuses it
   # as "not empty" — and that disagreement is exactly how this step used to fail, reported as "no
@@ -149,7 +167,9 @@ if [[ "$SKIP_BUILD" == "0" && ! -d "$UI_DIR/.git" ]]; then
   fi
 fi
 
-if [[ ! -d "$UI_DIR/.git" ]]; then
+# 同上：判「有没有检出」问 git，不看 `.git` 在不在。
+# Same as above: ask git whether there is a checkout, rather than whether a `.git` entry exists.
+if ! is_own_checkout "$UI_DIR"; then
   echo "no checkout at $UI_DIR — run without --skip-build, or set KEELBASE_YUDAO_UI" >&2
   exit 2
 fi
