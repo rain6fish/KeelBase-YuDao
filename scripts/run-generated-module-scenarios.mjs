@@ -25,6 +25,9 @@
 // another run's rows either. It does **not** remove audit rows: those are a hash chain, and cutting a link
 // to tidy up after a gate would be a worse act than the untidiness.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -36,6 +39,22 @@ const ENTITY = MODULE.charAt(0).toUpperCase() + MODULE.slice(1);
 // 宿主拒绝非字母数字的用户名（`用户账号由 数字、字母 组成`）——实测。
 const SECOND_USER = process.env.SECOND_USER || 'gatesales';
 const SECOND_PASS = process.env.SECOND_PASS || 'gate-pass-1234';
+
+// 这道门禁对「写该被扣下还是直接跑」的期望，取自**生成工具面所用的同一个源** —— 规格 —— 而不是在这里手敲一句。
+// 唯一的权威是写能力的**风险级**（协议 §4：R3/R4 的写为人停下，其余不停）；而生成器会**拒绝**一条自身
+// `requiresConfirmation` 布尔与风险级不符的规格，故这里读风险级，读的就是工具与运行时携带的**同一个决定**，
+// 不是它的第二份拷贝。`R3/R4` 这一对与冻结的 `RiskLevel.CONFIRMATION_LEVELS` 一致。
+//
+// What this gate expects of the write comes from the **same source the tool face was generated from** — the
+// Spec — rather than a hand-typed expectation here. The one authority is the write capability's risk level
+// (protocol §4: an R3/R4 write stops for a human, anything else does not), and the generator **refuses** a
+// Spec whose own `requiresConfirmation` flag disagrees with it — so reading the level here reads the same
+// decision the tool and the runtime carry, not a second copy of it. `R3/R4` mirrors the frozen
+// `RiskLevel.CONFIRMATION_LEVELS`.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const spec = JSON.parse(readFileSync(join(HERE, '..', 'specs', `${MODULE}.json`), 'utf8'));
+const writeCap = (spec.aiCapabilities || []).find((cap) => cap.kind === 'write');
+const expectHeld = writeCap ? ['R3', 'R4'].includes(writeCap.riskLevel || 'R3') : false;
 
 let pass = 0;
 let fail = 0;
@@ -218,7 +237,7 @@ psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_
   check('它的执行状态（审计轨）', 2, ranAs('list_generated_products'));
 }
 
-console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
+console.log(`== 场景 3 · 写${expectHeld ? '被扣下等人，批准后才执行' : '不被扣下，直接执行'}（期望读自规格的风险级）==`);
 {
   // Counted by this run's own marker rather than by a whole-table delta — see the same note in
   // `run-crm-customer-scenarios.mjs`: a delta reads correctly only while nothing else writes.
@@ -232,21 +251,29 @@ console.log('== 场景 3 · 写被扣下等人，批准后才执行 ==');
   const own = () => Number(psql(`select count(*) from ${MODULE} where name like '%${writeMarker}%'`));
   const held = pendingCount(secondId);
   await chat(second, `新建产品 ${writeMarker}`);
-  // "Held" is one more waiting row for this caller — which is also where the token comes from.
-  // 「被扣下」是这个调用方多了一行待确认 —— token 也正是从那儿来的。
-  check('写被扣下', held + 1, pendingCount(secondId));
-  check('未落库', 0, own());
-  const proposedToken = pendingToken(secondId);
-  checkNot('扣下时给出 token', 'undefined', proposedToken);
+  if (expectHeld) {
+    // "Held" is one more waiting row for this caller — which is also where the token comes from.
+    // 「被扣下」是这个调用方多了一行待确认 —— token 也正是从那儿来的。
+    check('写被扣下', held + 1, pendingCount(secondId));
+    check('未落库', 0, own());
+    const proposedToken = pendingToken(secondId);
+    checkNot('扣下时给出 token', 'undefined', proposedToken);
 
-  const decided = await fetch(`${HOST}/ai/confirmations/${proposedToken}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${second}` },
-    body: JSON.stringify({ decision: 'approve' })
-  });
-  const outcome = (await decided.json()).data || {};
-  check('批准后执行', 'executed', outcome.status);
-  check('落库', 1, own());
+    const decided = await fetch(`${HOST}/ai/confirmations/${proposedToken}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${second}` },
+      body: JSON.stringify({ decision: 'approve' })
+    });
+    const outcome = (await decided.json()).data || {};
+    check('批准后执行', 'executed', outcome.status);
+    check('落库', 1, own());
+  } else {
+    // 规格的风险级不为人停下（期望即由此读出），故引擎直接跑这次写 —— 不多一条待确认行，而那一行已落库。
+    // The Spec's risk level does not stop for a human — the expectation was read off exactly that — so the
+    // engine runs the write straight through: no new pending row, and the row is there.
+    check('写未被扣下', held, pendingCount(secondId));
+    check('直接落库', 1, own());
+  }
 }
 
 console.log('== 场景 4 · 审计链 ==');

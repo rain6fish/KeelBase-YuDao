@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.codegen;
 
+import cn.com.keelbase.protocol.RiskLevel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +33,10 @@ final class ToolsGenerator {
         String modulePkg = "cn.iocoder.yudao.module." + module;
         Spec.Cap read = spec.caps().stream().filter(cap -> "read".equals(cap.kind())).findFirst().orElse(null);
         Spec.Cap write = spec.caps().stream().filter(cap -> "write".equals(cap.kind())).findFirst().orElse(null);
-        String writeRisk = write != null && write.riskLevel() != null ? write.riskLevel() : "R3";
+        // 写工具的风险级取自**唯一**定义它的那处（{@link Spec.Cap}），故规格的一致性检查与它产出的工具不会各行其是。
+        // The write tool's level comes from the one place that defines it ({@link Spec.Cap}), so the Spec's
+        // consistency check and the tool it produces cannot drift apart.
+        String writeRisk = write != null ? write.effectiveLevel() : "R3";
 
         StringBuilder setters = new StringBuilder();
         for (Spec.Field field : spec.fields()) {
@@ -127,9 +131,19 @@ final class ToolsGenerator {
     }
 """.formatted(entity, entity, module, label, entity, entity, entity, entity, projection, module, label, label, label);
 
+        // 写工具的说明随风险级变，故生成的文件**不会**宣称一次引擎不会做的扣下：R3/R4 的写为人停下，其余直接跑。
+        // 对树上这些 Spec，这句话一字未变，故已提交的产物逐字节不变。
+        // The write tool's blurb follows the level, so a generated file never claims a hold the engine
+        // will not perform: an R3/R4 write stops for a human, anything else runs. For the Specs in the
+        // tree this reads exactly as before, so the checked-in artifact stays byte-identical.
+        boolean writeStops = RiskLevel.needsConfirmation(writeRisk);
+        String writeBlurbEn = writeStops ? "the engine holds it for a human before it runs."
+                : "the engine runs it without stopping for a human.";
+        String writeBlurbZh = writeStops ? "引擎扣下等人。" : "引擎直接执行、不为人停下。";
+
         String writeTool = write == null ? "" : """
 
-    /** %s — a write: the engine holds it for a human before it runs. / %s——写：引擎扣下等人。 */
+    /** %s — a write: %s / %s——写：%s */
     static final class CreateTool implements AiTool {
 
         private final %sService service;
@@ -200,8 +214,8 @@ final class ToolsGenerator {
             return args;
         }
     }
-""".formatted(writeRisk, writeRisk, entity, entity, module, label, writeRisk, module, params, entity, entity,
-                setters, entity, entity, entity, module, label, label, label, routeArgs);
+""".formatted(writeRisk, writeBlurbEn, writeRisk, writeBlurbZh, entity, entity, module, label, writeRisk, module,
+                params, entity, entity, setters, entity, entity, entity, module, label, label, label, routeArgs);
 
         // Tool beans first, then route beans: the order the checked-in file has, so a regeneration is a
         // no-op rather than a reordering. / 工具 bean 在前、路由 bean 在后——与已提交的那份同序。

@@ -213,7 +213,24 @@ public final class SpecCodegen {
     private SpecCodegen() {
     }
 
+    /**
+     * 入口：把工作交给 {@link #run(String[])}，并只在这里把**读不出的规格**变成一条可读的 stderr 消息 + 非零退出。
+     * 规格自相矛盾（见 {@link Spec.Cap}）时，消息点名是哪条能力、它的布尔与风险级差在哪 —— 而不是一串栈。
+     *
+     * <p>Entry point: hand the work to {@link #run(String[])} and, only here, turn an <b>unreadable Spec</b>
+     * into a legible stderr message plus a non-zero exit. When a Spec contradicts itself (see
+     * {@link Spec.Cap}) the message names which capability disagreed and by how much, rather than a stack.
+     */
     public static void main(String[] args) throws IOException {
+        try {
+            run(args);
+        } catch (IllegalArgumentException unreadable) {
+            System.err.println(unreadable.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private static void run(String[] args) throws IOException {
         boolean check = false;
         boolean boundary = false;
         String specArg = null;
