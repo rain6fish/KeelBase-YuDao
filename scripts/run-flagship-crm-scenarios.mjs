@@ -189,6 +189,15 @@ for (const rowId of [overdueId, psql(`select id from ${CUSTOMER} where name = '$
     + ` values (nextval('crm_permission_seq'), 2, ${rowId}, ${callerId}, 1, ${TENANT})`);
 }
 putBack = () => psql([
+  // 被**拒绝**的那一笔会留下一个没有效应的认领，而「按效应收」够不到它 —— 宿主把切面抛的 `AccessDeniedException`
+  // 包成了 `RuntimeException`，运行时的「没落库就释放认领」认不出来（`YD-28` 的冷读者实测；本线这类残留里
+  // `record_crm_followup` 有 7 条）。范围取**本门禁自己的工具** + **没有效应**：那一笔既然被拒，就没有可被重复执行的写。
+  //
+  // A **refused** call leaves a claim with no effect behind, and "delete by effect" cannot reach it — the host wraps
+  // the aspect's `AccessDeniedException` in a `RuntimeException` (measured by YD-28's cold reader; seven such rows
+  // were measured for `record_crm_followup`). Scoped to **this gate's own tool** plus **no effect**: the call was
+  // refused, so there is no write to duplicate.
+  `delete from write_claims where tool_name = 'record_crm_followup' and effect_id is null`,
   `delete from write_claims where effect_id in (select id from side_effects where tool_name = 'record_crm_followup' and result_id in (select id from ${FOLLOWUP} where content like '%${marker}%'))`,
   `delete from side_effects where tool_name = 'record_crm_followup' and result_id in (select id from ${FOLLOWUP} where content like '%${marker}%')`,
   `delete from confirmation_requests where args_json like '%${marker}%'`,

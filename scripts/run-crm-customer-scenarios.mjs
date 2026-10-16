@@ -253,6 +253,15 @@ const salesMarker = `${marker}-sales`;
 putBack = () =>
   psql(
     [
+      // 被**拒绝**的那一笔会留下一个没有效应的认领，而「按效应收」够不到它 —— 宿主把切面抛的 `AccessDeniedException`
+      // 包成了 `RuntimeException`，运行时的「没落库就释放认领」认不出来（`YD-28` 的冷读者实测；本门禁的越权写就是这种
+      // 拒绝）。范围取**本门禁自己的工具** + 调用方 + **没有效应**：那一笔既然被拒，就不存在可被重复执行的写。
+      //
+      // A **refused** call leaves a claim with no effect behind, and "delete by effect" cannot reach it — the host
+      // wraps the aspect's `AccessDeniedException` in a `RuntimeException` (measured by YD-28's cold reader; this
+      // gate's cross-scope write is exactly that refusal). Scoped to **this gate's own tool** plus the caller plus
+      // **no effect**: the call was refused, so there is no write to duplicate.
+      `delete from write_claims where user_id = '${secondId}' and tool_name = 'update_crm_customer' and effect_id is null`,
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
       `delete from confirmation_requests where args_json like '%${marker}%'`,
