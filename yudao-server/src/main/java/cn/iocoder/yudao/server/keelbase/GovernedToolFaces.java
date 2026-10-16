@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import java.util.List;
 
 /**
  * 本宿主上每一个**工具面**的声明：AI 到达执行的那些地方，逐个列出来。
@@ -19,8 +18,14 @@ import org.springframework.context.annotation.Configuration;
  * <p><b>为什么工具是**一份手写目录**，而模块是**在自己类上自报**。</b>这是刻意的不对称，理由只有一条：工具面里有一个是
  * **生成的**——`generated/ProductsTools`（来自 `specs/products.json`）。生成的文件不许手改，而让生成器给它发出声明是
  * **另一个工作项**（生成器，`YD-25`），不在本项射程内。于是工具的声明落在这**一处手写的地方**：模块有「能自报的载体」
- * （切面，生成器已经替它发出 {@code implements GovernedModule}），工具面则没有——除非动生成器。把十处收进一份可读的
- * 目录，比给九个类各加一个记号、再给生成面单开一个特例要诚实。
+ * （切面，生成器已经替它发出 {@code implements GovernedModule}），工具面则没有——除非动生成器。把十二处收进一份可读的
+ * 目录，比在类上逐个加记号、再给生成面与 {@code ai1} 那两处各开一个特例要诚实。
+ *
+ * <p><b>⚠ 它是一份清单、不是一批 bean——而这是修正过的一版。</b>第一版把每一条都做成 {@code @Bean GovernedPath}，
+ * 方法名（如 {@code crmCustomerTools}）**正好**等于那条路径自己组件的默认 bean 名（{@code @Component class
+ * CrmCustomerTools} ⇒ {@code crmCustomerTools}）⇒ 宿主**起不来**（bean 重名、且不允许覆盖；2026-10-16 部署实测）。
+ * 声明是**数据**、不是**组件**：唯一读它的是登记处与检查脚本，没有谁需要它是一个 bean。故现在是一份 {@code static}
+ * 清单，宿主容器里**一个 bean 都不多出**——也就再没有可撞的名字。
  *
  * <p><b>⚠ 它不做的事。</b>列在这里**不等于**这条路径受治理。工具面经引擎执行、受确认与审计管住；MCP 那条路只由它自己的
  * 切面管身份与审计、**不经引擎、不扣人**（`YD-T22` 的「丙」）——它的**posture 不在本声明里**，而在线上的那道边界
@@ -50,8 +55,17 @@ import org.springframework.context.annotation.Configuration;
  * the declaration is <b>a separate work item</b> (the generator, `YD-25`), outside this task. So the tool
  * declarations land in <b>this one hand-written place</b>: a module has a carrier that can declare itself
  * (the aspect, which the generator already emits {@code implements GovernedModule} for), a tool face does
- * not — not without touching the generator. Gathering the ten into one readable catalogue is more honest
- * than a marker on nine classes plus a special case for the generated one.
+ * not — not without touching the generator. Gathering the twelve into one readable catalogue is more
+ * honest than a marker on each class plus a special case for the generated face and `ai1`'s two.
+ *
+ * <p><b>⚠ It is a list, not a set of beans — and this is the corrected version.</b> The first version made
+ * each entry a {@code @Bean GovernedPath}, and the method name (e.g. {@code crmCustomerTools}) happened to
+ * <b>equal</b> the default bean name of that path's own component ({@code @Component class CrmCustomerTools}
+ * ⇒ {@code crmCustomerTools}) — so the host <b>would not start</b> (duplicate bean name, overriding
+ * disabled; measured on a 2026-10-16 deploy). A declaration is <b>data</b>, not a <b>component</b>: the
+ * only readers are the registry and the check script, and neither needs it to be a bean. It is now a
+ * {@code static} list, so the host's context holds <b>not one extra bean</b> — and there is no name left
+ * to collide.
  *
  * <p><b>⚠ What it does not do.</b> Being listed here is <b>not</b> being governed. The tool faces run
  * through the engine and are held by confirmation and audit; the MCP path is held by its own aspect for
@@ -62,83 +76,44 @@ import org.springframework.context.annotation.Configuration;
  * `ShellTools` it builds runs shell **on this server**. Being in this catalogue means it is *counted*,
  * not that it is *held*. This answers only "the path exists and someone enumerated it".
  */
-@Configuration
-public class GovernedToolFaces {
+public final class GovernedToolFaces {
 
-    /** CRM 的工具面：跑在上游已发布的 `CrmCustomerService` 上的一读一写。 / CRM's tool face over upstream's own service: one read, one write. */
-    @Bean
-    GovernedPath crmCustomerTools() {
-        return new ToolFace("CrmCustomerTools");
-    }
-
-    /** CRM 旗舰闭环的工具面：队列一读、跟进一写。 / The flagship loop's tool face: the queue read, the follow-up write. */
-    @Bean
-    GovernedPath crmFollowUpTools() {
-        return new ToolFace("CrmFollowUpTools");
-    }
-
-    /** BPM 请假单的工具面，同第二个上游模块一起接入。 / BPM's leave-request tool face, onboarded with the second upstream module. */
-    @Bean
-    GovernedPath bpmOaLeaveTools() {
-        return new ToolFace("BpmOALeaveTools");
-    }
-
-    /** FMS 记账凭证的工具面，第五个上治理的模块、也是第一个非 CRM。 / FMS voucher's tool face, the fifth module under governance and the first that is not CRM. */
-    @Bean
-    GovernedPath fmsVoucherTools() {
-        return new ToolFace("FmsVoucherTools");
-    }
-
-    /** 系统站内信的工具面，第三个上游模块。 / The in-app message tool face, the third upstream module. */
-    @Bean
-    GovernedPath systemNotifyMessageTools() {
-        return new ToolFace("SystemNotifyMessageTools");
-    }
-
-    /** 生成的 products 模块的工具面；**生成物**，故由本手写目录代它自报（见类注释的不对称）。 / The generated products module's tool face; <b>generated</b>, so this hand-written catalogue declares it on its behalf (see the class comment). */
-    @Bean
-    GovernedPath productsTools() {
-        return new ToolFace("ProductsTools");
-    }
-
-    /** 控制台导航的工具面：一个读工具 + 一条无模型路由，走同一个引擎。 / The console-navigation tool face: a read tool plus a model-free route, through the same engine. */
-    @Bean
-    GovernedPath consolePages() {
-        return new ToolFace("ConsolePages");
-    }
-
-    /** 跑在宿主自己数据上的单工具：管理端用户，经芋道自己的服务读。 / The single tool over the host's own data: admin users, read through Yudao's own service. */
-    @Bean
-    GovernedPath listYudaoUsersTool() {
-        return new ToolFace("ListYudaoUsersTool");
-    }
-
-    /** 本部署自己的引擎工具面：运行时持有的每一个工具经 `GovernedExecutionEngine` 执行——受治理那侧的那条缝。 / This deployment's own engine tool face: every tool the runtime holds runs through {@code GovernedExecutionEngine} — the seam on the governed side. */
-    @Bean
-    GovernedPath yudaoGovernedAgentTools() {
-        return new ToolFace("YudaoGovernedAgentTools");
-    }
-
-    /** MCP 那条路的治理切面：经 Spring AI 的工具循环、**不经引擎**，只担身份、审计与「声明是写的就拒」。 / The MCP path's governance aspect: driven by Spring AI's tool loop, <b>not through the engine</b>, carrying identity, audit and the refusal of an explicitly declared write. */
-    @Bean
-    GovernedPath ai1McpGovernance() {
-        return new ToolFace("Ai1McpGovernance");
-    }
-
-    /** `ai1` 把工具装配给一次会话的地方之一：MCP 那条路的**装配端**；同一条路的**治理端**是上面那条切面。 / One of `ai1`'s tool assemblers — the MCP path's **assembling end**; that same path's governed end is the aspect above. */
-    @Bean
-    GovernedPath ai1McpToolFactory() {
-        return new ToolFace("Ai1McpToolFactory");
-    }
-
-    /** ⚠ **本目录里唯一一条「完全没有治理」的路径**：`ai1` 的 SKILL 装配端。它造六个工具，含 `ShellTools`（**在这台服务器上跑 shell**）与 `FileSystemTools`（读写文件）；它没有身份、没有审计、没有拒绝，而**宿主侧没有可切的 public 方法**（调用发生在第三方库内部）⇒ 要治理它，只能在装配处包一层，那是**另一个工作项**。列在这里只说明「这条路存在、有人枚举过它」。 / ⚠ **The one path in this catalogue with no governance at all**: `ai1`'s SKILL assembling end. It builds six tools, including `ShellTools` (**runs shell on this server**) and `FileSystemTools` (reads and writes files); no identity, no audit, no refusal — and there is **no host-side public method to advise** (the calls happen inside a third-party library), so governing it would mean wrapping it at the assembly site, which is **another work item**. Listed here means only that the path exists and someone enumerated it. */
-    @Bean
-    GovernedPath ai1SkillToolFactory() {
-        return new ToolFace("Ai1SkillToolFactory");
+    // No Spring annotation, on purpose — see the class comment. A catalogue is data; wiring it as twelve
+    // @Bean methods is what a bean name collided with. / 刻意不带 Spring 注解——见类注释。目录是数据；把它接成十二个
+    // @Bean 方法，正是 bean 名相撞的来源。
+    private GovernedToolFaces() {
     }
 
     /**
-     * 一个工具面，作为一条声明。名字就是**类的简单名**——那是检查脚本能从源码里读出来、与这里比对的东西。
+     * 工具面的目录，一次给全。登记处（{@code GovernedModuleRegistry}）读它；那道检查脚本读的是**同一份源码**——按
+     * 下面这些 {@code new ToolFace(…)} 认。
+     *
+     * The catalogue, in full. {@code GovernedModuleRegistry} reads it; the check script reads <b>the same
+     * source</b>, by the {@code new ToolFace(…)} each entry names.
+     */
+    public static List<GovernedPath> all() {
+        return List.of(
+                // 八个工具面 / the eight tool faces
+                new ToolFace("CrmCustomerTools"),
+                new ToolFace("CrmFollowUpTools"),
+                new ToolFace("BpmOALeaveTools"),
+                new ToolFace("FmsVoucherTools"),
+                new ToolFace("SystemNotifyMessageTools"),
+                new ToolFace("ProductsTools"), // 生成的 / generated
+                new ToolFace("ConsolePages"),
+                new ToolFace("ListYudaoUsersTool"),
+                // 两条工具路 / the two tool paths：受治理那侧的引擎工具面，与 MCP 那条路的治理切面
+                new ToolFace("YudaoGovernedAgentTools"),
+                new ToolFace("Ai1McpGovernance"),
+                // ai1 的两条装配端 / ai1's two assembling ends
+                new ToolFace("Ai1McpToolFactory"),
+                // ⚠ 本目录里唯一一条「完全没有治理」的路径：没有身份、没有审计、没有拒绝，其 ShellTools 在**本机**跑 shell
+                // The one path here with no governance at all: no identity, no audit, no refusal, and its ShellTools runs shell on this host
+                new ToolFace("Ai1SkillToolFactory"));
+    }
+
+    /**
+     * 一条工具面，作为一条声明。名字就是**类的简单名**——那是检查脚本能从源码里读出来、与这里比对的东西。
      *
      * A tool face, as a declared path. The name is the <b>class's simple name</b> — what the check reads
      * out of the sources and compares against this.

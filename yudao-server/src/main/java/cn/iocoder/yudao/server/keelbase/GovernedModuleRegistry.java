@@ -5,11 +5,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 收集每一个 {@link GovernedPath} bean 并持有这个集合——本宿主唯一能回答「这里被数到的是什么」的地方。
+ * 收集每一份 {@link GovernedPath} 声明并持有这个集合——本宿主唯一能回答「这里被数到的是什么」的地方。**两个来源**：
+ * 模块在**自己类上自报**（切面是 bean），工具面从 {@link GovernedToolFaces} 的**目录**里读（那是数据，不是 bean）。
  *
  * <p>构造器注入就是全部机制：Spring 把每一份声明交过来，集合排好序、在启动时说一次，故一台跑着的宿主在自己的日志里
  * 就能回答那个问题，不必去翻源码。**它现在按种类分组**：模块、工具、工作流、定时任务各一栏，于是「本宿主被数全了吗」
@@ -19,8 +21,9 @@ import org.springframework.stereotype.Component;
  * 检查脚本要堵的那个洞：它去源码里找每种形状长什么样（模块的 `service` 切点、工具面的 `AiTool` bean / `Ai1LocalToolProvider`
  * / MCP 切面），拒掉一个没在这里声明的。登记处**计数**；那道检查让这个数**不假**。
  *
- * <p>Collects every {@link GovernedPath} bean and holds the set — the one place this host can be asked
- * "what is counted here".
+ * <p>Collects every {@link GovernedPath} declaration and holds the set — the one place this host can be
+ * asked "what is counted here". <b>Two sources</b>: a module <b>declares itself</b> (its aspect is a
+ * bean), a tool face is read from {@link GovernedToolFaces}'s <b>catalogue</b> (data, not a bean).
  *
  * <p>Constructor injection is the whole mechanism: Spring hands over each declaration, and the set is
  * sorted and said once at startup, so a running host answers the question in its own log rather than
@@ -40,8 +43,14 @@ public class GovernedModuleRegistry {
 
     private final List<GovernedPath> paths;
 
-    public GovernedModuleRegistry(List<GovernedPath> paths) {
-        this.paths = paths.stream()
+    public GovernedModuleRegistry(List<GovernedPath> selfDeclared) {
+        // Two sources, on purpose: a **module** declares itself (its aspect has to be a bean — it is what
+        // gets advised), while a **tool face** is data and is read from the catalogue instead of being
+        // wired as a bean. It was a bean once, and the bean name collided with the component of the same
+        // name and stopped the host starting (see GovernedToolFaces).
+        // 两个来源，刻意如此：**模块**自报（切面**必须**是 bean——要被通知到），而**工具面**是数据、从目录里读，
+        // 不接成 bean。它曾是个 bean，bean 名与同名组件相撞、把宿主顶得起不来（见 GovernedToolFaces）。
+        this.paths = Stream.concat(selfDeclared.stream(), GovernedToolFaces.all().stream())
                 .sorted(Comparator.comparing((GovernedPath path) -> path.kind().ordinal())
                         .thenComparing(GovernedPath::id))
                 .toList();
