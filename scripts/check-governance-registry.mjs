@@ -18,6 +18,16 @@
 // 射程是**写明的**：只扫 `yudao-server` 自己的 `cn.iocoder.yudao.server.keelbase` 树（含 `generated/`）。上游的模块不扫
 // ——我们不治理它们，是它们被我们治理。
 //
+// **射程为何到此（依据，不是省略）。** 两条。① **方向**：治理接口（`GovernedPath`）住在 `yudao-server`，而
+// `yudao-module-ai1-springai` **不能反向依赖它** ⇒ 那个模块里的类**实现不了**本接口，自报这条路对它们根本不通。
+// ② **那一层自称什么**：`ai1` 的 `harness/`，按它自己的 `package-info.java`，是**平台去调用**大模型、MCP 服务、知识库
+// 与 SKILL 的**客户端与工厂**——原文是「**不是**注册给模型调用的 function tool」。故本集合装的是**本线自己声明的路径**，
+// 落在 keelbase 树内；`harness/` 那一层整层属**出站**，不入本射程。
+//
+// **一处张力，如实记、不掩。** 那份手写目录里的 `Ai1McpGovernance` 切的是 `Ai1McpClientTool.callTool`——那是**出站**
+// （宿主作为 MCP 客户端去调外部服务端），与 `harness/` 里那些**同方向**的装配者分处两侧。故这条边界判的是**「归谁声明」**，
+// 不是「入站还是出站」；把它读成后者，这一条会看起来自相矛盾。
+//
 // 一条**AI 执行路径** = 本宿主上一处「AI 能到达执行」的载体，按下面四条形状判定（读的是**形状**、不是名字）：
 //
 //   * `module`  —— 自己的 `@Around` pointcut 点了 `cn.iocoder.yudao.module.<x>.service.` 的切面。它是一处**业务模块**，
@@ -50,7 +60,24 @@
 //
 // Scope is stated, not implied: only `yudao-server`'s own `cn.iocoder.yudao.server.keelbase` tree
 // (including `generated/`). Upstream's modules are not scanned; we do not govern them, they are governed
-// by us. An **AI execution path** is a carrier of one of four shapes — read as shapes, not names:
+// by us.
+//
+// **Why the scope ends here (a reason, not an omission).** Two of them. (1) **Direction**: the
+// governance interface (`GovernedPath`) lives in `yudao-server`, and `yudao-module-ai1-springai`
+// **cannot depend back on it** — so a class in that module **cannot** implement the interface and
+// declaring itself is not open to it at all. (2) **What that layer says it is**: `ai1`'s `harness/`, by
+// its own `package-info.java`, is the **client and factory side** that calls out to models, MCP,
+// knowledge bases and SKILL — in its words, "**not** a function tool registered for the model to call".
+// So this set holds **the paths this line declares itself**, inside the keelbase tree; `harness/` is
+// outbound as a whole and stays outside the scope.
+//
+// **One tension, recorded rather than hidden.** The hand-written catalogue's `Ai1McpGovernance` advises
+// `Ai1McpClientTool.callTool` — an **outbound** call (this host as an MCP client reaching an external
+// server), on the far side from the same-direction assemblers in `harness/`. So this boundary judges
+// **"who declares it"**, not "inbound or outbound"; read as the latter, this one line looks
+// self-contradictory.
+//
+// An **AI execution path** is a carrier of one of four shapes — read as shapes, not names:
 //
 //   * `module`  — an aspect whose `@Around` pointcut names `cn.iocoder.yudao.module.<x>.service.`. It must
 //       `implements GovernedModule`, and the name it declares has to be the `<x>` own pointcuts name.
