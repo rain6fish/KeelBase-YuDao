@@ -12,8 +12,10 @@
 #   1. `sql/postgresql/ruoyi-vue-pro.sql` — upstream's own script, loaded **as upstream wrote it**.
 #      Its header says it is machine-converted from MySQL (it even keeps a `dual` table), so a failure
 #      in it is a fact about that conversion, not about this line.
-#   2. The five `sql/keelbase-*.sql` — this line's own additions: the licence-free names the deployment
-#      shows, and the tables for the modules this line enables but upstream publishes no DDL for.
+#   2. This line's own additions (`sql/keelbase-*.sql`): the licence-free names the deployment shows, the
+#      tables for the modules this line enables but upstream publishes no DDL for, and the console menu
+#      rows its pages hang from. **The list below is the source — this prose names no count**, because a
+#      count here drifts: it said "five" while the list held nine.
 #
 # The runtime's own migrations are **not** here: the server applies them itself on startup (Flyway,
 # baselined at 0). This script only gets the tables and seed rows in place.
@@ -27,8 +29,9 @@
 #
 #   1. `sql/postgresql/ruoyi-vue-pro.sql` —— 上游自己的脚本，**按上游所写原样**导入。它的文件头写着
 #      它是从 MySQL 机器转换来的（甚至留着 `dual` 表），所以它出错是**那份转换**的事实，不是本线的事实。
-#   2. 五份 `sql/keelbase-*.sql` —— 本线自己的增补：本部署显示的无版权名，以及本线启用、而上游不发布
-#      建表脚本的那些模块的表。
+#   2. 本线自己的增补（`sql/keelbase-*.sql`）：本部署显示的无版权名、本线启用而上游不发布建表脚本的那些模块的
+#      表、以及控制台页面挂着的那些菜单行。**清单在下面就是单源 —— 这段散文里不写数目**，因为写数目就会漂：
+#      它曾写着「五份」，而清单列着九份。
 #
 # 运行时的迁移**不在这里**：服务启动时自己应用（Flyway，基线 0）。本脚本只负责把表与种子数据放好。
 set -uo pipefail
@@ -51,6 +54,13 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-assistant-agent.sql"
   "$REPO_ROOT/sql/keelbase-assistant-role-grants.sql"
   "$REPO_ROOT/sql/keelbase-assistant-menus.sql"
+  # 治理边界页那条菜单行 + 它旁边那条授予（`YD-27` 的页）—— 它挂在治理目录（`20001`）下，而那个目录的授予
+  # 来自 `keelbase-governance-menu-grants.sql`：**那份不在本清单里**，所以照本清单从零重建仍需要它先跑
+  # （已登记成 `YD-41`）。
+  # The boundary console page's menu row and its grant: it hangs under the governance directory (`20001`),
+  # whose grant comes from `keelbase-governance-menu-grants.sql` — **that file is not in this list**, so a
+  # from-scratch run still needs it first (recorded as `YD-41`).
+  "$REPO_ROOT/sql/keelbase-boundary-menu.sql"
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
   "$REPO_ROOT/sql/keelbase-local-images.sql"
