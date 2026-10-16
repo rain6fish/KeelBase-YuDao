@@ -7,6 +7,11 @@
 //   bash scripts/run-server.sh &            # a running stack, PostgreSQL + redis
 //   node scripts/run-mcp-governance-scenarios.mjs
 //
+// Every assertion is scoped by a **name unique to this run** — the `gate-<timestamp>` marker every row
+// it builds carries — so the gate holds both on a database it has already been run against and
+// alongside another run of itself. Its two `count(*)`s are scoped by that same marker (`tool =
+// '<this run's server>:…'`), not by the whole table.
+//
 // It brings up the probe MCP server itself, builds the chain it needs (API key, model, MCP, agent,
 // session) through the host's own APIs, asks the model for a two-step job, and then checks the two
 // things a governed multi-step run has to leave behind: the probe's own log of what it was called
@@ -26,6 +31,10 @@
 //
 //   bash scripts/run-server.sh &            # 一套跑着的栈：PostgreSQL + redis
 //   node scripts/run-mcp-governance-scenarios.mjs
+//
+// 每条断言都用**本次唯一的名字**收束 —— 就是它建的每一行都带着的那个 `gate-<时间戳>` 标记 —— 故本门禁**在一个
+// 已经跑过的库上**、**以及跟它自己的另一次运行并排**时都照样成立；它那两处 `count(*)` 同样由这个标记收束
+// （`tool = '<本轮的 server>:…'`），**不**按整张表计。
 //
 // 它自己拉起探针 MCP 服务，经宿主**自己的 API** 建出它需要的链路（API 密钥 · 模型 · mcp · agent · session），
 // 请模型做**两件**事，然后查一次受治理的多步运行**必须留下**的两样：探针自己记下的「被调用成什么样」，以及
