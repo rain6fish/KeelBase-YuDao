@@ -6,6 +6,7 @@ import cn.com.keelbase.runtime.effect.SideEffectCompensator;
 import cn.com.keelbase.runtime.identity.ActingCaller;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.crm.service.customer.CrmCustomerService;
+import cn.iocoder.yudao.module.crm.service.followup.CrmFollowUpRecordService;
 import cn.iocoder.yudao.module.products.service.products.ProductsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,6 +57,11 @@ public class YudaoLocalCompensators {
         return new GeneratedProductsCompensator(service);
     }
 
+    @Bean
+    SideEffectCompensator crmFollowUpRecordCompensator(CrmFollowUpRecordService service) {
+        return new CrmFollowUpRecordCompensator(service);
+    }
+
     /**
      * {@code crm_customer}: a create is deleted, an update is refused.
      *
@@ -103,6 +109,50 @@ public class YudaoLocalCompensators {
         public void compensate(SideEffect effect) {
             requireCreate(effect);
             as(effect, () -> service.deleteProducts(effect.getResultId()));
+        }
+    }
+
+    /**
+     * {@code crm_follow_up_record}: the flagship tool only ever creates one, so the row is deleted.
+     *
+     * <p>It does not go through {@link #requireCreate} — that rule reads the naming convention
+     * ({@code create_}), and this tool is named for what it records rather than for the verb, so the
+     * guarantee is stated here instead of inferred from a prefix.
+     *
+     * {@code crm_follow_up_record}：旗舰那个工具只会建一条，故删掉那一行。
+     *
+     * <p>它不走 {@link #requireCreate} —— 那条规则读的是命名约定（{@code create_}），而这个工具按**它记的是什么**命名、
+     * 不按动词，故这里把保证**写出来**，而不是从前缀去推。
+     */
+    static final class CrmFollowUpRecordCompensator implements SideEffectCompensator {
+
+        private final CrmFollowUpRecordService service;
+
+        CrmFollowUpRecordCompensator(CrmFollowUpRecordService service) {
+            this.service = service;
+        }
+
+        @Override
+        public String resultType() {
+            return "crm_follow_up_record";
+        }
+
+        @Override
+        public void compensate(SideEffect effect) {
+            if (!"record_crm_followup".equals(effect.getToolName())) {
+                throw new IllegalStateException("cannot compensate " + effect.getToolName()
+                        + " locally: only a recorded follow-up can be taken back here");
+            }
+            as(effect, () -> service.deleteFollowUpRecord(effect.getResultId(), asId(effect.getUserId())));
+        }
+    }
+
+    /** 调用方在副作用行上是字符串；`deleteFollowUpRecord` 要的是数字。 */
+    private static Long asId(String value) {
+        try {
+            return value == null ? null : Long.valueOf(value);
+        } catch (NumberFormatException notAnId) {
+            return null;
         }
     }
 
