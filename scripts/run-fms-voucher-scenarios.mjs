@@ -213,6 +213,15 @@ putBack = () => {
   psql(
     [
       `delete from confirmation_requests where args_json ~ '"id"[[:space:]]*:[[:space:]]*(${idAlt})([^0-9]|$)' and status = 'pending'`,
+      // 被**拒绝**的那一笔会留下一个没有效应的认领，而「按效应收」够不到它 —— 宿主把切面抛的 `AccessDeniedException`
+      // 包成了 `RuntimeException`，运行时的「没落库就释放认领」认不出来（冷读者实测）。故另收一次，范围取**本门禁
+      // 自己的工具** + 调用方 + **没有效应**：那一笔既然被拒了，就不存在可被重复执行的写，删它不可能造成重复。
+      //
+      // A **refused** call leaves a claim with no effect behind, and "delete by effect" cannot reach it — the host
+      // wraps the aspect's `AccessDeniedException` in a `RuntimeException`, so the runtime's "nothing landed, release
+      // the claim" does not recognise it (measured by the cold reader). Collected separately, scoped to **this gate's
+      // own tool** plus the caller plus **no effect**: the call was refused, so there is no write to duplicate.
+      `delete from write_claims where user_id = '${secondId}' and tool_name = 'review_fms_voucher' and effect_id is null`,
       `delete from write_claims where effect_id in (select id from side_effects where result_id in (${vouchers}))`,
       `delete from side_effects where result_id in (${vouchers})`,
       `delete from fms_voucher_entry where voucher_id in (${vouchers})`,
