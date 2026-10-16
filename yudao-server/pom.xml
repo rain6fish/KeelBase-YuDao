@@ -201,12 +201,14 @@
 <!--        </dependency>-->
 
         <!-- FMS 财务管理模块。默认注释，保证编译速度 -->
-        <!-- Enabled for this line. / 本线打开。 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.boot</groupId>-->
-<!--            <artifactId>yudao-module-fms</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
+        <!-- Enabled for this line — `YD-28`'s fifth module, and the first one that is not CRM. Upstream wrote it;
+             we neither regenerate nor edit it. 本线打开 —— `YD-28` 的第五个模块，也是第一个非 CRM 的。
+             上游写的，我们既不重新生成也不改它。 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-fms</artifactId>
+            <version>${revision}</version>
+        </dependency>
 
         <!-- PMS 项目管理模块。默认注释，保证编译速度 -->
         <!-- Enabled for this line. / 本线打开。 -->
