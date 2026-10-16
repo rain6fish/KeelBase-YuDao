@@ -212,8 +212,7 @@ public class CrmCustomerTools {
             // 属主**刻意不在这里设**：由 CrmCustomerGovernance 从调用方盖上去，与它对模块自己的 REST 路径一样。
             // 这里就算写了，也会被它覆盖——而那正是被断言的性质。
             Long caller = asId(principal.userId());
-            Long id = ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> service.createCustomer(row, caller)));
+            Long id = YudaoGovernedCall.write(principal.userId(), () -> service.createCustomer(row, caller));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", id);
             return ToolResult.ok(out);
@@ -318,11 +317,10 @@ public class CrmCustomerTools {
                         return existing == null ? null
                                 : JsonUtils.toJsonString(ListTool.project(existing));
                     }));
-            ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> {
-                        service.updateCustomer(row);
-                        return null;
-                    }));
+            YudaoGovernedCall.write(principal.userId(), () -> {
+                service.updateCustomer(row);
+                return null;
+            });
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", row.getId());
             return ToolResult.ok(out, before);

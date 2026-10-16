@@ -221,9 +221,8 @@ public class CrmFollowUpTools {
             // seven days rather than a guess at its fields: a follow-up that names no next time is a dead
             // end, and "when to come back" is what the record is for.
             record.setNextTime(nextTimeOrDefault(args.get("nextTime")));
-            Long recordId = ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(),
-                            () -> followUps.createFollowUpRecord(record)));
+            Long recordId = YudaoGovernedCall.write(principal.userId(),
+                    () -> followUps.createFollowUpRecord(record));
             if (recordId == null) {
                 return ToolResult.fail("the follow-up record could not be created");
             }

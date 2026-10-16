@@ -200,11 +200,10 @@ public class BpmOALeaveTools {
         public ToolResult execute(Map<String, Object> args, Principal principal) {
             Long id = asLong(args.get("id"));
             Integer approved = BpmTaskStatusEnum.APPROVE.getStatus();
-            ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> {
-                        service.updateLeaveStatus(id, approved);
-                        return null;
-                    }));
+            YudaoGovernedCall.write(principal.userId(), () -> {
+                service.updateLeaveStatus(id, approved);
+                return null;
+            });
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", id);
             out.put("status", approved);

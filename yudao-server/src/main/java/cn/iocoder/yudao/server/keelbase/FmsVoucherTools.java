@@ -238,12 +238,11 @@ public class FmsVoucherTools {
                 return ToolResult.fail("no voucher " + id);
             }
             Integer approved = FmsVoucherStatusEnum.APPROVED.getStatus();
-            ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(), () -> {
-                        service.updateVoucherReviewStatus(accountSetId, List.of(id), approved,
-                                asId(principal.userId()));
-                        return null;
-                    }));
+            YudaoGovernedCall.write(principal.userId(), () -> {
+                service.updateVoucherReviewStatus(accountSetId, List.of(id), approved,
+                        asId(principal.userId()));
+                return null;
+            });
             // 结果**必须带 id**：引擎每个结果记一条副作用，而 `side_effects.result_id` 是 NOT NULL。
             // The result **must carry an id**: the engine records one side effect per result, and
             // `side_effects.result_id` is NOT NULL.

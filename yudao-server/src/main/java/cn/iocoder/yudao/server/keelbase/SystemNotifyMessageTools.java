@@ -322,9 +322,8 @@ public class SystemNotifyMessageTools {
         public ToolResult execute(Map<String, Object> args, Principal principal) {
             Long id = asLong(args.get("id"));
             Long caller = asId(principal.userId());
-            int changed = ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(),
-                            () -> service.updateNotifyMessageRead(List.of(id), caller, CALLER_USER_TYPE)));
+            int changed = YudaoGovernedCall.write(principal.userId(),
+                    () -> service.updateNotifyMessageRead(List.of(id), caller, CALLER_USER_TYPE));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", id);
             out.put("changed", changed);
@@ -466,9 +465,8 @@ public class SystemNotifyMessageTools {
         @Override
         public ToolResult execute(Map<String, Object> args, Principal principal) {
             Long caller = asId(principal.userId());
-            int changed = ActingCaller.as(principal.userId(),
-                    () -> TenantUtils.execute(YudaoCallerTenant.current(),
-                            () -> service.updateAllNotifyMessageRead(caller, CALLER_USER_TYPE)));
+            int changed = YudaoGovernedCall.write(principal.userId(),
+                    () -> service.updateAllNotifyMessageRead(caller, CALLER_USER_TYPE));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", caller);
             out.put("changed", changed);
