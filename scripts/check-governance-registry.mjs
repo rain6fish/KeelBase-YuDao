@@ -1,57 +1,98 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Every module this host governs declares itself, and the name it declares is the one its own
-// pointcuts point at.
+// 本宿主上每一条 AI 执行路径都登记，且它报的种类就是它自己那种。
 //
 //   node scripts/check-governance-registry.mjs
 //
-// The registry (`GovernedModuleRegistry`) collects the declarations Spring can see, so a running host
-// can be asked what is governed. What it **cannot** do is tell "not governed" from "forgotten" — a
-// module whose aspect never declares itself is simply absent from the set. That is the gap this check
-// closes, and it closes it on the sources rather than at runtime:
+// 登记处（`GovernedModuleRegistry`）收的是 Spring 看得见的那些声明，故一台跑着的宿主可以被问到「这里被数到的是什么」。
+// 它**做不到**的是：分出「不受治理」与「被忘了」——载体没自报的路径，**就是不在**集合里。本检查堵的就是那个洞，而它堵在
+// **源码**上、不是运行时。
 //
-//   * a class under our own `keelbase` package whose `@Around` pointcut names
-//     `cn.iocoder.yudao.module.<x>.service.` **is** a governed module — that shape is the definition
-//     the onboarding file writes down, and it is what is read here;
-//   * it has to `implements GovernedModule`, or the set silently misses it;
-//   * the name it declares has to be the `<x>` its own pointcuts name, or the set is countable but
-//     wrong.
+// **`YD-24`：射程从「模块一种」扩到全量 AI 执行路径。**在此之前，这里只读模块的 `service` 层切点一种形状，于是一个
+// **工具面**——AI 经它到达执行的地方——从没被枚举过，丢了也没人看得见。现在四种形状都读（下面「怎么数」列全），每种
+// 都要求**登记**：形状读出来的每一个载体，都得在登记处自报（或在手写目录里被列出）；缺失即红。
 //
-// Scope is stated, not implied: only `yudao-server`'s own `cn.iocoder.yudao.server.keelbase` tree, and
-// only files whose pointcut goes through a module's `service.` layer. A governance that targets a tool
-// path instead — `Ai1McpGovernance` points at `module.ai1.harness.mcp` — is not a governed *module* and
-// is not read here. Upstream's modules are not scanned; we do not govern them, they are governed by us.
+// ## 怎么数：射程与四条形状
 //
-// 本宿主治理的每个模块都**自报**，而它报的名字**就是**它自己的 pointcut 所指的那一个。
+// 射程是**写明的**：只扫 `yudao-server` 自己的 `cn.iocoder.yudao.server.keelbase` 树（含 `generated/`）。上游的模块不扫
+// ——我们不治理它们，是它们被我们治理。
+//
+// 一条**AI 执行路径** = 本宿主上一处「AI 能到达执行」的载体，按下面四条形状判定（读的是**形状**、不是名字）：
+//
+//   * `module`  —— 自己的 `@Around` pointcut 点了 `cn.iocoder.yudao.module.<x>.service.` 的切面。它是一处**业务模块**，
+//      且拿模块自己的 service 层当接缝；它必须 `implements GovernedModule`，且它报的名字**必须**是它 pointcut 里的 `<x>`。
+//   * `tool`    —— 把可调用物交给**引擎或模型**的地方，读三种子形状：① 声明 `@Bean` 且**声明返回类型**是 `AiTool` 的方法
+//      （工具面）；② `implements AiTool` 的类（单工具）；③ `implements Ai1LocalToolProvider` 的类（本部署自己的引擎工具面）；
+//      ④ 一处**不是模块 service** 的切面（`@Aspect` + `@Around`，但 pointcut 不走 `module.<x>.service.`）—— 那是打**工具路**
+//      的治理（本宿主上就是 MCP 那条）。它必须**登记**：或者自己 `implements GovernedPath`（`kind()` 为 `TOOL`），或者在
+//      `GovernedToolFaces.java` 这份手写目录里被按类名列出（生成面走这条，见那份文件的类注释）。
+//   * `workflow` / `scheduled-task` —— 今天本宿主上**一条都没有**；形状写在下面，空缺**明说**而不是省略。一条流程若出现，
+//      它应 `implements GovernedPath` 并报 `WORKFLOW`；一个定时任务同理报 `SCHEDULED_TASK`。
+//
+// **为什么工具也守「反向」**：目录里列了一个**没有**对应形状的类名 ⇒ 那也是红（一条过期的登记，读起来像治理、其实是幽灵）。
+// 故本检查两个方向都读：形状 ⇒ 有登记，登记 ⇒ 有形状。
+//
+// Every AI execution path on this host is declared, and the kind it declares is the one it is.
 //
 //   node scripts/check-governance-registry.mjs
 //
-// 登记处（`GovernedModuleRegistry`）收的是 Spring 看得见的那些声明，故一台跑着的宿主可以被问到「管住了什么」。
-// 它**做不到**的是：分出「不受治理」与「被忘了」——切面从没自报的模块，**就是不在**集合里。本检查堵的就是那个洞，
-// 而它堵在**源码**上、不是运行时：
+// The registry (`GovernedModuleRegistry`) collects the declarations Spring can see, so a running host can
+// be asked what is counted here. What it cannot do is tell "not governed" from "forgotten" — a path whose
+// carrier does not declare itself is simply absent. This check closes that gap, on the **sources** rather
+// than at runtime.
 //
-//   * 我们自己 `keelbase` 包下、`@Around` pointcut 点了 `cn.iocoder.yudao.module.<x>.service.` 的类，**就是**一个
-//     受治理的模块——那个形状就是接入文件写下的定义，也是这里读的东西；
-//   * 它必须 `implements GovernedModule`，否则那个集合会**静默地**漏掉它；
-//   * 它报的名字必须是它自己 pointcut 里的 `<x>`，否则那个集合**数得出来、但是错的**。
+// **`YD-24`: the scope widened from one kind to every AI execution path.** Before, this read a module's
+// `service.` pointcut and nothing else, so a **tool face** — a place the AI reaches execution through —
+// was never enumerated and could be dropped unseen. It now reads four shapes (all listed above), and each
+// requires a **declaration**: every carrier a shape picks out must declare itself in the registry (or be
+// listed in the hand-written catalogue); a miss is red.
 //
-// 射程是**写明的**、不是暗示的：只扫 `yudao-server` 自己的 `cn.iocoder.yudao.server.keelbase` 树，且只看 pointcut
-// 走**模块 `service.` 层**的文件。打**工具路径**的治理——`Ai1McpGovernance` 点的是 `module.ai1.harness.mcp`——不是
-// 一个受治理的**模块**，这里不读它。上游的模块不扫：我们不治理它们，是它们被我们治理。
+// Scope is stated, not implied: only `yudao-server`'s own `cn.iocoder.yudao.server.keelbase` tree
+// (including `generated/`). Upstream's modules are not scanned; we do not govern them, they are governed
+// by us. An **AI execution path** is a carrier of one of four shapes — read as shapes, not names:
+//
+//   * `module`  — an aspect whose `@Around` pointcut names `cn.iocoder.yudao.module.<x>.service.`. It must
+//       `implements GovernedModule`, and the name it declares has to be the `<x>` own pointcuts name.
+//   * `tool`    — a place that hands callables to the engine or a model, read as three sub-shapes: a
+//       `@Bean` method whose declared return type is `AiTool`; a class that `implements AiTool`; a class
+//       that `implements Ai1LocalToolProvider`; and an aspect that governs a **tool path** rather than a
+//       module's `service.` layer. It must declare itself (`implements GovernedPath`, `kind()` = `TOOL`)
+//       or be listed by class name in the hand-written `GovernedToolFaces.java` catalogue.
+//   * `workflow` / `scheduled-task` — there are none on this host today; the shapes are stated and the
+//       emptiness is said rather than omitted.
+//
+// **Why tools are read both ways**: a name listed in the catalogue with no matching shape is also red — a
+// stale declaration that reads like governance but is a ghost. So both directions are read.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OWN = 'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase'
+// The one hand-written catalogue a tool face may be listed in instead of declaring itself. Read as data,
+// so a face added to the sources without an entry here turns this check red.
+// 工具面可以**不**自报、改为在这份手写目录里被列出（生成面走这条）。当数据读：源码里加了面而这里没加，即红。
+const CATALOGUE = 'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/GovernedToolFaces.java'
 
 /** A pointcut that goes through a module's own service layer — the shape that makes it a governed module. */
 const MODULE_SERVICE = /execution\(\*\s*cn\.iocoder\.yudao\.module\.([a-z0-9]+)\.service\./g
-/** The declaration this check requires. */
-const DECLARES = /implements[^{]*\bGovernedModule\b/
-/** The name it declares. */
+const HAS_MODULE_SERVICE = /execution\(\*\s*cn\.iocoder\.yudao\.module\.([a-z0-9]+)\.service\./
+/** The declaration a governed module requires, and the name it declares. */
+// Anchored to a *class declaration* (`class X implements …`) rather than the bare phrase, so prose in a
+// comment — a class comment may well write "implements GovernedModule" while explaining the pattern —
+// is not read as a declaration. Shape, not text. / 锚在**类声明**上（`class X implements …`），而不是光秃秃那句话，
+// 免得注释里的散文（类注释完全可能写着 `implements GovernedModule` 在解释这个形状）被读成声明。读形状、不读文字。
+const DECLARES_MODULE = /\bclass\s+\w+[^{;]*\bimplements\b[^{;]*\bGovernedModule\b/
 const MODULE_METHOD = /String\s+module\(\)\s*\{\s*return\s*"([a-z0-9]+)"/
+/** The declaration a tool face may carry itself (a record may carry it too — the catalogue's entry does). */
+const DECLARES_PATH = /\b(?:class|record)\s+\w+[^{;]*\bimplements\b[^{;]*\bGovernedPath\b/
+const KIND_METHOD = /Kind\s*\.\s*(MODULE|TOOL|WORKFLOW|SCHEDULED_TASK)/
+/** A class that hands tools to the engine or a model, as a shape in the source. */
+const IMPLEMENTS_AI_TOOL = /\bclass\s+\w+[^{;]*\bimplements\b[^{;]*\bAiTool\b/
+const IMPLEMENTS_LOCAL_PROVIDER = /\bclass\s+\w+[^{;]*\bimplements\b[^{;]*\bAi1LocalToolProvider\b/
+/** Is this source line a comment? A shape lives in code, not in prose about it. / 这一行是注释吗？形状长在代码里、不长在讲它的散文里。 */
+const IS_COMMENT_LINE = /^\s*(\*|\/\/|\/\*)/
 
 const javaFiles = []
 const walk = (dir) => {
@@ -69,61 +110,135 @@ const walk = (dir) => {
 }
 walk(join(ROOT, OWN))
 
-const governed = []
+/** The class a file primarily declares, as the check names it: the file's base name. */
+const classNameOf = (file) => file.split(/[\\/]/).pop().replace(/\.java$/, '')
+const pathOf = (file) => relative(ROOT, file).split('\\').join('/')
+
+/** Does a `@Bean` method declare `AiTool` as its return type? Read as a declaration, like the sibling check. */
+const declaresAiToolBean = (text) => {
+  const lines = text.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i += 1) {
+    if (IS_COMMENT_LINE.test(lines[i]) || !/@Bean\b/.test(lines[i])) continue
+    let decl = ''
+    for (let j = i; j < lines.length && j < i + 15; j += 1) {
+      decl += `${lines[j]}\n`
+      if (/[{;]\s*$/.test(lines[j])) break
+    }
+    if (/\bAiTool\s+\w+\s*\(/.test(decl)) return true
+  }
+  return false
+}
+
+// The tool faces a person has enumerated by hand, as the catalogue declares them: `new ToolFace("X")`.
+// 人手枚举出来的工具面，按目录声明它们的样子读：`new ToolFace("X")`。
+let catalogueIds = []
+try {
+  catalogueIds = [...new Set([...readFileSync(join(ROOT, CATALOGUE), 'utf8')
+    .matchAll(/new\s+ToolFace\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]))]
+} catch {
+  // Absent catalogue: every tool face becomes undeclared rather than silently passing. / 目录缺失：每个工具面都判未登记，
+  // 而不是悄悄放行。
+}
+
+const declared = { module: [], tool: [], workflow: [], scheduledTask: [] }
 const offenders = []
+const seenCatalogue = new Set()
 
 for (const file of javaFiles) {
   const text = readFileSync(file, 'utf8')
-  const path = relative(ROOT, file).split('\\').join('/')
-  const modules = [...new Set([...text.matchAll(MODULE_SERVICE)].map((m) => m[1]))]
-  const declares = DECLARES.test(text)
+  const path = pathOf(file)
+  const cls = classNameOf(file)
+  const moduleNames = [...new Set([...text.matchAll(MODULE_SERVICE)].map((m) => m[1]))]
 
-  if (modules.length === 0) {
-    // It governs something, but not a module's service — or it is not a governance at all.
-    if (declares) {
-      offenders.push(`${path} declares itself a GovernedModule but names no module's ` +
-        '`.service.` pointcut — either point it at the module it governs, or drop the declaration')
-    }
-    continue
-  }
-  if (modules.length > 1) {
-    offenders.push(`${path} names more than one module (${modules.join(', ')}) — a declaration ` +
+  // ---- module shape -------------------------------------------------------------------------------
+  if (moduleNames.length > 1) {
+    offenders.push(`${path} names more than one module (${moduleNames.join(', ')}) — a declaration ` +
       'carries one name; split the aspect or say which module it governs')
     continue
   }
-  const module = modules[0]
-  if (!declares) {
-    offenders.push(`${path} governs \`${module}\` but does not implement GovernedModule — ` +
-      'the registry cannot count what was never declared')
+  if (moduleNames.length === 1) {
+    const module = moduleNames[0]
+    if (!DECLARES_MODULE.test(text)) {
+      offenders.push(`${path} governs \`${module}\` but does not implement GovernedModule — ` +
+        'the registry cannot count what was never declared')
+      continue
+    }
+    const name = MODULE_METHOD.exec(text)
+    if (name === null) {
+      offenders.push(`${path} implements GovernedModule but declares no name — ` +
+        '`module()` has to return the module it governs')
+      continue
+    }
+    if (name[1] !== module) {
+      offenders.push(`${path} declares \`${name[1]}\` and its pointcuts name \`${module}\` — ` +
+        'the set would be countable and wrong')
+      continue
+    }
+    declared.module.push({ id: module, file: path })
     continue
   }
-  const declared = MODULE_METHOD.exec(text)
-  if (declared === null) {
-    offenders.push(`${path} implements GovernedModule but declares no name — ` +
-      '`module()` has to return the module it governs')
+  // Declares itself a module but names no module's service — a declaration with nothing under it.
+  if (DECLARES_MODULE.test(text)) {
+    offenders.push(`${path} declares itself a GovernedModule but names no module's \`.service.\` ` +
+      'pointcut — either point it at the module it governs, or drop the declaration')
     continue
   }
-  if (declared[1] !== module) {
-    offenders.push(`${path} declares \`${declared[1]}\` and its pointcuts name \`${module}\` — ` +
-      'the set would be countable and wrong')
+
+  // ---- tool shape ---------------------------------------------------------------------------------
+  const toolShape = declaresAiToolBean(text) || IMPLEMENTS_AI_TOOL.test(text)
+    || IMPLEMENTS_LOCAL_PROVIDER.test(text)
+    || (/@Aspect\b/.test(text) && /@Around\b/.test(text) && !HAS_MODULE_SERVICE.test(text))
+  if (!toolShape) continue
+
+  // A tool face declares itself, or is listed in the hand-written catalogue. / 工具面自报，或在手写目录里被列出。
+  const selfDeclared = DECLARES_PATH.test(text)
+  if (selfDeclared && !/Kind\s*\.\s*TOOL/.test(text) && KIND_METHOD.test(text)) {
+    offenders.push(`${path} declares itself a GovernedPath of kind ${KIND_METHOD.exec(text)[1]} ` +
+      'but carries a tool shape — a tool face declares `Kind.TOOL`')
     continue
   }
-  governed.push({ module, path, file: file.split(/[\\/]/).pop() })
+  if (selfDeclared || catalogueIds.includes(cls)) {
+    if (catalogueIds.includes(cls)) seenCatalogue.add(cls)
+    declared.tool.push({ id: cls, file: path })
+    continue
+  }
+  offenders.push(`${path} is a tool face but is not declared — a shape the AI reaches execution ` +
+    'through, with nothing on the list that says so. Declare it (`implements GovernedPath`, `kind()` ' +
+    '= `TOOL`) or list it in GovernedToolFaces.java')
 }
 
-for (const g of governed.sort((a, b) => a.module.localeCompare(b.module))) {
-  console.log(`  governed  ${g.module.padEnd(10)} ${g.file}`)
+// The catalogue read backwards: a listed name with no matching shape is a stale declaration. / 目录反读：列了名却
+// 没有对应形状，是一条过期登记。
+for (const id of catalogueIds) {
+  if (!seenCatalogue.has(id)) {
+    offenders.push(`GovernedToolFaces.java lists \`${id}\` but no file in the scope carries a tool ` +
+      'shape under that name — a declaration with nothing under it reads like governance and is a ghost')
+  }
 }
+
+// ---- report, grouped by kind ---------------------------------------------------------------------
+const line = (kind, id, file) => console.log(`  ${kind.padEnd(14)} ${id.padEnd(24)} ${file}`)
+for (const m of declared.module.sort((a, b) => a.id.localeCompare(b.id))) line('module', m.id, m.file)
+for (const t of declared.tool.sort((a, b) => a.id.localeCompare(b.id))) line('tool', t.id, t.file)
+for (const w of declared.workflow) line('workflow', w.id, w.file)
+for (const s of declared.scheduledTask) line('scheduled-task', s.id, s.file)
+if (declared.workflow.length === 0) line('workflow', '(none)', '— no such path on this host today')
+if (declared.scheduledTask.length === 0) line('scheduled-task', '(none)', '— none on this host today')
+
+const total = declared.module.length + declared.tool.length + declared.workflow.length
+  + declared.scheduledTask.length
 
 if (offenders.length > 0) {
   console.error()
   for (const o of offenders) console.error(`  UNDECLARED  ${o}`)
   console.error()
-  console.error(`${offenders.length} governance(s) would make the governed set incomplete or wrong.`)
-  console.log(`${governed.length} ok / ${offenders.length} failed`)
+  console.error(`${offenders.length} path(s) would make the governed set incomplete, wrong or stale.`)
+  console.log(`${total} ok / ${offenders.length} failed`)
   process.exit(1)
 }
 
-console.log(`\n${governed.length} governed module(s), each declaring the name its pointcuts point at`
-  + ` (${javaFiles.length} file(s) under ${OWN})`)
-console.log(`${governed.length} ok / 0 failed`)
+console.log(`\n${total} AI execution path(s) declared — ` +
+  `${declared.module.length} module, ${declared.tool.length} tool, ` +
+  `${declared.workflow.length} workflow, ${declared.scheduledTask.length} scheduled-task ` +
+  `(${javaFiles.length} file(s) under ${OWN})`)
+console.log(`${total} ok / 0 failed`)

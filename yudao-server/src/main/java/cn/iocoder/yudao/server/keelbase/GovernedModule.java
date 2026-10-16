@@ -21,6 +21,14 @@ package cn.iocoder.yudao.server.keelbase;
  * checked rather than assumed (2026-10-12). So this is a host-local declaration, not an abstraction
  * being pushed upward, and it leaves `D34` alone.
  *
+ * <p><b>The one kind, inside a wider set.</b> A governed module is now one {@link GovernedPath.Kind}
+ * of a {@link GovernedPath} rather than the only thing the registry holds — a tool face, a workflow and
+ * a scheduled task are the other three, and the registry counts all four. Nothing about this interface's
+ * meaning changed: {@code module()} and {@code ownerField()} are what a module's advices read and are
+ * still the per-module reading that does not compress. What is new is only that the registry can also be
+ * asked about the paths that are not modules, so "is this host accounted for?" has an answer that does
+ * not stop at the module kind.
+ *
  * 一个**自报受治理**的模块，使本宿主的通知到底管住了**什么**，在一处可读，而不是只散在一个没人枚举的 pointcut 里。
  *
  * <p><b>为什么是接口、不是一张清单。</b>手写清单就是**第二个可以忘的地方**。声明长在模块自己的类上、随模块走：
@@ -34,8 +42,32 @@ package cn.iocoder.yudao.server.keelbase;
  * <p><b>它坐在哪。</b>RuoYi 宿主把同一对（{@code GovernedModule} + {@code GovernedModuleRegistry}）放在**它自己的仓**
  * 里，而**平台两样都没有**——这是 2026-10-12 **查过**的、不是假定的。故本接口是**宿主本地的声明**，不是往上推的抽象，
  * 也就不动 `D34`。
+ *
+ * <p><b>一种，落在一个更宽的集合里。</b>一个受治理的模块，现在是 {@link GovernedPath} 的**一种**
+ * （{@link GovernedPath.Kind}），而不再是登记处唯一装的东西——工具面、工作流、定时任务是另外三种，四者登记处都数。
+ * 本接口的**意思**一点没变：{@code module()} 与 {@code ownerField()} 还是模块那些通知所读的东西，还是那份**不肯压缩的
+ * 逐模块读**。新的只是：登记处也能被问到那些**不是模块**的路径，于是「本宿主被数全了吗」有了一个**不终于模块这一种**
+ * 的答案。
  */
-public interface GovernedModule {
+public interface GovernedModule extends GovernedPath {
+
+    /** 模块这一种。给缺省，故每个现存的模块切面一个字都不用改就落在它的种类下。
+     *
+     * This kind. Defaulted, so every existing module aspect lands under its own kind without a word of
+     * change. */
+    @Override
+    default Kind kind() {
+        return Kind.MODULE;
+    }
+
+    /** 模块报自己的那一段，而不是简单类名——那一段正是它 pointcut 所指的、也正是那道检查比对的。
+     *
+     * A module reports its own segment rather than a simple class name — the very segment its pointcuts
+     * point at and the one the check compares. */
+    @Override
+    default String id() {
+        return module();
+    }
 
     /**
      * The module this class governs, as the build names it — the segment in
