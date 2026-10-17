@@ -73,6 +73,16 @@
       <el-table-column :label="t('keelbase.effects.colTool')" width="220">
         <template #default="{ row }">{{ toolText(row.toolName) }}</template>
       </el-table-column>
+      <!-- 谁发起的这次写：运行时答 `userId`；宿主名录认得出时把它译成名字（口径见 `callerNames.ts`），
+           认不出就原样显示 id。 -->
+      <!-- Who caused the write: the runtime answers `userId`; the host's directory turns it into a name
+           when it knows one (the rule `callerNames.ts` states), and otherwise the id stands as it is. -->
+      <el-table-column :label="t('keelbase.effects.colWho')" width="170">
+        <template #default="{ row }">
+          <div>{{ callerName(row.userId) }}</div>
+          <div v-if="row.userId" class="muted">#{{ row.userId }}</div>
+        </template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colTarget')" width="240">
         <template #default="{ row }">
           {{ maskTitle(row.targetTitle) }} <span class="muted">#{{ row.resultId ?? '—' }}</span>
@@ -129,6 +139,17 @@ function toolText(name: string | null | undefined): string {
   return key ? t(key) : name
 }
 
+/**
+ * 这一行的发起人：名录认得就显示名字，认不得就原样显示 id —— 页面**只补名字、不改事实**。
+ *
+ * The caller behind the row: a name when the directory knows it, the id itself otherwise — this only
+ * adds a name, it never changes the fact.
+ */
+function callerName(id: string | null | undefined): string {
+  if (!id) return '—'
+  return names.value[String(id)] ?? String(id)
+}
+
 /** Whether the record this write landed on is still there — read off the row, never re-derived. */
 /** 这次写落在的那条记录**还在不在** —— 按行读，绝不自己重算。 */
 function stateText(row: EffectRow): string {
@@ -138,6 +159,9 @@ function stateText(row: EffectRow): string {
 }
 
 const rows = ref<EffectRow[]>([])
+/** 名录给发起人配好的名字，按 id 索引；取不到时列回落成 id 本身。 */
+/** Names the directory holds for the callers, keyed by id; the column falls back to the id. */
+const names = ref<Record<string, string>>({})
 const total = ref(0)
 const page = ref(1)
 const limit = ref(20)
@@ -155,6 +179,7 @@ async function load() {
     const res = await effectApi.list(page.value, limit.value, userId.value || undefined)
     rows.value = res.items
     total.value = res.total
+    names.value = { ...names.value, ...(await resolveCallerNames(res.items.map((r) => r.userId))) }
     if (userId.value) {
       const resolved = await resolveCallerNames([userId.value])
       const name = resolved[userId.value]

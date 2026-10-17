@@ -57,6 +57,9 @@ export interface ChainVerification {
 export interface EffectRow {
   id: number
   toolName: string | null
+  /** 谁发起的这次写（JV-65）—— 运行时一直存着这个值，此前缺的只是 wire 上的一处声明。 */
+  /** Who caused the write (JV-65) — the runtime always held the value; the wire declaration was missing. */
+  userId: string | null
   resultType: string | null
   resultId: number | string | null
   createdAt: string

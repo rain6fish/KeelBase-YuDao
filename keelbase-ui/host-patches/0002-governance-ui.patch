@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,304 @@
+@@ -1,4 +1,305 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -66,6 +66,7 @@ index 96269a8..2611a9b 100644
 +    effects: {
 +      colId: 'ID',
 +      colTool: 'Tool',
++      colWho: 'Who',
 +      colTarget: 'Target',
 +      colResultType: 'Result type',
 +      colRevokeClass: 'Revoke class',
@@ -311,7 +312,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,303 @@
+@@ -1,4 +1,304 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -375,6 +376,7 @@ index 35f1e1a..856d201 100644
 +    effects: {
 +      colId: '编号',
 +      colTool: '工具',
++      colWho: '谁',
 +      colTarget: '目标',
 +      colResultType: '结果类型',
 +      colRevokeClass: '可撤档位',
