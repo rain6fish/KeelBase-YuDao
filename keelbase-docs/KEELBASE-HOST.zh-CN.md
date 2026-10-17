@@ -15,7 +15,7 @@
 | 上游 | `YunaiV/ruoyi-vue-pro`（芋道） |
 | 分支 | `master-jdk25` |
 | 提交 | `994605b51080fbc1f4c7838f80ac0468f1d0e67c`（2026-10-07） |
-| Revision | `0.1.0`（本衍生仓自己的版本线）· Java 25 · Spring Boot 4.1.1 |
+| Revision | `0.1.1`（本衍生仓自己的版本线）· Java 25 · Spring Boot 4.1.1 |
 | 许可证 | MIT —— **原样保留**在 `LICENSE`，见 `NOTICE` |
 
 **历史不是上游的。** 本仓**全新初始化**：不携带上游提交历史，与上游**没有 merge base**。继承关系由

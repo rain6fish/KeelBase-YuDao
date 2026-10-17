@@ -19,7 +19,7 @@ this file is the part of it that belongs with the code.
 | Upstream | `YunaiV/ruoyi-vue-pro` ("yudao") |
 | Branch | `master-jdk25` |
 | Commit | `994605b51080fbc1f4c7838f80ac0468f1d0e67c` (2026-10-07) |
-| Revision | `0.1.0` (this derivative's own line) · Java 25 · Spring Boot 4.1.1 |
+| Revision | `0.1.1` (this derivative's own line) · Java 25 · Spring Boot 4.1.1 |
 | Licence | MIT — retained unmodified in `LICENSE`; see `NOTICE` |
 
 **The history is not upstream's.** This repository was initialised fresh: it carries no upstream

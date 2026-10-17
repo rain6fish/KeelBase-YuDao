@@ -216,23 +216,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # 宿主的 `yudao-server/pom.xml` 钉的是 `cn.com.keelbase:keelbase4j-core:0.1.8-SNAPSHOT`，而
-      # **SNAPSHOT 不在任何公共仓库里** —— 它只在本机的 `~/.m2` 里。故 CI 从**公开的**运行时仓构建那两件，
-      # 并按一个**明确提交**检出：让上游主线的移动把宿主构建弄红，是两件不同的事，不该混在一起。
-      # 抬运行时版本时，这个 SHA 与宿主 pom 里的坐标要一起改。
+      # 宿主钉的是**已发布**的运行时 `0.1.9`（Central 上有），故 CI 直接解析它，不再从公开仓按 SHA
+      # 构建：一个 SNAPSHOT 只在本机 `~/.m2` 里，会让这套 job 在 runner 上永远缺件。抬运行时版本时，
+      # 宿主 pom 的坐标与这里一起改。
       #
-      # The host's `yudao-server/pom.xml` pins `cn.com.keelbase:keelbase4j-core:0.1.8-SNAPSHOT`, and a
-      # **SNAPSHOT is in no public repository** — only in a developer's `~/.m2`. So CI builds those
-      # artifacts from the **public** runtime repository at an **explicit commit**: letting that
-      # repository's own progress turn the host's build red is a different thing and must not be
-      # mixed in. When the runtime version is bumped, this SHA and the host pom's coordinate move
-      # together.
-      - uses: actions/checkout@v5
-        with:
-          repository: rain6fish/KeelBase4J
-          ref: 8c6f33bd503ab7d8050abe4cad0ef1cad10c2e50
-          path: .runtime
-
+      # The host pins the **released** runtime `0.1.9` (available on Central), so CI resolves it
+      # directly instead of building the public repository at a SHA: a SNAPSHOT lives only in a
+      # developer's `~/.m2`, which left this job missing artifacts on the runner. When the runtime
+      # version is bumped, the host pom's coordinate moves with it.
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -242,11 +233,6 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-
-      - name: Build and install the runtime the host pins
-        run: >-
-          mvn -B -ntp -DskipTests -Dmaven.test.skip=true
-          -f .runtime/pom.xml -pl keelbase4j-core,keelbase4j-springai -am install
 
       - name: Build the host
         run: >-

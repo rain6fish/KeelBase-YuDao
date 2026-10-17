@@ -11,6 +11,36 @@ tag（`v2026.0x(jdkX/Y)`）解耦；后者保留为历史，绝不在这里复�
 
 ---
 
+## v0.1.1 — 2026-10-18
+
+**The host pins a released runtime, and CI can resolve it. / 宿主钉住已发布的运行时，CI 解析得到。**
+
+Highlights
+
+* The host pins the **released** `keelbase4j-core` / `keelbase4j-springai` **0.1.9** instead of an unreleased `0.1.8-SNAPSHOT`, so a clean machine and CI resolve it from Maven Central rather than from one developer's `~/.m2`.
+* The conformance CI job no longer builds the runtime from a commit SHA: with a released coordinate there is nothing to build, which removes the artifact-missing failure that job hit on every run.
+
+Also
+
+* The `generator` CI job resolves the same released coordinate, so the committed generated files are checked on a runner without a local runtime install.
+* No wire change, no behaviour change; the host build was verified locally against 0.1.9.
+
+Full details: [CHANGELOG.md](https://github.com/rain6fish/KeelBase-YuDao/blob/v0.1.1/CHANGELOG.md)
+
+亮点
+
+* 宿主改为钉住**已发布**的 `keelbase4j-core` / `keelbase4j-springai` **0.1.9**，不再钉未发布的 `0.1.8-SNAPSHOT`；干净机器与 CI 从 Maven Central 解析它，而不是从某个开发者的 `~/.m2`。
+* 符合性 CI job 不再按提交 SHA 构建运行时：坐标已发布，就没有要构建的东西，这也移除了那次 job 每次都撞上的「缺件」失败。
+
+其它
+
+* `generator` CI job 解析同一个已发布坐标，故提交的生成物能在没有本地运行时安装的 runner 上被检查。
+* 线缆不变、行为不变；宿主构建已在本地对 0.1.9 验过。
+
+完整详情：[CHANGELOG.md](https://gitee.com/rain6fish/KeelBase-YuDao/blob/v0.1.1/CHANGELOG.md)
+
+---
+
 ## v0.1.0 — 2026-10-18
 
 **The first own version line: the host is YuDao, the governance is KeelBase. / 第一条自家版本线：宿主是芋道，治理是 KeelBase。**
