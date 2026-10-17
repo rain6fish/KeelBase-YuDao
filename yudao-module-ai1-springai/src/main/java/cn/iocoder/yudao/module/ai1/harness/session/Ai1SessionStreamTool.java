@@ -706,10 +706,12 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         // 4. 工具（MCP + SKILL + 部署方在进程内交来的）与 RAG Advisor；知识库不可用时降级跳过，并把提示写入思考流
         // 会话随工具一起过去 —— MCP 那条路与部署方交来的那条**都算**：正是它让一次受治理的调用归得了**这一轮**、
         // 而不是笼统地归给调用方。SKILL 那条**不动**：它上面没有治理缝，也就没有行要归位。
+        // **这一处是 KeelBase 对上游文件的改动**：登记在 `keelbase-docs/KEELBASE-UPSTREAM.md`，并由一条测试盯着。
         //
         // The session travels with the tools — the MCP face and the deployment's own alike: it is what makes a
         // governed call attributable to *this* turn rather than to the caller in general. The SKILL face is left
-        // alone: nothing governs it, so there is no row to place.
+        // alone: nothing governs it, so there is no row to place. **This place is KeelBase's change to an
+        // upstream file**: registered in `keelbase-docs/KEELBASE-UPSTREAM.md` and covered by a test.
         List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent, sessionId));
         tools.addAll(skillToolFactory.buildTools(agent));
         if (localToolProvider != null) {
