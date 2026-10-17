@@ -317,13 +317,13 @@ jobs:
           KEEP_CONFIRMATIONS: '1'
         run: |
           set -euo pipefail
-          node scripts/run-app-conformance.mjs | tee conformance.out
-          # 四率是门禁的一部分，不是装饰：2.1 来自各场景套件的收束断言（`TASKS`），2.2/2.3/2.4 由
-          # `measure-governance-rates.mjs` 按 `RY-19` 的规则读出。缺任何一项，这一步就红。
-          # The four rates are part of the gate, not decoration: 2.1 comes from the scenario suites'
-          # closing assertions (`TASKS`), and 2.2/2.3/2.4 from `measure-governance-rates.mjs` under
-          # `RY-19`'s rule. A missing field turns this step red.
-          grep -Eq '^RATES 2\.1=[0-9]+/[0-9]+ 2\.2=[0-9]+/[0-9]+=[0-9.-]+ 2\.3=[0-9]+/[0-9]+=[0-9.-]+ 2\.4=[0-9]+/[0-9]+=[0-9.-]+$' conformance.out
+          # 闸门自己跑套件并做结构判决：四率必须是 `[01].[0-9]{3}`（`-` / `0/0` 不是读数），
+          # SKIP 集合必须恰好是 `Tool path (MCP)` 与 `Confirmation` 两栏——多一栏、少一栏都红。
+          # 判据在脚本头部，只有一处。
+          # The gate runs the suite and makes the structural verdict: the four rates must be
+          # `[01].[0-9]{3}` (`-` / `0/0` are not readings), and the SKIP set must be exactly the two
+          # model-path columns — one extra or one missing is red. The rules live in the script's header.
+          node scripts/ci/run-governance-gate.mjs | tee conformance.out
 
       - name: Report the host's tail when the run went red
         if: failure()
