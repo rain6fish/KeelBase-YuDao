@@ -253,6 +253,9 @@ jobs:
           # 跟 PostgreSQL 说话，故这就是它们要的那个句柄。
           PG_CONTAINER="$(docker ps --filter ancestor=pgvector/pgvector:pg17 --format '{{.ID}}' | head -n1)"
           test -n "$PG_CONTAINER"
+          # Export as well as persist: `GITHUB_ENV` reaches later steps, not this script's child.
+          # 既要持久化也要导出：`GITHUB_ENV` 只到后续步骤，到不了本步脚本的子进程。
+          export PG_CONTAINER
           echo "PG_CONTAINER=$PG_CONTAINER" >> "$GITHUB_ENV"
           bash deploy/demo-ecs/bootstrap-db.sh
 
