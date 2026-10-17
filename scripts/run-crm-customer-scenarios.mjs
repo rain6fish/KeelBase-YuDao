@@ -264,7 +264,10 @@ putBack = () =>
       `delete from write_claims where user_id = '${secondId}' and tool_name = 'update_crm_customer' and effect_id is null`,
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
-      `delete from confirmation_requests where args_json like '%${marker}%'`,
+      // 一次性栈（CI）保留确认行，好让 RY-19 的确认率有分母；共用库上照旧收干净。
+      // An ephemeral stack (CI) keeps the confirmation rows so RY-19's confirmation rate has a
+      // denominator; a shared database still cleans them up.
+      ...(process.env.KEEP_CONFIRMATIONS === '1' ? [] : [`delete from confirmation_requests where args_json like '%${marker}%'`]),
       `delete from ${CUSTOMER} where name like '%${marker}%'`,
     ].join('; '),
   );

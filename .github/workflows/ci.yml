@@ -6,7 +6,7 @@
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
 # what we *have* touched is `YD-T4`).
 #
-# Five jobs, and each answers a question the others cannot:
+# Seven jobs, and each answers a question the others cannot:
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
@@ -20,19 +20,27 @@
 #                        and still what that Spec says (`--check`);
 #   family-block         the generated "KeelBase family" section at the top of this repository's
 #                        READMEs still matches the stamp it was generated with — the copy carries its
-#                        own hash, so this needs neither the sibling repositories nor the network.
+#                        own hash, so this needs neither the sibling repositories nor the network;
+#   conformance          the application conforms end to end against a **running** stack (PostgreSQL
+#                        + Redis + the host), and the four governance rates are readable — driven, not
+#                        quoted.
 #
-# All but `generator` are pure Node and finish in seconds. `generator` wants a JDK 25 toolchain and a
-# Maven build, so it is the one job here that costs minutes — and it is kept to those two **offline**
-# checks. The conformance suite and the four governance rates need a running stack (PostgreSQL + Redis
-# + the server); they are deliberately **not** run here, because calling those scripts without a host
-# would not be running them.
+# All but `generator` and `conformance` are pure Node and finish in seconds. `generator` wants a JDK 25
+# toolchain and a Maven build, so it costs minutes; it is kept to those two **offline** checks.
+#
+# `conformance` is the one job that needs a service stack, because calling the scenario scripts without
+# a host would not be running them. It brings up PostgreSQL (with pgvector) and Redis as service
+# containers, builds the host, loads the seed, starts the server, waits for `/actuator/health`, and
+# then runs `scripts/run-app-conformance.mjs`. Two of that suite's columns have the **model path** as
+# their subject (MCP's two real model steps, and the assistant drawer's real session), so the job sets
+# `CONFORMANCE_NO_MODEL_KEY=1`: those two columns are recorded `SKIP` with that reason, never `PASS`,
+# and every deterministic column is still driven. No model key is needed or present.
 #
 # 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
 # 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
 #
-# 五个 job，各答一个别的 job 答不了的问题：
+# 七道 job，各答一个别的 job 答不了的问题：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
@@ -45,11 +53,16 @@
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
 #                        东西（`--check`）；
 #   family-block         本仓 README 开头生成的「KeelBase 家族」段仍与生成时的戳相符 —— 副本自带哈希，
-#                        故既不需要兄弟仓、也不需要联网。
+#                        故既不需要兄弟仓、也不需要联网；
+#   conformance          应用对着**跑着的栈**（PostgreSQL + Redis + 宿主）端到端符合，且四个治理率可读
+#                        —— 驱动门禁，不誊抄门禁。
 #
-# 除 `generator` 外都是 pure Node、几秒完事。`generator` 要一套 JDK 25 工具链与一次 Maven 构建，是本文件里唯一
-# 按分钟计的 job —— 它只跑那两道**离线**检查。符合性套件与四个治理率要一套**跑着的栈**（PostgreSQL + Redis +
-# 宿主），**刻意不在这里跑**：不起宿主直接调那些脚本，那不叫跑过它。
+# 前六道是 pure Node 或离线检查、几秒到几分钟。第七道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
+# service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主 → 灌种子 → 起服务 → 等
+# `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调那些脚本，那不叫跑过它。
+# 套件里有两栏的主语是**模型那条路**（MCP 的两个真模型步、抽屉的真会话），故这道 job 置
+# `CONFORMANCE_NO_MODEL_KEY=1`：那两栏记 `SKIP` 并写出原因、**绝不记 `PASS`**，其余确定性的栏照常驱动。
+# 这道 job **不接**任何真模型 key。
 name: CI
 
 on:
@@ -166,3 +179,162 @@ jobs:
       # 仓里的闸来说，这是唯一行得通的形状。
       - name: The family section in the READMEs must match its stamp
         run: node scripts/check-family-block.mjs
+
+  conformance:
+    name: The application conforms, and the four governance rates are readable
+    runs-on: ubuntu-latest
+    # A cold host needs the runtime built, the host built, the seed loaded and the server up. 45
+    # minutes is a ceiling for a cold runner, not the expected time.
+    # 冷 runner 要构建运行时、构建宿主、灌种子、起服务；45 分钟是**冷启动**的上限，不是通常耗时。
+    timeout-minutes: 45
+    services:
+      postgres:
+        # pgvector, not plain PostgreSQL: the line's datastore has the extension, and the conformance
+        # suite's Schema column reads the runtime's migrations against the same datastore it ships on.
+        # 用 pgvector 而不是普通 PostgreSQL：本线的数据存储带这个扩展，套件的 Schema 栏读的也是同一套。
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: ruoyi-vue-pro
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U root -d ruoyi-vue-pro"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # 宿主的 `yudao-server/pom.xml` 钉的是 `cn.com.keelbase:keelbase4j-core:0.1.8-SNAPSHOT`，而
+      # **SNAPSHOT 不在任何公共仓库里** —— 它只在本机的 `~/.m2` 里。故 CI 从**公开的**运行时仓构建那两件，
+      # 并按一个**明确提交**检出：让上游主线的移动把宿主构建弄红，是两件不同的事，不该混在一起。
+      # 抬运行时版本时，这个 SHA 与宿主 pom 里的坐标要一起改。
+      #
+      # The host's `yudao-server/pom.xml` pins `cn.com.keelbase:keelbase4j-core:0.1.8-SNAPSHOT`, and a
+      # **SNAPSHOT is in no public repository** — only in a developer's `~/.m2`. So CI builds those
+      # artifacts from the **public** runtime repository at an **explicit commit**: letting that
+      # repository's own progress turn the host's build red is a different thing and must not be
+      # mixed in. When the runtime version is bumped, this SHA and the host pom's coordinate move
+      # together.
+      - uses: actions/checkout@v5
+        with:
+          repository: rain6fish/KeelBase4J
+          ref: 8c6f33bd503ab7d8050abe4cad0ef1cad10c2e50
+          path: .runtime
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build and install the runtime the host pins
+        run: >-
+          mvn -B -ntp -DskipTests -Dmaven.test.skip=true
+          -f .runtime/pom.xml -pl keelbase4j-core,keelbase4j-springai -am install
+
+      - name: Build the host
+        run: >-
+          KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
+          -pl yudao-server -am -DskipTests -Dmaven.test.skip=true package
+
+      - name: Load the seed into the service database
+        env:
+          PG_DB: ruoyi-vue-pro
+          PG_USER: root
+          PUBLIC_ORIGIN: http://127.0.0.1:48085
+        run: |
+          set -euo pipefail
+          # GitHub gives service containers generated names; resolve the one by its image rather than
+          # guessing. The scenario scripts talk to PostgreSQL through `docker exec`, so this is the
+          # handle they need.
+          # GitHub 给 service container 生成名字；按镜像解析出它，而不是猜。场景脚本通过 `docker exec`
+          # 跟 PostgreSQL 说话，故这就是它们要的那个句柄。
+          PG_CONTAINER="$(docker ps --filter ancestor=pgvector/pgvector:pg17 --format '{{.ID}}' | head -n1)"
+          test -n "$PG_CONTAINER"
+          echo "PG_CONTAINER=$PG_CONTAINER" >> "$GITHUB_ENV"
+          bash deploy/demo-ecs/bootstrap-db.sh
+
+      - name: Start the host and wait for it to answer UP
+        env:
+          PORT: '48085'
+          PG_PORT: '55432'
+          REDIS_PORT: '56379'
+          PG_DB: ruoyi-vue-pro
+          PG_USER: root
+          PG_PASSWORD: password
+        run: |
+          set -euo pipefail
+          # `run-server.sh` goes through `jdk25.sh`, whose resolver would otherwise fall through to its
+          # last option and fetch a **Windows** build on this Linux runner — the same trap the
+          # `generator` job documents. Handing it the runner's own JDK 25 home is the fix.
+          # `run-server.sh` 经 `jdk25.sh`，而它的解析器否则会落到最后一档、在这台 Linux runner 上取一个
+          # **Windows** 构建 —— 与 `generator` job 记载的是同一个坑。把 runner 自己的 JDK 25 home 交给它。
+          KEELBASE_JDK25="$JAVA_HOME" bash scripts/run-server.sh > host.log 2>&1 &
+          echo $! > host.pid
+          for i in $(seq 1 150); do
+            if curl -fsS "http://127.0.0.1:48085/actuator/health" 2>/dev/null \
+              | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'; then
+              echo "host is UP after $((i * 2))s"
+              exit 0
+            fi
+            if ! kill -0 "$(cat host.pid)" 2>/dev/null; then
+              echo "the host exited before it became healthy" >&2
+              tail -n 200 host.log >&2 || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "the host did not become healthy in 300s" >&2
+          tail -n 200 host.log >&2 || true
+          exit 1
+
+      - name: Run the conformance suite and require the four rates
+        env:
+          HOST_URL: http://127.0.0.1:48085
+          PG_DB: ruoyi-vue-pro
+          PG_USER: root
+          PG_PASSWORD: password
+          CONFORMANCE_NO_MODEL_KEY: '1'
+          # 一次性栈：门禁把确认行留着，好让 RY-19 的确认率（2.3）有分母。共用库上**绝不**置这个。
+          # An ephemeral stack: the gates keep their confirmation rows so RY-19's confirmation rate
+          # (2.3) has a denominator. **Never** set this against a shared database.
+          KEEP_CONFIRMATIONS: '1'
+        run: |
+          set -euo pipefail
+          node scripts/run-app-conformance.mjs | tee conformance.out
+          # 四率是门禁的一部分，不是装饰：2.1 来自各场景套件的收束断言（`TASKS`），2.2/2.3/2.4 由
+          # `measure-governance-rates.mjs` 按 `RY-19` 的规则读出。缺任何一项，这一步就红。
+          # The four rates are part of the gate, not decoration: 2.1 comes from the scenario suites'
+          # closing assertions (`TASKS`), and 2.2/2.3/2.4 from `measure-governance-rates.mjs` under
+          # `RY-19`'s rule. A missing field turns this step red.
+          grep -Eq '^RATES 2\.1=[0-9]+/[0-9]+ 2\.2=[0-9]+/[0-9]+=[0-9.-]+ 2\.3=[0-9]+/[0-9]+=[0-9.-]+ 2\.4=[0-9]+/[0-9]+=[0-9.-]+$' conformance.out
+
+      - name: Report the host's tail when the run went red
+        if: failure()
+        run: tail -n 200 host.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-conformance
+          path: |
+            conformance/reports/
+            conformance.out
+            host.log
+          if-no-files-found: warn

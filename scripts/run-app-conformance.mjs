@@ -36,6 +36,10 @@
 // evidence, not source. The directory carries its own `.gitignore` for that reason.
 //
 //   node scripts/run-app-conformance.mjs
+//   CONFORMANCE_NO_MODEL_KEY=1 node scripts/run-app-conformance.mjs   # a deterministic stack, no model
+//
+// The last form is what CI uses: the two model-path columns are `SKIP` with that reason, everything
+// deterministic is driven, and the single `RATES` line at the end carries all four governance rates.
 //
 // ── 中文 ────────────────────────────────────────────────────────────────────────
 //
@@ -78,12 +82,28 @@ const PG_USER = process.env.PG_USER || 'root';
 const PG_PASS = process.env.PG_PASSWORD || 'password';
 const DB = process.env.PG_DB || 'ruoyi-vue-pro';
 const OUT_DIR = process.env.OUT_DIR || 'conformance/reports';
+// **CI 模式：栈里没有模型 key。** 有两栏的主语就是模型那条路（MCP 的两个真模型步、抽屉那条真会话），
+// 没有 key 时它们跑不起来 —— 这样的栏记 `SKIP` 并把原因写出来，**绝不记 `PASS`**。其余栏、以及四率，
+// 都是确定性的，照常驱动。
+//
+// **CI mode: the stack carries no model key.** Two columns have the model path as their subject (the MCP
+// gate's two real model steps, and the drawer's real session); without a key they cannot run — such a
+// column is recorded as `SKIP` with the reason attached, **never `PASS`**. Every other column, and the
+// four rates, is deterministic and is still driven.
+const NO_MODEL_KEY = process.env.CONFORMANCE_NO_MODEL_KEY === '1';
 
 const STARTED = Date.now();
 const stamp = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z').replace(/:/g, '-');
 
 let pass = 0, fail = 0, skip = 0;
 const CASES = [];
+// Task success (2.1) is judged by the scenario suites' own closing assertions — so it is counted from
+// the rows those suites produce, one unit per suite that was actually driven. A suite skipped for lack
+// of a model key leaves the denominator rather than counting as a failure.
+//
+// 任务成功率（2.1）由各场景套件**自己的收束断言**判定 —— 故按那些套件产生的行来数，**一个被真正驱动的
+// 套件算一个单位**。因缺模型 key 而跳过的套件退出分母，而不是记成失败。
+const TASKS = [];
 let RATES = '';
 
 function psql(sql) {
@@ -123,7 +143,15 @@ function judge(column, assertion, expected, got) {
 // 驱动应用自己的一道门禁。退出码与它自己的收束行就是证据；它转红时，**红的是哪几条在记录里点名**，而不是留给
 // 读的人去反推——本文件原先只带一个计数，事实证明那会逼得读的人回去重跑门禁。最多三条：记录是汇总，剩下的去读
 // 门禁自己的输出。
-function gate(column, script, what) {
+function gate(column, script, what, task = true) {
+  const record = (result, detail) => {
+    row(column, what, result, detail);
+    // Only the **scenario suites** answer 2.1. A source-reading check (the tool-bean boundary) is a
+    // gate but not a task, so it is excluded by the caller with `task = false`.
+    // 只有**场景套件**回答 2.1。读源码的那道检查（工具 bean 边界）是门禁、不是任务，故由调用方以
+    // `task = false` 排除。
+    if (task) TASKS.push({ column, result });
+  };
   const r = spawnSync(process.execPath, [join('scripts', script)], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -133,18 +161,18 @@ function gate(column, script, what) {
   const status = r.status === null ? `spawn failed (${r.error?.message || 'no status'})` : r.status;
   const m = out.match(/(\d+) ok \/ (\d+) failed/);
   if (!m) {
-    row(column, what, 'SKIP', `scripts/${script} produced no summary (exit ${status})`);
+    record('SKIP', `scripts/${script} produced no summary (exit ${status})`);
     return;
   }
   const summary = `${m[1]} ok / ${m[2]} failed`;
   if (r.status === 0) {
-    row(column, what, 'PASS', summary);
+    record('PASS', summary);
     return;
   }
   const red = out.split('\n').filter((l) => l.startsWith('  FAIL'))
     .map((l) => l.replace(/^  FAIL\s+/, '').replace(/ — .*$/, ''));
   const named = red.slice(0, 3).join('; ') + (red.length > 3 ? `; +${red.length - 3} more` : '');
-  row(column, what, 'FAIL', `${summary} (exit ${r.status})${named ? ` — failed: ${named}` : ''}`);
+  record('FAIL', `${summary} (exit ${r.status})${named ? ` — failed: ${named}` : ''}`);
 }
 
 const sh = (cmd, args) => {
@@ -198,8 +226,18 @@ gate('Tool Governance', 'run-generated-module-scenarios.mjs', "the generated mod
 // 同一栏的另一半，也是 `YD-T14`（`D42`）讲的那一件：治理有多好，取决于**模型够得到什么**。我们的工具一旦以
 // bean `ToolCallback` 的形式注册，模型就能经 Spring AI 自己的解析器够到它，而 KeelBase 的切面看不见——所以这条
 // 边界在这里断言，而不是留着等人发现。
-gate('Tool Governance', 'check-ungoverned-tool-beans.mjs', 'no bean hands our tools to Spring AI');
-gate('Tool path (MCP)', 'run-mcp-governance-scenarios.mjs', "the host's own tool path, two real model steps");
+gate('Tool Governance', 'check-ungoverned-tool-beans.mjs', 'no bean hands our tools to Spring AI', false);
+// 这一栏要真模型才跑得动（它走 MCP、让模型选两次工具）。没有 key 时记 SKIP 并说出原因 —— 这条 job
+// 是确定性的，不接真模型 key。
+// This column needs a real model to run (it drives MCP and makes the model pick a tool twice). Without a
+// key it is recorded as SKIP with the reason — this job is deterministic and carries no model key.
+if (NO_MODEL_KEY) {
+  row('Tool path (MCP)', "the host's own tool path, two real model steps", 'SKIP',
+    'needs a model key; this run carries none');
+  TASKS.push({ column: 'Tool path (MCP)', result: 'SKIP' });
+} else {
+  gate('Tool path (MCP)', 'run-mcp-governance-scenarios.mjs', "the host's own tool path, two real model steps");
+}
 // 5b · Tenant — `YD-10`'s half. Until `D39`/`D40` landed the adapter ran every host-service call under
 // one hard-coded tenant, so this column's question could not be asked: a governed write made by a caller
 // on another tenant landed in tenant 1. The gate answers it by comparison — two callers, two tenants,
@@ -230,7 +268,16 @@ gate('Tenant', 'run-tenant-scenarios.mjs', "a governed write lands in the caller
 // 于是它的判决取决于**别的某一次运行**有没有留下已决的行 —— 这也正是那些门禁不能把自己造的行收回去的原因
 // （一收，这一栏就黑）。这里驱动的那道门禁，题目**正是**确认卡：它断言确认卡有源、且**调用方**决得动，
 // 记下的判决来自那一次运行自己。
-gate('Confirmation', 'run-assistant-drawer-scenarios.mjs', 'a human decision is on record');
+// 这道门禁开真会话、发真消息，故同样的条件：没有 key 就 SKIP 并说出原因。
+// This gate opens a real session and sends a real message, so the same condition applies: without a key
+// it is SKIP with the reason attached.
+if (NO_MODEL_KEY) {
+  row('Confirmation', 'a human decision is on record', 'SKIP',
+    'needs a model key; this run carries none');
+  TASKS.push({ column: 'Confirmation', result: 'SKIP' });
+} else {
+  gate('Confirmation', 'run-assistant-drawer-scenarios.mjs', 'a human decision is on record');
+}
 
 // 8 · Revoke — a side effect was withdrawn, and the ledger says so. **Driven, not quoted**, and here that
 // is not merely tidier: the gate **reads the ledger itself while it runs** — that reading is one of its
@@ -254,6 +301,17 @@ gate('Confirmation', 'run-assistant-drawer-scenarios.mjs', 'a human decision is 
 gate('Revoke', 'run-revoke-scenario.mjs', 'a withdrawal is attempted and its outcome asserted');
 
 // 9 · The other half of the criterion: the four rates, read from the line's own tool.
+//
+// The three audit-derived rates come from `measure-governance-rates.mjs` untouched — the counting rule
+// is `RY-19`'s, not this file's. The fourth (2.1) is the one that tool deliberately does not compute: it
+// is judged by the scenario suites' closing assertions, which is exactly what `TASKS` collected above.
+// The single `RATES` line is the machine-readable form CI keys on.
+//
+// 另外那一半判据：四个治理率，读自本线自己的工具。
+//
+// 三个由审计推出的率原样来自 `measure-governance-rates.mjs`——计数规则是 `RY-19` 的、不是本文件的。
+// 第四个（2.1）正是那个工具**刻意不**算的：它由各场景套件的收束断言判定，而那正是上面 `TASKS` 收下的东西。
+// 单行 `RATES` 就是 CI 据以判定的机器可读形态。
 {
   const r = spawnSync(process.execPath, [join('scripts', 'measure-governance-rates.mjs')], {
     cwd: ROOT, encoding: 'utf8',
@@ -263,6 +321,17 @@ gate('Revoke', 'run-revoke-scenario.mjs', 'a withdrawal is attempted and its out
   if (!RATES) row('Rates', 'the four governance rates are readable', 'SKIP', 'measure-governance-rates.mjs gave nothing');
   else row('Rates', 'the four governance rates are readable', 'PASS', RATES.replace(/\n/g, ' | '));
 }
+
+const DRIVEN = TASKS.filter((t) => t.result !== 'SKIP');
+const TASK_PASS = DRIVEN.filter((t) => t.result === 'PASS').length;
+const field = (re) => {
+  const m = RATES.match(re);
+  return m ? `${m[1]}/${m[2]}=${m[3]}` : 'unreadable';
+};
+const RATE_LINE = `RATES 2.1=${TASK_PASS}/${DRIVEN.length}`
+  + ` 2.2=${field(/2\.2 tool success = (\d+)\/(\d+) = (\S+)/)}`
+  + ` 2.3=${field(/2\.3 confirmation = (\d+)\/(\d+) = (\S+)/)}`
+  + ` 2.4=${field(/2\.4 refusal\s+= (\d+)\/(\d+) = (\S+)/)}`;
 
 // ── the record ──────────────────────────────────────────────────────────────────
 
@@ -280,6 +349,7 @@ const record = {
   date: new Date().toISOString(),
   pass, fail, skip, elapsedSec: ELAPSED,
   rates: RATES.split('\n').join(';'),
+  ratesLine: RATE_LINE,
   cases: CASES.map((c, i) => ({ n: i + 1, ...c }))
 };
 writeFileSync(JSON_PATH, `${JSON.stringify(record, null, 2)}\n`);
@@ -294,9 +364,11 @@ CASES.forEach((c, i) => {
   md.push(`| ${i + 1} | ${c.column} | ${c.assertion} | ${mark} | ${c.detail} |`);
 });
 md.push('', '## 四率（读自 `measure-governance-rates.mjs`）', '', '```', RATES || '(unreadable)', '```');
+md.push('', `机器可读：\`${RATE_LINE}\``, '');
 md.push('', '**本记录不跟踪**（`conformance/reports/` 自带 `.gitignore`）——它是证据、不是源码。', '');
 writeFileSync(MD_PATH, md.join('\n'));
 
 console.log(`\n${pass} pass, ${fail} failed, ${skip} skipped in ${ELAPSED}s`);
+console.log(RATE_LINE);
 console.log(`record: ${JSON_PATH}\n        ${MD_PATH}`);
 process.exit(fail === 0 ? 0 : 1);

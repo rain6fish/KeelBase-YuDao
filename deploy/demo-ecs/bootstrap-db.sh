@@ -81,7 +81,11 @@ ADDITIONS=(
   "$REPO_ROOT/sql/keelbase-policy-menu.sql"
   "$REPO_ROOT/sql/keelbase-brand-names.sql"
   "$REPO_ROOT/sql/keelbase-operate-log-nullable.sql"
-  "$REPO_ROOT/sql/keelbase-local-images.sql"
+  # 注：`keelbase-local-images.sql` **不在这里** —— 它需要 `origin` 参数，故由下面第 4b 步单独跑。
+  # 曾经它同时列在这里：循环不带 `origin`，它会 `\quit 1`，于是冷启动在第 4 步就断了。
+  # `keelbase-local-images.sql` is **not** here — it takes an `origin` parameter, so step 4b runs it on
+  # its own. It used to be listed here as well: the loop passed no `origin`, the file `\quit 1`, and a
+  # cold bootstrap stopped at step 4.
 )
 
 # This deployment runs a subset of the modules — the ones its jar actually carries — so the menus
