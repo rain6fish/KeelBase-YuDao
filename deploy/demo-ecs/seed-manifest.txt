@@ -1,0 +1,132 @@
+# KeelBase-YuDao 部署种子清单 —— `bootstrap-db.sh` 的唯一来源。
+#
+# 每一份 `sql/keelbase-*.sql` 都必须在这里出现且只出现一次，三态之一：
+#
+#   load      由 `bootstrap-db.sh` 第 4 步按本文件顺序导入。**顺序就是依赖顺序**：父菜单先于子菜单，
+#             目录的授予先于它下面的页。
+#   separate  由自己的步骤跑 —— 它要参数（`origin`），或不能放进那个循环。
+#   skip      本部署不需要。`#` 后必须写理由；没有理由的 skip 视为漏分类。
+#
+# 新增一份 `sql/keelbase-*.sql` 而不在这里归类 ⇒ `scripts/check-seed-list.mjs` 红。
+# 清单里点名一份不存在的文件 ⇒ 同样红。检查也核对「给 keelbase-ui 页面插菜单行的文件」必须在
+# `load` 里，以及 `load` 落下的顶级路径都在 `module-scope.sql` 的保留清单里。
+#
+# ---
+#
+# KeelBase-YuDao deployment seed manifest — the single source for `bootstrap-db.sh`.
+#
+# Every `sql/keelbase-*.sql` appears here exactly once, in one of three states:
+#
+#   load      applied by step 4 of `bootstrap-db.sh`, in this file's order. **The order is the
+#             dependency order**: a parent menu before its children, a directory's grant before the
+#             pages under it.
+#   separate  run by its own step — it takes a parameter (`origin`), or cannot sit in that loop.
+#   skip      not needed by this deployment. A reason is mandatory after `#`; a skip without one reads
+#             as an unclassified file.
+#
+# A new `sql/keelbase-*.sql` that is not classified here ⇒ `scripts/check-seed-list.mjs` is red. A
+# manifest entry naming a file that does not exist ⇒ red too. The check also holds that any file
+# seeding a menu row for a keelbase-ui page is on `load`, and that the top-level paths `load` lays are
+# on the keep list in `module-scope.sql`.
+
+# ---------------------------------------------------------------------------
+# load — applied in this order / 按此顺序导入
+# ---------------------------------------------------------------------------
+
+# 业务模块的表：crm 与产品目录（本部署的两个业务面）。
+# Tables for the business modules: crm and the product catalogue (this deployment's two business faces).
+load keelbase-crm.sql
+load keelbase-products.sql
+
+# AI 助手管理台：先 ai1 自己的表，再常驻 agent（agent 行引用 provider/model），再抽屉的父级与权限，
+# 最后管理台的菜单行。
+# Assistant console: ai1's own tables first, then the resident agent (its rows reference provider/model),
+# then the drawer's parent and permissions, then the console's menu rows.
+load keelbase-ai1.sql
+load keelbase-assistant-agent.sql
+load keelbase-assistant-role-grants.sql
+load keelbase-assistant-menus.sql
+
+# 治理控制台：先目录 `20001`，再目录的授予，再各页。子项没有父项可挂就进不了侧栏；普通角色没有授予
+# 就只看得到 super_admin 的那一份。
+# Governance console: the directory `20001` first, then its grants, then the pages. A child with no
+# parent to hang from stays out of the sidebar; without the grants the ordinary role sees only what
+# `super_admin` sees.
+load keelbase-governance-menus.sql
+load keelbase-governance-menu-grants.sql
+load keelbase-boundary-menu.sql
+load keelbase-trace-menu.sql
+load keelbase-showcase-menu.sql
+load keelbase-tool-inventory-menu.sql
+load keelbase-operation-audit-menu.sql
+load keelbase-policy-menu.sql
+
+# 本部署显示的名字，以及让操作日志能记「没有登录用户」（PostgreSQL 不接受上游的 NOT NULL）。
+# The names this deployment shows, and letting the operation log record "no login user" (PostgreSQL
+# refuses upstream's NOT NULL).
+load keelbase-brand-names.sql
+load keelbase-operate-log-nullable.sql
+
+# ---------------------------------------------------------------------------
+# separate — run by their own step / 由各自的步骤跑
+# ---------------------------------------------------------------------------
+
+# 第 6 步：上传存储（要 `origin`）。Step 6: the upload store (takes `origin`).
+separate keelbase-file-storage.sql
+
+# 第 4b 步：把指向厂商文件服务器的行改掉（要 `origin`）。曾同时列在 `load` 里，循环不带参数 ⇒ 冷启动
+# 在第 4 步就断。Step 4b: repoint rows that live on the vendor's file server (takes `origin`). It was
+# once on `load` too; the loop passed no parameter, so a cold bootstrap stopped at step 4.
+separate keelbase-local-images.sql
+
+# ---------------------------------------------------------------------------
+# skip — not needed by this deployment / 本部署不需要（理由必填）
+# ---------------------------------------------------------------------------
+
+# `ai` 模块不在本部署的 jar 里；它上游的那些菜单行由 `module-scope.sql` 第 5 步整支停用。
+# 无理由或理由为空 ⇒ 检查红。
+# Module `ai` is not in this deployment's jar; its upstream menu rows are switched off wholesale by
+# step 5 of `module-scope.sql`. An empty reason ⇒ red.
+skip keelbase-ai.sql # 模块 ai 不在部署 jar 里，菜单由 module-scope 整支停用 | module ai is not in the deployment jar; module-scope switches its menus off wholesale
+skip keelbase-ai-app-surface-off.sql # 同上：该模块的菜单已被整支停用，这一份只关其中几页 | same: the module's menus are off wholesale, so switching off individual pages adds nothing
+
+# ⚠ 待裁，不是已裁：部署 README 说 jar 含 `bpm`，而 `module-scope.sql` 的保留清单没有 `/bpm`。
+# 两者只能有一个对。若 `bpm` 是展示模块 ⇒ 本文件要加这一份，保留清单也要加 `/bpm`。
+# ⚠ Undecided, not decided: the deployment README says the jar carries `bpm`, while the keep list in
+# `module-scope.sql` has no `/bpm`. Only one can be right. If `bpm` is a shown module ⇒ this file adds
+# this entry, and the keep list adds `/bpm`.
+skip keelbase-bpm.sql # 待裁：README 说 jar 含 bpm，保留清单却不留 /bpm；未裁前不导入 | UNDECIDED: README says the jar carries bpm, the keep list has no /bpm; not loaded until decided
+
+# 样例业务数据：它自己的文件头写明**带外灌入、不进部署引导**。
+# Sample business data: its own header says it is loaded out of band, not by the bootstrap.
+skip keelbase-demo-data.sql # 样例数据，文件头写明带外灌入、不进引导 | sample data; its header says out of band, not in the bootstrap
+
+# 以下模块不在本部署的 jar 里（部署 README：五模块 system/infra/bpm/crm/ai1-springai）。它们的建表
+# 种子不导入；导入了只会种出没有模块的菜单与空表。
+# The modules below are not in this deployment's jar (deployment README: the five modules system,
+# infra, bpm, crm, ai1-springai). Their table seeds are not loaded; loading them would only plant menus
+# and empty tables for modules that are not there.
+#
+# `fms` 单独标一句：roadmap 的 `YD-41` 行曾把它写成第六个模块，而部署 README 与 module-scope 都不含它
+# —— 与 bpm 同一条待裁项的反面。
+# `fms` gets its own note: the `YD-41` roadmap line once called it a sixth module, while the deployment
+# README and module-scope both exclude it — the other side of the same undecided item as bpm.
+skip keelbase-fms.sql # 模块 fms 不在部署 jar 里（与 roadmap 原文冲突，见上） | module fms is not in the deployment jar (conflicts with the roadmap line; see above)
+skip keelbase-hrm.sql # 模块 hrm 不在部署 jar 里 | module hrm is not in the deployment jar
+skip keelbase-oa.sql # 模块 oa 不在部署 jar 里 | module oa is not in the deployment jar
+skip keelbase-pms.sql # 模块 pms 不在部署 jar 里 | module pms is not in the deployment jar
+skip keelbase-report.sql # 模块 report 不在部署 jar 里 | module report is not in the deployment jar
+
+# 只动 pms 的菜单（pms 不部署），以及厂商外链菜单 —— 后者是顶级路径，`module-scope.sql` 第 5 步已经
+# 按「不在保留清单里」把它停用。
+# Touches only pms menus (pms is not deployed), and the vendor's external-link menus — the latter are
+# top-level paths, already switched off by step 5 of `module-scope.sql` as "not on the keep list".
+skip keelbase-menus-without-pages.sql # 只涉及 pms（不部署）与顶级外链；后者由 module-scope 停用 | only pms (not deployed) and top-level vendor links; module-scope already disables the latter
+
+# 只改显示名（监控菜单与一条 infra 配置），不决定页面能不能到。
+# Display names only (the monitor menu and one infra config); page reachability does not depend on it.
+skip keelbase-monitor-rename.sql # 只改显示名，不影响页面可达 | display names only; page reachability does not depend on it
+
+# MySQL 日期分量函数只为 hrm / mes 的 Java 拼接 SQL 而存在；这两个模块都不部署。
+# The MySQL date-part functions exist for Java-built SQL in hrm / mes; neither module is deployed.
+skip keelbase-mysql-compat.sql # 只有 hrm/mes 的 Java 用到；两模块都不部署 | only hrm/mes Java uses them; neither module is deployed

@@ -66,6 +66,11 @@ bash bootstrap-db.sh        # 建库并灌 schema（幂等；RESET=1 重灌）
 docker compose up -d
 ```
 
+`bootstrap-db.sh` 的 `load` 清单来自同目录的 `seed-manifest.txt`。那份清单把**每一份**
+`sql/keelbase-*.sql` 都归类一次 —— `load`、`separate`（由自己的步骤跑，因为它要参数）、或 `skip`
+（带理由）—— 于是新增的种子文件不可能被静默忽略。`node scripts/check-seed-list.mjs` 拿它与 SQL 目录、
+控制台页面和 `module-scope.sql` 对账，已进 CI。页面到底可不可达，仍以从零重建为唯一终判。
+
 服务要一两分钟才起来，日志结尾是 `项目启动成功！`。这样检查：
 
 ```bash

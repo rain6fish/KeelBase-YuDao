@@ -76,6 +76,13 @@ bash bootstrap-db.sh        # create the database and load the schema (idempoten
 docker compose up -d
 ```
 
+`bootstrap-db.sh` takes its `load` list from `seed-manifest.txt` beside it. That manifest classifies
+**every** `sql/keelbase-*.sql` once — `load`, `separate` (run by its own step because it takes a
+parameter), or `skip` (with a reason) — so a new seed file cannot be ignored silently.
+`node scripts/check-seed-list.mjs` holds it against the SQL directory, the console pages and
+`module-scope.sql`, and is part of CI. A from-scratch rebuild is still the only final word on whether
+the pages are reachable.
+
 The server takes a minute or two to come up, and its log ends with `项目启动成功！`. Check it with:
 
 ```bash
