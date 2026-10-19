@@ -102,6 +102,18 @@ public class YudaoAuditReaderRules extends AuthorizationRules {
     }
 
     /**
+     * 调用方是否持有启用的 `audit_reader` 角色——运行时的执行入口守卫也问这一问。
+     *
+     * <p>英文：
+     *
+     * <p>Whether the caller holds an enabled `audit_reader` role — the runtime execution-entry guard
+     * asks the same question.
+     */
+    public boolean isAuditReader(String subject) {
+        return holdsAuditReaderRole(subject);
+    }
+
+    /**
      * 调用方是否持有启用的 `audit_reader` 角色。读不出来即「不持有」——缺一次角色读只会收窄。
      *
      * <p>Whether the caller holds an enabled `audit_reader` role. An unreadable answer is "does not

@@ -140,6 +140,14 @@ jobs:
       - name: The deployment's seed manifest must classify every SQL file and carry every menu it serves
         run: node scripts/check-seed-list.mjs
 
+      # The runtime's `/ai/chat`, `/ai/chat/stream` and `/ai/task` carry no `@PreAuthorize`, and the
+      # engine's gate never consults the rule source. The host closes that entry for the audit reader
+      # itself; this check keeps the guard, the list it reads and its registration from drifting apart.
+      # 运行时的 `/ai/chat`、`/ai/chat/stream` 与 `/ai/task` 没有 `@PreAuthorize`，引擎的闸门也不查规则源。
+      # 宿主自己为审计读者关掉那个入口；这道检查让守卫、它读的清单与它的注册不漂走。
+      - name: The audit reader cannot reach the runtime's AI execution entries
+        run: node scripts/check-audit-reader-execution-guard.mjs
+
   generator:
     name: The generated files are still a Spec's output
     runs-on: ubuntu-latest
