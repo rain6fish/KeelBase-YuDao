@@ -61,6 +61,13 @@ load keelbase-tool-inventory-menu.sql
 load keelbase-operation-audit-menu.sql
 load keelbase-policy-menu.sql
 
+# 只读审计读者（B11）：角色与它在治理读面上的菜单授予。必须排在以上菜单文件之后——授予引用的
+# `20001` 与各页 id 由那些文件落下。接口那半由宿主规则源 `YudaoAuditReaderRules` 供给。
+# Read-only audit reader (B11): the role and its menu grants on the governance read faces. It must come
+# after the menu files above — the `20001` and page ids its grants reference are laid by them. The API
+# half is supplied by the host rule source `YudaoAuditReaderRules`.
+load keelbase-audit-reader.sql
+
 # 本部署显示的名字，以及让操作日志能记「没有登录用户」（PostgreSQL 不接受上游的 NOT NULL）。
 # The names this deployment shows, and letting the operation log record "no login user" (PostgreSQL
 # refuses upstream's NOT NULL).
