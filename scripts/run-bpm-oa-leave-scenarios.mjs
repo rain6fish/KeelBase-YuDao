@@ -67,8 +67,30 @@ const checkNot = (name, forbidden, got) =>
   String(got).includes(forbidden) ? bad(name, `must not contain ${forbidden}`, got) : ok(name);
 const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 
-const psql = (sql) =>
-  execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+// The helper keeps `docker exec` as its default, unchanged. On a host without Docker, set
+// `PSQL_HELPER=direct` (or `local`) to run the client against a PostgreSQL you can reach; `PSQL` names
+// that client and the usual PG* variables (PGHOST / PGPORT / PGUSER / PGPASSWORD) select the endpoint.
+// `PSQL_HELPER=docker` is the same command this gate has always run.
+//
+// psql 助手默认保持原样（`docker exec`）。没有 Docker 的机器上设 `PSQL_HELPER=direct`（或 `local`）直连
+// 一个你能连到的 PostgreSQL；`PSQL` 指定客户端路径，连接信息走常见的 PG* 变量（PGHOST / PGPORT /
+// PGUSER / PGPASSWORD）。`PSQL_HELPER=docker` 就是这道门禁一直跑的那条命令。
+const PSQL = process.env.PSQL || 'psql';
+const PSQL_HELPER = (process.env.PSQL_HELPER || 'docker').toLowerCase();
+const psql = (sql) => {
+  if (PSQL_HELPER === 'docker') {
+    return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+  }
+  if (PSQL_HELPER === 'direct' || PSQL_HELPER === 'local') {
+    return execFileSync(
+      PSQL,
+      ['-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}")`);
+};
 
 // 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
 // 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
