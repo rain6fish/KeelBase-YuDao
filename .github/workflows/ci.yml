@@ -141,11 +141,13 @@ jobs:
         run: node scripts/check-seed-list.mjs
 
       # The runtime's `/ai/chat`, `/ai/chat/stream` and `/ai/task` carry no `@PreAuthorize`, and the
-      # engine's gate never consults the rule source. The host closes that entry for the audit reader
-      # itself; this check keeps the guard, the list it reads and its registration from drifting apart.
+      # engine's gate never consults the rule source. The AI module's send route has the same shape, and
+      # AI1's session stream assembles tools. The host closes those entries for the audit reader itself;
+      # this check keeps the guard, the list it reads and its registration from drifting apart.
       # 运行时的 `/ai/chat`、`/ai/chat/stream` 与 `/ai/task` 没有 `@PreAuthorize`，引擎的闸门也不查规则源。
-      # 宿主自己为审计读者关掉那个入口；这道检查让守卫、它读的清单与它的注册不漂走。
-      - name: The audit reader cannot reach the runtime's AI execution entries
+      # AI 模块的发送路由同一形状，AI1 的会话流会装配工具。宿主自己为审计读者关掉这些入口；这道检查让守卫、
+      # 它读的清单与它的注册不漂走。
+      - name: The audit reader cannot reach any AI execution entry
         run: node scripts/check-audit-reader-execution-guard.mjs
 
   generator:

@@ -20,9 +20,19 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 等仍是该角色的正当射程。角色读不出来时 `YudaoAuditReaderRules` 按「不持有」处理，故守卫失败即放行给运行时
  * 自己的身份处理；这一取舍与规则源一致——缺一次角色读只会收窄规则，不会在这里凭空放大权限。
  *
+ * <p>清单里还有宿主自己的 AI 执行形状：AI 模块的 `/admin-api/ai/chat/message/send`（及其流式兄弟）
+ * **没有** {@code @PreAuthorize}，却把角色的工具回调交给模型；AI1 的
+ * `/admin-api/ai1/session/message/send-stream` 会装配 MCP、SKILL 与受治理的本地工具。它们出于同一个理由、
+ * 由同一个开关拒绝。
+ *
  * <p>英文：
  *
  * <p>Keeps the audit reader out of the runtime's <b>tool-executing</b> entries.
+ *
+ * <p>The list also carries the host's own AI execution shapes: the AI module's
+ * `/admin-api/ai/chat/message/send` (and its stream) hands a role's tool callbacks to the model with no
+ * `@PreAuthorize`, and AI1's `/admin-api/ai1/session/message/send-stream` assembles MCP, SKILL and
+ * governed local tools. They are refused for the same reason and by the same switch.
  *
  * <p>Why the host must do it: the runtime's `/ai/chat` (and its streaming sibling `/ai/chat/stream` and
  * the multi-step `/ai/task`) carry **no** {@code @PreAuthorize}, and the engine's gate decides on risk

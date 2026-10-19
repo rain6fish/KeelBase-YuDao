@@ -72,7 +72,17 @@ const list = (source, name) => {
 }
 const executionPaths = list(config, 'EXECUTION_PATHS')
 const decisionPrefixes = list(config, 'DECISION_PREFIXES')
-for (const path of ['/ai/chat', '/ai/chat/stream', '/ai/task']) {
+for (const path of [
+  '/ai/chat',
+  '/ai/chat/stream',
+  '/ai/task',
+  // 宿主自己的 AI 执行形状（2026-10-19 全扫）：AI 模块的发送口径没有 @PreAuthorize，
+  // AI1 的会话流会装配工具。 / The host's own AI execution shapes (2026-10-19 sweep): the AI
+  // module's send has no @PreAuthorize, and AI1's session stream assembles tools.
+  '/admin-api/ai/chat/message/send',
+  '/admin-api/ai/chat/message/send-stream',
+  '/admin-api/ai1/session/message/send-stream'
+]) {
   if (!executionPaths.includes(path)) fail(`EXECUTION_PATHS 少了 ${path}`)
 }
 for (const prefix of ['/ai/confirmations', '/ai/my/confirmations']) {
