@@ -151,12 +151,12 @@ jobs:
           java-version: '25'
           cache: maven
       # `gen-from-spec.sh` resolves a JDK 25 for the one command; on a runner the toolchain is already
-      # 25, so it is handed that home explicitly rather than letting its own resolver fall through to
-      # its last option (which fetches a Windows build). Both checks are **offline**: `--check`
-      # compares what the generator would write against what is committed, and `--check-boundary`
-      # proves the two generated namespaces hold generated files and nothing else.
+      # 25, so it is handed that home explicitly rather than letting the resolver download its own
+      # copy (the download is the fallback, not the preferred path). Both checks are **offline**:
+      # `--check` compares what the generator would write against what is committed, and
+      # `--check-boundary` proves the two generated namespaces hold generated files and nothing else.
       # `gen-from-spec.sh` 为那一条命令解析一个 JDK 25；runner 上工具链本就是 25，故**显式**把这个 home 交给它，
-      # 免得它自己的解析器落到最后一档（那一档取的是 **Windows** 构建）。两道检查都是**离线**的：`--check`
+      # 而不是让它自己去下载一份（下载是**兜底**，不是首选路径）。两道检查都是**离线**的：`--check`
       # 拿「生成器会写的」比对已提交的，`--check-boundary` 证明两个生成命名空间里只有生成物、没有别的。
       - name: A Spec's output must match what is committed
         run: KEELBASE_JDK25="$JAVA_HOME" bash scripts/gen-from-spec.sh specs/products.json --check
@@ -271,11 +271,11 @@ jobs:
           PG_PASSWORD: password
         run: |
           set -euo pipefail
-          # `run-server.sh` goes through `jdk25.sh`, whose resolver would otherwise fall through to its
-          # last option and fetch a **Windows** build on this Linux runner — the same trap the
-          # `generator` job documents. Handing it the runner's own JDK 25 home is the fix.
-          # `run-server.sh` 经 `jdk25.sh`，而它的解析器否则会落到最后一档、在这台 Linux runner 上取一个
-          # **Windows** 构建 —— 与 `generator` job 记载的是同一个坑。把 runner 自己的 JDK 25 home 交给它。
+          # `run-server.sh` goes through `jdk25.sh`. The runner already has a JDK 25, so hand it that
+          # home: the resolver would otherwise download a second copy. The download branch itself is
+          # platform-aware, but it is the fallback, and CI should not depend on it.
+          # `run-server.sh` 经 `jdk25.sh`。runner 上本就有 JDK 25，故把这个 home 交给它：否则解析器会
+          # 再下载一份。下载那一档本身已按平台区分，但它是**兜底**，CI 不该依赖它。
           KEELBASE_JDK25="$JAVA_HOME" bash scripts/run-server.sh > host.log 2>&1 &
           echo $! > host.pid
           for i in $(seq 1 150); do

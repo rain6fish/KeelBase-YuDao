@@ -19,9 +19,33 @@ bash scripts/jdk25.sh                     # report the resolved JDK, change noth
 bash scripts/jdk25.sh java -version       # run one command on 25
 ```
 
-Resolution order, first hit wins: `$KEELBASE_JDK25` → `$JDK25_HOME` → `/d/Develop/jdk-25` → download
-from the Adoptium API into `${KEELBASE_JDK25_DIR:-/d/Develop}`. Nothing is installed unless all three
-existing locations fail.
+Resolution order, first hit wins: `$KEELBASE_JDK25` → `$JDK25_HOME` →
+`$KEELBASE_JDK25_DIR/jdk-25` → `/d/Develop/jdk-25` → download. The directory a download lands in is
+itself part of that order, so the download happens **once**; set `KEELBASE_JDK25_DIR` to choose it
+(the default is `$HOME/.keelbase/jdk25`). Nothing is installed unless the first four all fail.
+
+### On a clean machine
+
+A stranger needs `bash`, `curl`, and `unzip` (or `tar`) — all of them ship with Git for Windows, and
+all are on the Ubuntu runners this repository's CI uses. Nothing is installed by hand, and nothing
+global is changed:
+
+```bash
+bash scripts/jdk25.sh                      # downloads Temurin 25 if the machine has none
+bash scripts/jdk25.sh java -version        # prints 25.0.x from the resolved home
+```
+
+The download asks the Adoptium API for a **Temurin 25** build matching the machine:
+
+| OS | `uname -s` matches | archive | `uname -m` → Adoptium arch |
+|---|---|---|---|
+| Windows (Git Bash) | `MINGW*` / `MSYS*` / `CYGWIN*` | zip | `x86_64` → `x64`; `arm64` → `aarch64` |
+| Linux | `Linux` | tar.gz | same |
+| macOS | `Darwin` | tar.gz | same |
+
+It then checks that the unpacked JDK reports version 25 before returning it, so a wrong artifact
+aborts instead of being handed to the build. **CI does not exercise this branch** — it passes the
+runner's own JDK 25 through `KEELBASE_JDK25`, which is also how to reuse an existing installation.
 
 **Why not just install it system-wide:** the core's own rule is that its products build on Java 17.
 This host is the exception, so the exception is scoped to the commands that need it.
@@ -33,7 +57,8 @@ bash scripts/jdk25.sh mvn -pl yudao-server -am -DskipTests -Dmaven.test.skip=tru
 ```
 
 `-pl yudao-server -am` builds the server and what it depends on, and skips the fifteen business modules
-that are not wired into the server. The artifact is a fat jar under `yudao-server/target/`.
+that are not wired into the server. The artifact is a fat jar under `yudao-server/target/`. This
+assumes `mvn` is on `PATH`; the datastore below additionally needs Docker.
 
 ## Run
 

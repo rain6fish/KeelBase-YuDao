@@ -18,8 +18,30 @@ bash scripts/jdk25.sh                     # 报告解析到的 JDK，什么都�
 bash scripts/jdk25.sh java -version       # 用 25 跑一条命令
 ```
 
-解析顺序，**先成的胜出**：`$KEELBASE_JDK25` → `$JDK25_HOME` → `/d/Develop/jdk-25` → 从 Adoptium API
-下载到 `${KEELBASE_JDK25_DIR:-/d/Develop}`。**前三处只要有一处成立，就不装任何东西。**
+解析顺序，**先成的胜出**：`$KEELBASE_JDK25` → `$JDK25_HOME` → `$KEELBASE_JDK25_DIR/jdk-25` →
+`/d/Develop/jdk-25` → 下载。**下载落到哪个目录，本身就在这条顺序里**，故下载只发生**一次**；要换地方就设
+`KEELBASE_JDK25_DIR`（默认 `$HOME/.keelbase/jdk25`）。**前四处只要有一处成立，就不装任何东西。**
+
+### 在一台干净机器上
+
+只需要 `bash`、`curl`，以及 `unzip`（或 `tar`）——它们都随 Git for Windows 一起装好，本仓 CI 用的 Ubuntu
+runner 上也都有。**没有一样要手工装，也没有一样是全局改动**：
+
+```bash
+bash scripts/jdk25.sh                      # 机器上没有就下载 Temurin 25
+bash scripts/jdk25.sh java -version        # 报出解析到的 home 里的 25.0.x
+```
+
+下载会按机器向 Adoptium API 要一个 **Temurin 25** 构建：
+
+| 系统 | `uname -s` 命中 | 归档 | `uname -m` → Adoptium 架构 |
+|---|---|---|---|
+| Windows（Git Bash） | `MINGW*` / `MSYS*` / `CYGWIN*` | zip | `x86_64` → `x64`；`arm64` → `aarch64` |
+| Linux | `Linux` | tar.gz | 同上 |
+| macOS | `Darwin` | tar.gz | 同上 |
+
+解包后还会核对它报的是不是 25，**不符就中止**，而不是把一个错的 JDK 交给构建。**CI 不走这一档**——它把
+runner 自己的 JDK 25 经 `KEELBASE_JDK25` 递进去；想复用已有安装时也是这个办法。
 
 **为什么不干脆装成系统级**：核心自己的规矩是它的产物基线 Java 17。本宿主是那个例外，所以例外被**限制在
 需要它的那些命令里**。
@@ -31,7 +53,7 @@ bash scripts/jdk25.sh mvn -pl yudao-server -am -DskipTests -Dmaven.test.skip=tru
 ```
 
 `-pl yudao-server -am` 构建服务端及其依赖，跳过那十五个没接进服务端的业务模块。产物是
-`yudao-server/target/` 下的 fat jar。
+`yudao-server/target/` 下的 fat jar。这一步假定 `mvn` 在 `PATH` 上；下面的数据存储另需 Docker。
 
 ## 运行
 
