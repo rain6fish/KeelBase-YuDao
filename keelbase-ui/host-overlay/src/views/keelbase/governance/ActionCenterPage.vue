@@ -29,6 +29,10 @@
       </el-button>
     </template>
 
+    <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
+    <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
+    <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.actionCenter') }}</div>
+
     <div v-if="pendingLoading && !pending.length" class="text-[var(--el-text-color-secondary)]">
       {{ t('keelbase.common.loading') }}
     </div>

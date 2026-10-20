@@ -13,6 +13,9 @@
   底线那半（`stated`）不可能由一次运行**推出** —— 它是设计事实：运行时的缝扣住哪五样；上游那条路今天为什么
   无害（本构建里唯一的 `ToolCallback` bean 是上游自己的示例），以及它**离「不再无害」只差一个 `@Bean`**。
   门禁只能**确认**它。页面上如实画出来，包括那句「只差一个 bean」的告诫。
+  `stated.paths`（`D57`）再把**每一条 AI 路径**的治理姿态、缺口与**代码出处**列成一张表：运行时那条缝、
+  `D42` 上游解析器路、`D44`-B 的 ai1 MCP、SKILL、ai1 RAG —— 五条各自「扣住什么、扣不住什么」都在这里，
+  不留「默认没写 = 已覆盖」。
 
   Which AI paths this build's governance holds, and which it does not.
 
@@ -64,23 +67,39 @@
         {{ t('keelbase.boundary.excluded', { paths: boundary.computed.scope.excludedPaths.join(', ') }) }}
       </div>
 
-      <!-- 运行时扣住的那些 / what the runtime's seam holds -->
-      <div class="font-medium mb-4px">{{ t('keelbase.boundary.heldTitle') }}</div>
-      <div class="text-12px mb-6px">{{ t('keelbase.boundary.heldWhat') }}</div>
-      <el-tag v-for="h in boundary.stated.held.holds" :key="h" size="small" effect="plain" class="mr-6px">
-        {{ t(`keelbase.boundary.holds.${h}`) }}
-      </el-tag>
-
-      <!-- 它扣不住的 / the path it does not hold -->
-      <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.notHeldTitle') }}</div>
-      <div class="text-12px mb-4px">{{ t('keelbase.boundary.notHeldWhat') }}</div>
-      <div class="text-12px text-[var(--el-text-color-secondary)] mb-6px">{{ t('keelbase.boundary.notHeldWhy') }}</div>
-      <el-alert
-        v-if="boundary.stated.notHeld.oneBeanAway"
-        type="warning"
-        :closable="false"
-        :title="t('keelbase.boundary.notHeldOneBean')"
-      />
+      <!-- 每条 AI 路径及其治理姿态 —— `stated.paths` 是设计事实，页面只画、不重算。 -->
+      <!-- Every AI path and its posture — `stated.paths` is a design fact; the page only draws it. -->
+      <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.pathsTitle') }}</div>
+      <div class="text-12px mb-6px">{{ t('keelbase.boundary.pathsWhat') }}</div>
+      <el-table :data="boundary.stated.paths" stripe>
+        <el-table-column :label="t('keelbase.boundary.colPath')" min-width="190">
+          <template #default="{ row }">{{ t(`keelbase.boundary.path.${row.id}`) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('keelbase.boundary.colPosture')" width="170">
+          <template #default="{ row }">
+            <el-tag :type="postureTagType(row.posture)" size="small">{{ t(`keelbase.boundary.posture.${row.posture}`) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('keelbase.boundary.colHolds')" min-width="220">
+          <template #default="{ row }">
+            <el-tag v-for="h in row.holds" :key="h" size="small" effect="plain" class="mr-4px mb-4px">
+              {{ t(`keelbase.boundary.holds.${h}`) }}
+            </el-tag>
+            <span v-if="!row.holds.length" class="text-12px text-[var(--el-text-color-secondary)]">
+              {{ t('keelbase.boundary.none') }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('keelbase.boundary.colGap')" min-width="300">
+          <template #default="{ row }">{{ t(`keelbase.boundary.gap.${row.gap}`) }}</template>
+        </el-table-column>
+        <!-- 代码出处（`文件:行`）与产物同源，读者可自己核对。 / the code coordinates, from the same record. -->
+        <el-table-column :label="t('keelbase.boundary.colSource')" min-width="260">
+          <template #default="{ row }">
+            <div v-for="s in row.sources" :key="s" class="text-12px text-[var(--el-text-color-secondary)]">{{ s }}</div>
+          </template>
+        </el-table-column>
+      </el-table>
 
       <!-- 会绕过它的 bean：有才画，且是这一页唯一「坏了」的样子 / only when there are any -->
       <template v-if="boundary.computed.offenders.length">
@@ -105,6 +124,16 @@ const { t } = useI18n()
 
 /** The record, as the gate writes it. Identifiers and enums only — no prose, in any language. */
 /** 那份记录，如门禁所写。只有标识与枚举 —— 任何一种语言的散文都不在里面。 */
+type PathRow = {
+  id: 'runtime-seam' | 'upstream-resolver' | 'ai1-mcp' | 'ai1-skill' | 'ai1-rag'
+  posture: 'governed' | 'partially-governed' | 'not-governed'
+  holds: string[]
+  doesNotHold: string[]
+  gap: 'none' | 'one-bean-away' | 'declaration-quality' | 'shell-on-host' | 'retrieval-unlogged'
+  /** 代码出处（`文件:行`）—— 与产物同源，读者可核对。 / code coordinates (`file:line`), from the same record. */
+  sources: string[]
+}
+
 type Boundary = {
   schema: string
   computed: {
@@ -117,7 +146,15 @@ type Boundary = {
   stated: {
     held: { id: string; holds: string[] }
     notHeld: { id: string; whyHarmlessNow: string; oneBeanAway: boolean }
+    paths: PathRow[]
   }
+}
+
+/** 姿态 → 标签颜色：受治理绿、部分受治理黄、未纳入红。 / posture → tag colour. */
+function postureTagType(posture: PathRow['posture']): 'success' | 'warning' | 'danger' {
+  if (posture === 'governed') return 'success'
+  if (posture === 'partially-governed') return 'warning'
+  return 'danger'
 }
 
 const boundary = ref<Boundary | null>(null)

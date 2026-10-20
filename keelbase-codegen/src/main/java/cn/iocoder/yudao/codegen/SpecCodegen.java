@@ -208,7 +208,16 @@ public final class SpecCodegen {
             // declaration catch up with fact — not one of the check's judgements is relaxed; it merely now
             // knows these two files exist.
             "sql/keelbase-assistant-menus.sql",
-            "sql/keelbase-boundary-menu.sql");
+            "sql/keelbase-boundary-menu.sql",
+            // 审计读者的授予文件（`sql/keelbase-audit-reader.sql`，`839044a3b8` 引入、`3374c3be4d` 补授边界页）
+            // 同样是手写、任何 Spec 都不产出；引入时漏了在此声明，边界检查自那时起把它判成 UNDECLARED。
+            // 补声明 = 让声明**追上事实**；判据未松。
+            //
+            // The audit reader's grants (`sql/keelbase-audit-reader.sql`, landed in `839044a3b8`, with the
+            // boundary page added in `3374c3be4d`) are hand-written too and produced by no Spec; they were
+            // not declared when they landed, so the check has called the file UNDECLARED ever since.
+            // Declaring it lets the declaration catch up with fact; no judgement is relaxed.
+            "sql/keelbase-audit-reader.sql");
 
     private SpecCodegen() {
     }

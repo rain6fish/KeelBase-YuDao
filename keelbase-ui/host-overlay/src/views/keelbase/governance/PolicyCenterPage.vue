@@ -38,6 +38,9 @@
     <!-- Said on the page: what this document can and cannot say, and that saving replaces all of it. -->
     <!-- 写在页面上：这份文档能说什么、不能说什么，以及保存会替换掉它的全部。 -->
     <div class="note">{{ t('keelbase.policy.note') }}</div>
+    <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
+    <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
+    <div class="note">{{ t('keelbase.coverage.policy') }}</div>
 
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
 

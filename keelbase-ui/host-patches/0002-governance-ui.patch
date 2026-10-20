@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,305 @@
+@@ -1,4 +1,343 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -126,7 +126,34 @@ index 96269a8..2611a9b 100644
 +        identity: 'acting identity',
 +        confirmation: 'confirmation',
 +        audit: 'audit rows',
++        refusal: 'refusal',
 +        'side-effect-ledger': 'side-effect ledger',
++      },
++      pathsTitle: 'Every AI path and its posture',
++      pathsWhat: 'The runtime seam is the governed baseline; the four paths below it are the ones D57 names. Each row states what governance holds, what it does not, and the known gap.',
++      colPath: 'Path',
++      colPosture: 'Posture',
++      colHolds: 'What it holds',
++      colGap: 'Known gap',
++      colSource: 'Source (file:line)',
++      path: {
++        'runtime-seam': 'Runtime seam',
++        'upstream-resolver': 'Upstream model→tool resolver',
++        'ai1-mcp': 'ai1 MCP tools',
++        'ai1-skill': 'ai1 SKILL tools',
++        'ai1-rag': 'ai1 RAG retrieval',
++      },
++      posture: {
++        governed: 'Governed',
++        'partially-governed': 'Partially governed',
++        'not-governed': 'Not governed',
++      },
++      gap: {
++        none: 'No known gap',
++        'one-bean-away': 'Harmless today only because no tool callback bean of ours exists; one such bean would put this path beyond every check.',
++        'declaration-quality': 'Write refusal covers only tools that explicitly declare themselves writes; confirmation and the side-effect ledger are not on this path.',
++        'shell-on-host': 'No identity, audit, confirmation or refusal; its shell tool runs commands on this host.',
++        'retrieval-unlogged': 'Retrieval writes no audit row, including the advisor’s own search.',
 +      },
 +      notHeldTitle: 'Not held by it',
 +      notHeldWhat: "Upstream's own path: chat resolves a role's tool ids through Spring AI's own resolver and hands the callbacks to the model. This line's governance does not see it.",
@@ -138,6 +165,17 @@ index 96269a8..2611a9b 100644
 +      none: 'none',
 +      missing: 'This build carries no boundary record — the UI was laid down without it',
 +      loadFailed: 'The boundary could not be read',
++    },
++    // 每个审计页顶部的一句覆盖声明：只说**这张面读到哪、哪些 AI 路径它到不了**。
++    // One coverage statement per audit page: what that face reads, and which AI paths it cannot reach.
++    coverage: {
++      auditChain: 'This page does not cover: the SKILL tools and ai1 RAG retrieval (they write no audit rows), or the upstream resolver path (it does not pass through this governance).',
++      opAudit: 'This page does not cover: the AI audit rows (a separate chain), or the SKILL shell/file execution, ai1 RAG retrieval, ai1 MCP calls and the upstream resolver path — none of them writes a business operation log.',
++      toolInventory: 'This page does not cover: the ai1 MCP tools discovered per agent, the shell/file tools SKILL assembles, ai1 RAG retrieval, or the upstream resolver path — none is in the governed tool inventory.',
++      trace: 'This page does not cover: tool calls, confirmation decisions and side effects (they carry no conversation link here), or the SKILL, ai1 RAG and upstream resolver paths.',
++      actionCenter: 'This page does not cover: ai1 MCP calls (no engine, no confirmation, no side-effect ledger), the SKILL tools, ai1 RAG retrieval, or the upstream resolver path.',
++      effectsLedger: 'This page does not cover: ai1 MCP calls (no ledger row), the files and shell commands SKILL writes, ai1 RAG retrieval, or the upstream resolver path.',
++      policy: 'This page does not cover: the ai1 MCP, SKILL, ai1 RAG and upstream resolver paths — their tools are outside this policy’s scope.',
 +    },
 +    trace: {
 +      title: 'Conversation trace',
@@ -312,7 +350,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,304 @@
+@@ -1,4 +1,341 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -436,7 +474,34 @@ index 35f1e1a..856d201 100644
 +        identity: '身份代入',
 +        confirmation: '确认门控',
 +        audit: '审计行',
++        refusal: '拒绝',
 +        'side-effect-ledger': '副作用账本',
++      },
++      pathsTitle: '每条 AI 路径及其治理姿态',
++      pathsWhat: '运行时那条缝是受治理的基线；它下面四条是 `D57` 点名的路径 —— 每一行写明治理扣住什么、扣不住什么、以及已知缺口。',
++      colPath: '路径',
++      colPosture: '治理姿态',
++      colHolds: '扣住的',
++      colGap: '已知缺口',
++      colSource: '代码出处（文件:行）',
++      path: {
++        'runtime-seam': '运行时那条缝',
++        'upstream-resolver': '上游模型→工具解析器',
++        'ai1-mcp': 'ai1 MCP 工具',
++        'ai1-skill': 'ai1 SKILL 工具',
++        'ai1-rag': 'ai1 RAG 检索',
++      },
++      posture: {
++        governed: '受治理',
++        'partially-governed': '部分受治理',
++        'not-governed': '未纳入治理',
++      },
++      gap: {
++        none: '无已知缺口',
++        'one-bean-away': '今天无害只因没有我们自己的工具回调 bean；只消一个这样的 bean，这条路就绕过一切检查。',
++        'declaration-quality': '写拒绝只覆盖明确声明自己是写的工具；确认与副作用台账都不在这条路上。',
++        'shell-on-host': '没有身份、审计、确认或拒绝；它的 shell 工具在本机执行命令。',
++        'retrieval-unlogged': '检索不写审计行，包括 Advisor 自己发起的那次检索。',
 +      },
 +      notHeldTitle: '它扣不住的',
 +      notHeldWhat: '上游自己那条路：chat 取角色的 toolIds、经 Spring AI 自己的解析器把 callback 交给模型 —— 本线治理看不见它。',
@@ -448,6 +513,16 @@ index 35f1e1a..856d201 100644
 +      none: '无',
 +      missing: '本构建没有带边界记录 —— 界面是没带它铺下去的',
 +      loadFailed: '读不到这条边界',
++    },
++    // 每个审计页顶部的一句覆盖声明：只说**这张面读到哪、哪些 AI 路径它到不了**。
++    coverage: {
++      auditChain: '本页不覆盖：SKILL 工具与 ai1 RAG 检索（它们不写审计行），以及上游解析器路（它不经本治理）。',
++      opAudit: '本页不覆盖：AI 审计行（另一条链），以及 SKILL 的 shell/文件执行、ai1 RAG 检索、ai1 MCP 调用与上游解析器路 —— 它们都不写业务操作日志。',
++      toolInventory: '本页不覆盖：ai1 按 agent 动态发现的 MCP 工具、SKILL 装配出的 shell/文件工具、ai1 RAG 检索，以及上游解析器路 —— 它们都不在受治理的工具清单里。',
++      trace: '本页不覆盖：工具调用、确认裁决与副作用（它们在这里没有会话链接），以及 SKILL、ai1 RAG 与上游解析器路。',
++      actionCenter: '本页不覆盖：ai1 MCP 调用（不经引擎、无确认、无副作用台账）、SKILL 工具、ai1 RAG 检索，以及上游解析器路。',
++      effectsLedger: '本页不覆盖：ai1 MCP 调用（无台账行）、SKILL 写入的文件与执行的 shell、ai1 RAG 检索，以及上游解析器路。',
++      policy: '本页不覆盖：ai1 MCP、SKILL、ai1 RAG 与上游解析器路 —— 它们的工具不在这份策略的范围内。',
 +    },
 +    trace: {
 +      title: '决策轨迹',

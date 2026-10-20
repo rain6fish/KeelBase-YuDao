@@ -37,6 +37,9 @@
     <!-- Said on the page, not left to be noticed: there is nothing here to filter by. -->
     <!-- 写在页面上、而不是留给读者自己发现：这里没有可按之筛选的东西。 -->
     <div class="note">{{ t('keelbase.opAudit.noFilter') }}</div>
+    <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
+    <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
+    <div class="note">{{ t('keelbase.coverage.opAudit') }}</div>
 
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
     <el-table v-loading="loading" :data="rows" stripe>

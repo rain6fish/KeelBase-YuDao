@@ -154,6 +154,87 @@ const boundary = {
       whyHarmlessNow: 'no-tool-callback-bean-of-ours',
       oneBeanAway: true,
     },
+    // 每一条 AI 路径的治理姿态 —— 运行**推不出来**、只能**确认**的**设计事实**。四路由 `D57` 点名：
+    // `D42` 上游解析器路、`D44`-B（ai1 MCP）、SKILL、ai1 RAG（另加本部署受治理的运行时那条缝作基线）。
+    // 每个条目只带**标识与枚举**：`posture`、`holds` / `doesNotHold`（与 `held.holds` 同一套词）、一个
+    // `gap` 枚举，以及**代码出处** `sources`（`文件:行`）。散文由控制台 i18n 按读者语言给。
+    // 这些姿态的出处（逐条核于 2026-10-20，main `3dbe9a2894`）：
+    //   · runtime-seam —— `YudaoGovernedAgentTools.java:81` 实现 `Ai1LocalToolProvider`，调用经
+    //     `GovernedExecutionEngine`；`GovernedToolFaces.java:30-33` 写明它受确认与审计管住。
+    //   · upstream-resolver —— `GovernedToolFaces.java:30-34` 与 `:74-77` 写明治理看不见它；本文件头
+    //     (`:16-38`) 与 `:152-156` 是那条边界的门禁。
+    //   · ai1-mcp —— `Ai1McpGovernance.java:128` 是切点；`:135-139` 无身份即拒；`:142-148` 明确声明的写即拒；
+    //     `:149-160` 读/执行/失败都写审计；`:30-33` 自己写明**不经引擎、不扣人**。
+    //   · SKILL —— `Ai1SkillToolFactory.java:93` 装配、`:106-109` 造 `ShellTools` / `FileSystemTools`；
+    //     `GovernedToolFaces.java:32-37` / `:74-77` 明说它**一条治理缝都没有**，shell 在本机跑。
+    //   · ai1 RAG —— `Ai1RagTool.java:150` 的 `search` 与 `:202-205` 的 `buildAdvisor`；装配点
+    //     `Ai1SessionStreamTool.java:715-727`。ai1 模块里 0 处 `AuditService` ⇒ 检索没有审计行。
+    //
+    // Every AI path's governance posture — a **design fact** a run can only *confirm*, never derive. The
+    // four paths are named by `D57`: `D42`'s upstream resolver, `D44`-B (ai1 MCP), SKILL and ai1 RAG
+    // (plus this deployment's governed runtime seam as the baseline). Each entry carries identifiers and
+    // enums only: `posture`, `holds` / `doesNotHold` (the same vocabulary as `held.holds`), one `gap`
+    // enum, and `sources` — the code coordinates (`file:line`). The console supplies the prose through
+    // its i18n, in the reader's language. Coordinates were checked on 2026-10-20 against main `3dbe9a2894`.
+    paths: [
+      {
+        id: 'runtime-seam',
+        posture: 'governed',
+        holds: ['authorization', 'identity', 'confirmation', 'audit', 'side-effect-ledger'],
+        doesNotHold: [],
+        gap: 'none',
+        sources: [
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/YudaoGovernedAgentTools.java:81',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/GovernedToolFaces.java:30',
+        ],
+      },
+      {
+        id: 'upstream-resolver',
+        posture: 'not-governed',
+        holds: [],
+        doesNotHold: ['authorization', 'identity', 'confirmation', 'audit', 'refusal', 'side-effect-ledger'],
+        gap: 'one-bean-away',
+        sources: [
+          'scripts/check-ungoverned-tool-beans.mjs:16',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/GovernedToolFaces.java:30',
+        ],
+      },
+      {
+        id: 'ai1-mcp',
+        posture: 'partially-governed',
+        holds: ['identity', 'audit', 'refusal'],
+        doesNotHold: ['authorization', 'confirmation', 'side-effect-ledger'],
+        gap: 'declaration-quality',
+        sources: [
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1McpGovernance.java:128',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1McpGovernance.java:142',
+        ],
+      },
+      {
+        id: 'ai1-skill',
+        posture: 'not-governed',
+        holds: [],
+        doesNotHold: ['authorization', 'identity', 'audit', 'confirmation', 'refusal', 'side-effect-ledger'],
+        gap: 'shell-on-host',
+        sources: [
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/skill/Ai1SkillToolFactory.java:93',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/skill/Ai1SkillToolFactory.java:106',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/GovernedToolFaces.java:32',
+        ],
+      },
+      {
+        id: 'ai1-rag',
+        posture: 'not-governed',
+        holds: [],
+        doesNotHold: ['authorization', 'identity', 'audit', 'confirmation', 'refusal', 'side-effect-ledger'],
+        gap: 'retrieval-unlogged',
+        sources: [
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/rag/Ai1RagTool.java:150',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/rag/Ai1RagTool.java:202',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/session/Ai1SessionStreamTool.java:727',
+        ],
+      },
+    ],
   },
 }
 

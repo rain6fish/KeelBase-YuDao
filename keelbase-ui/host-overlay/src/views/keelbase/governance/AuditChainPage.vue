@@ -59,6 +59,10 @@
       </el-form-item>
     </el-form>
 
+    <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
+    <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
+    <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.auditChain') }}</div>
+
     <div v-if="rowsError" class="text-[var(--el-color-danger)] mb-10px">{{ rowsError }}</div>
     <!-- A description of this page, said as such — the window is all the face gives. -->
     <!-- **本页**的描述，并如实这么说 —— 这条面给的就是一个窗口。 -->

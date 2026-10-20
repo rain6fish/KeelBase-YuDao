@@ -29,6 +29,9 @@
     </template>
 
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
+    <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
+    <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
+    <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.toolInventory') }}</div>
     <el-table v-loading="loading" :data="items" stripe>
       <el-table-column :label="t('keelbase.toolInv.colTool')" width="240">
         <template #default="{ row }">
