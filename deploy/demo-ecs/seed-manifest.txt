@@ -90,12 +90,14 @@ separate keelbase-local-images.sql
 # skip — not needed by this deployment / 本部署不需要（理由必填）
 # ---------------------------------------------------------------------------
 
-# `ai` 模块不在本部署的 jar 里；它上游的那些菜单行由 `module-scope.sql` 第 5 步整支停用。
+# `ai` 模块**仍随 jar 编译**（`D52 ①` 只弃用应用面、不删代码），但它的应用面已关停：菜单由
+# `module-scope.sql` 第 5 步整支停用，HTTP 面由宿主对 `/admin-api/ai/**` 一律答 404 ⇒ 它的表不需要灌。
 # 无理由或理由为空 ⇒ 检查红。
-# Module `ai` is not in this deployment's jar; its upstream menu rows are switched off wholesale by
-# step 5 of `module-scope.sql`. An empty reason ⇒ red.
-skip keelbase-ai.sql # 模块 ai 不在部署 jar 里，菜单由 module-scope 整支停用 | module ai is not in the deployment jar; module-scope switches its menus off wholesale
-skip keelbase-ai-app-surface-off.sql # 同上：该模块的菜单已被整支停用，这一份只关其中几页 | same: the module's menus are off wholesale, so switching off individual pages adds nothing
+# Module `ai` **still ships in the jar** (`D52 ①` deprecates the surface, keeps the code), but that surface
+# is off: step 5 of `module-scope.sql` switches its menus off wholesale, and the host answers every
+# `/admin-api/ai/**` route with 404 ⇒ its tables are not seeded. An empty reason ⇒ red.
+skip keelbase-ai.sql # 模块 ai 仍随 jar 编译，但应用面已关停（菜单整支停用 + /admin-api/ai/** 答 404），表不需要灌 | module ai still ships, but its surface is off (menus disabled wholesale + /admin-api/ai/** answers 404), so its tables are not seeded
+skip keelbase-ai-app-surface-off.sql # 同上：菜单已由 module-scope 整支停用，这一份只关其中几页 | same: module-scope already switches the menus off wholesale, so switching off individual pages adds nothing
 
 # ⚠ 待裁，不是已裁：部署 README 说 jar 含 `bpm`，而 `module-scope.sql` 的保留清单没有 `/bpm`。
 # 两者只能有一个对。若 `bpm` 是展示模块 ⇒ 本文件要加这一份，保留清单也要加 `/bpm`。

@@ -21,6 +21,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * paths are registered" and "which paths are refused" cannot drift apart.
  * `scripts/check-audit-reader-execution-guard.mjs` reconciles the three places (rule source, guard,
  * this registration) statically so the list cannot quietly change.
+ *
+ * <p>本类还注册了已弃用 AI 模块 HTTP 应用面的 404 守卫（`YudaoAiModuleSurfaceGuard`）。它的注册排在审计读者
+ * 守卫**之后**：审计读者先拿到自己的 403，其余调用方才听到「这个面不存在」。
+ *
+ * <p>This class also registers the 404 guard for the deprecated AI module's HTTP surface
+ * (`YudaoAiModuleSurfaceGuard`). It is registered **after** the audit-reader guard, so an audit reader
+ * gets its own 403 first and only the remaining callers hear that the surface does not exist.
  */
 @Configuration
 public class YudaoAuditReaderWebConfig implements WebMvcConfigurer {
@@ -57,9 +64,12 @@ public class YudaoAuditReaderWebConfig implements WebMvcConfigurer {
             "/ai/my/confirmations");
 
     private final YudaoAuditReaderExecutionGuard guard;
+    private final YudaoAiModuleSurfaceGuard aiModuleSurface;
 
-    public YudaoAuditReaderWebConfig(YudaoAuditReaderExecutionGuard guard) {
+    public YudaoAuditReaderWebConfig(YudaoAuditReaderExecutionGuard guard,
+                                     YudaoAiModuleSurfaceGuard aiModuleSurface) {
         this.guard = guard;
+        this.aiModuleSurface = aiModuleSurface;
     }
 
     @Override
@@ -71,5 +81,10 @@ public class YudaoAuditReaderWebConfig implements WebMvcConfigurer {
                         "/admin-api/ai/chat/message/send-stream",
                         "/admin-api/ai1/session/message/send-stream",
                         "/ai/confirmations/**", "/ai/my/confirmations/**");
+        // 顺序有意义：审计读者先在上述注册里拿到自己的 403，其余调用方才在这里听到「这个面不存在」。
+        // Order matters: an audit reader gets its own 403 from the registration above, and only the
+        // remaining callers hear here that the surface does not exist.
+        registry.addInterceptor(aiModuleSurface)
+                .addPathPatterns("/admin-api/ai/**");
     }
 }
