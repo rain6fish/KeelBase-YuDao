@@ -47,6 +47,8 @@
 // `reason`, so the cleanup cannot reach another run's rows either. It does **not** remove audit rows: those
 // are a hash chain, and cutting a link to tidy up after a gate would be a worse act than the untidiness.
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -72,12 +74,32 @@ const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 // that client and the usual PG* variables (PGHOST / PGPORT / PGUSER / PGPASSWORD) select the endpoint.
 // `PSQL_HELPER=docker` is the same command this gate has always run.
 //
+// On a host with **no psql client at all**, set `PSQL_HELPER_SCRIPT` to a psql-shaped Node helper
+// (`scripts/psql-helper.mjs` in this repo). It takes precedence over `PSQL_HELPER`: when it is set the
+// gate runs `node <script> -h … -p … -U … -d … -tAc <sql>` and never calls docker or psql.
+//
 // psql 助手默认保持原样（`docker exec`）。没有 Docker 的机器上设 `PSQL_HELPER=direct`（或 `local`）直连
 // 一个你能连到的 PostgreSQL；`PSQL` 指定客户端路径，连接信息走常见的 PG* 变量（PGHOST / PGPORT /
 // PGUSER / PGPASSWORD）。`PSQL_HELPER=docker` 就是这道门禁一直跑的那条命令。
+//
+// **机器上根本没有 psql 客户端**时，把 `PSQL_HELPER_SCRIPT` 设成一个 psql 形状的 Node 助手（本仓
+// `scripts/psql-helper.mjs`）。它的优先级高于 `PSQL_HELPER`：设了它就只跑
+// `node <script> -h … -p … -U … -d … -tAc <sql>`，既不调 docker 也不调 psql。
 const PSQL = process.env.PSQL || 'psql';
 const PSQL_HELPER = (process.env.PSQL_HELPER || 'docker').toLowerCase();
+const PSQL_HELPER_SCRIPT = process.env.PSQL_HELPER_SCRIPT ? resolve(process.env.PSQL_HELPER_SCRIPT) : '';
+if (PSQL_HELPER_SCRIPT && !existsSync(PSQL_HELPER_SCRIPT)) {
+  throw new Error(`PSQL_HELPER_SCRIPT points to a missing file: ${process.env.PSQL_HELPER_SCRIPT} (resolved ${PSQL_HELPER_SCRIPT})`);
+}
 const psql = (sql) => {
+  if (PSQL_HELPER_SCRIPT) {
+    return execFileSync(
+      process.execPath,
+      [PSQL_HELPER_SCRIPT, '-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
   if (PSQL_HELPER === 'docker') {
     return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
   }
@@ -89,7 +111,7 @@ const psql = (sql) => {
       { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
     ).trim();
   }
-  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}")`);
+  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}"); or set PSQL_HELPER_SCRIPT to a psql-shaped helper`);
 };
 
 // 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
