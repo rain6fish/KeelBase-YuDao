@@ -105,6 +105,14 @@ jobs:
       # 新加的 `@Bean` 会打破的那一条；也正因如此，它不该取决于「谁记得跑」。
       - name: Our tools must not be reachable by a model without KeelBase
         run: node scripts/check-ungoverned-tool-beans.mjs
+      # 那条事实的另一半：上一步看不见 `yudao-module-ai`，故说不出「全构建唯一的工具 `@Bean` 是上游示例」。
+      # `--whole-build` 扫全部模块的生产源码、只放行那一个；多出一个、或它不见了，这一步就红。
+      #
+      # The other half of that fact: the step above cannot see `yudao-module-ai`, so it cannot say the only
+      # tool `@Bean` in the build is upstream's sample. `--whole-build` scans every module's production
+      # sources and allows exactly that one; a second one, or its disappearance, turns this step red.
+      - name: The only tool bean in the whole build is upstream's sample
+        run: node scripts/check-ungoverned-tool-beans.mjs --whole-build
 
   governance-registry:
     name: Every governed module declares itself

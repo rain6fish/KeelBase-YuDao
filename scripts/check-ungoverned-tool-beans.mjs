@@ -6,6 +6,7 @@
 //   node scripts/check-ungoverned-tool-beans.mjs
 //   node scripts/check-ungoverned-tool-beans.mjs --json          # the boundary as data, on stdout
 //   node scripts/check-ungoverned-tool-beans.mjs --emit <path>   # …and written where the UI build reads it
+//   node scripts/check-ungoverned-tool-beans.mjs --whole-build   # re-check the stated fact across every module
 //
 // `--json` / `--emit` exist for `YD-27`: the governance console is supposed to *present* this boundary —
 // which AI paths are held back and which are not — and to do that from **the same computation the gate
@@ -41,6 +42,7 @@
 //   node scripts/check-ungoverned-tool-beans.mjs
 //   node scripts/check-ungoverned-tool-beans.mjs --json          # 边界的数据形态，打到标准输出
 //   node scripts/check-ungoverned-tool-beans.mjs --emit <路径>    # ……并写到 UI 构建要去读的地方
+//   node scripts/check-ungoverned-tool-beans.mjs --whole-build   # 跨全部模块复核那条写明的事实
 //
 // `--json` / `--emit` 是为 `YD-27` 加的：治理控制台要**呈现**这条边界（哪些 AI 路径会被扣下、哪些不会），
 // 且必须由**门禁跑的那同一次计算**给出，而不是旁边手写一段描述。部署物是 jar、没有源码，故边界只能在**构建
@@ -63,6 +65,24 @@
 //   - 读的是**形状**不是名字：`@Bean` 方法的**声明返回类型**交出 `ToolCallback`（或 `FunctionCallback` /
 //     `ToolCallbacks`）。仅仅**返回**一个的方法——`Ai1McpToolFactory.buildTools` 就是——**不是 bean**、永不被按名
 //     解析，**不得**被报出来：本线所倚的那条缝正是走那个方法的。
+//
+// **上面那半条事实现在由 `--whole-build` 复核**（2026-10-20 加）。默认运行只能确认「我们的源码里没有」，推不出
+// 「全构建里唯一的那个是上游示例」—— 因为默认射程**刻意**不含 `yudao-module-ai`。`--whole-build` 扫**全部模块的
+// 生产源码**（`src/main/java`）并对那条事实负责：恰好一个工具 `@Bean`、且它就是白名单里的**上游示例**
+// `AiAutoConfiguration.toolCallbacks`（`ToolCallbacks.from(personService)`，照 MCP client boot-starter 文档写的示例；
+// 不是我们的、不该改，它的存在正是边界所倚的事实）。多出任何一处 ⇒ 非零退出并点名 `文件:行`；连那一处也不见了
+// ⇒ 同样非零（事实变了，要人来重新陈述，而不是让 `stated.notHeld` 悄悄过期）。`--whole-build` 不改变默认运行、
+// `--json` / `--emit` 的任何输出与退出码。
+//
+// **That half of the fact is now re-checked by `--whole-build`** (added 2026-10-20). The default run can only
+// confirm "nothing in our sources"; it cannot derive "the only one in the whole build is upstream's sample",
+// because the default scope deliberately omits `yudao-module-ai`. `--whole-build` scans **every module's
+// production sources** (`src/main/java`) and answers for that fact: exactly one tool `@Bean`, and it is the
+// allow-listed **upstream sample** `AiAutoConfiguration.toolCallbacks` (`ToolCallbacks.from(personService)`,
+// straight from the MCP client boot-starter docs; not ours to change, and its presence is the fact the boundary
+// rests on). Any extra one ⇒ non-zero exit naming `file:line`; the sample disappearing ⇒ also non-zero (the fact
+// changed and a person must restate it, rather than letting `stated.notHeld` go quietly stale). `--whole-build`
+// changes nothing about the default run, `--json` or `--emit`.
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -91,6 +111,120 @@ const walk = (dir) => {
   }
 }
 for (const r of ROOTS) walk(join(ROOT, r))
+
+// ── `--whole-build`: re-check the stated fact ────────────────────────────────────────────────────────
+//
+// `stated.notHeld` below claims "the only `ToolCallback` bean in this build is upstream's own sample".
+// The default scan cannot check that (it deliberately omits `yudao-module-ai`), so this mode does: it
+// reads **every** module's production sources and allows exactly one bean — the one named here.
+//
+// 下面 `stated.notHeld` 声称「本构建里唯一的 `ToolCallback` bean 是上游自己的示例」。默认扫描**刻意**不含
+// `yudao-module-ai`，推不出这条；本模式负责复核：读**全部**模块的生产源码，只放行这里点名的唯一一个。
+const WHOLE_BUILD_ALLOWED = {
+  // 上游的 MCP 示例：`ToolCallbacks.from(personService)`，照 Spring AI MCP client boot-starter 文档写的。
+  // 它属于上游、不归我们改；它的存在正是边界所倚的那条事实。按文件与**方法**放行（行号会漂，故不按行号）。
+  //
+  // Upstream's MCP sample: `ToolCallbacks.from(personService)`, straight from the Spring AI MCP client
+  // boot-starter docs. It is upstream's, not ours to change, and its presence is the fact the boundary
+  // rests on. Allowed by file and **method** — a line number would drift; a method name is the identity.
+  file: 'yudao-module-ai/src/main/java/cn/iocoder/yudao/module/ai/framework/ai/config/AiAutoConfiguration.java',
+  method: 'toolCallbacks'
+}
+
+/** The declaration that starts on `lines[i]`: annotation, modifiers, return type, name, parameters. */
+const declarationAt = (lines, i) => {
+  let decl = ''
+  for (let j = i; j < lines.length && j < i + 15; j += 1) {
+    decl += `${lines[j]}\n`
+    if (/[{;]\s*$/.test(lines[j])) break
+  }
+  return decl
+}
+
+/** The method name in a declaration — annotations (and their arguments) removed first. */
+const methodNameOf = (decl) => {
+  const m = decl.replace(/@[\w.]+(?:\s*\([^)]*\))?/g, ' ').match(/([A-Za-z_$][\w$]*)\s*\(/)
+  return m ? m[1] : null
+}
+
+const runWholeBuild = () => {
+  // Production sources only: a jar carries `src/main/java`, not tests, and the stated fact is about the
+  // build. Directories that are not the build itself are skipped so a stray checkout or copy cannot vote.
+  // 只看生产源码：jar 带的是 `src/main/java` 而不是测试，而那条事实讲的是构建。非构建目录一并跳过，
+  // 免得一份另起的检出或拷贝来投票。
+  const SKIP_DIRS = new Set(['.git', '.claude', 'target', 'node_modules', 'dist', 'build'])
+  const wholeBuildFiles = []
+  const walkWhole = (dir) => {
+    let entries
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      const p = join(dir, e)
+      let st
+      try {
+        st = statSync(p)
+      } catch {
+        continue
+      }
+      if (st.isDirectory()) {
+        if (!SKIP_DIRS.has(e)) walkWhole(p)
+      } else if (e.endsWith('.java')) {
+        const rel = relative(ROOT, p).split('\\').join('/')
+        if (rel.includes('/src/main/java/')) wholeBuildFiles.push({ file: p, rel })
+      }
+    }
+  }
+  walkWhole(ROOT)
+
+  const beans = []
+  for (const { file, rel } of wholeBuildFiles) {
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/)
+    lines.forEach((line, i) => {
+      // An annotation starts the line; `{@code @Bean}` in a javadoc does not. / 注解在行首；javadoc 里的
+      // `{@code @Bean}` 不算。
+      if (!/^\s*@Bean\b/.test(line)) return
+      const decl = declarationAt(lines, i)
+      if (!TOOL_TYPES.test(decl)) return
+      beans.push({ file: rel, line: i + 1, method: methodNameOf(decl) })
+    })
+  }
+
+  const allowed = beans.filter((b) => b.file === WHOLE_BUILD_ALLOWED.file && b.method === WHOLE_BUILD_ALLOWED.method)
+  const extras = beans.filter((b) => !allowed.includes(b))
+
+  console.log(`whole build: ${beans.length} tool @Bean(s) over ${wholeBuildFiles.length} main-source file(s)`)
+  for (const b of allowed) {
+    console.log(`  ALLOWED  ${b.file}:${b.line}  ${b.method}()  — upstream's sample (see the header)`)
+  }
+  for (const b of extras) {
+    console.error(`  UNGOVERNED  ${b.file}:${b.line}  ${b.method}()  <- a @Bean hands tools to Spring AI by name`)
+  }
+
+  if (extras.length > 0) {
+    console.error()
+    console.error(`${extras.length} bean(s) beyond upstream's sample would make tools reachable by a model`
+      + ' without KeelBase seeing the call. Route them through the runtime instead (see YD-T14 / D42).')
+    console.error(`0 ok / ${extras.length} failed`)
+    return 1
+  }
+  if (allowed.length !== 1) {
+    console.error()
+    console.error('the stated fact no longer holds: the allow-listed upstream sample'
+      + ` (${WHOLE_BUILD_ALLOWED.file} ${WHOLE_BUILD_ALLOWED.method}()) is gone or ambiguous;`
+      + ' re-review `stated.notHeld` in this script and the header above.')
+    console.error('0 ok / 1 failed')
+    return 1
+  }
+  console.log('1 ok / 0 failed')
+  return 0
+}
+
+if (process.argv.includes('--whole-build')) {
+  process.exit(runWholeBuild())
+}
 
 const offenders = []
 for (const file of javaFiles) {
