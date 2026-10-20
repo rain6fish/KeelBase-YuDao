@@ -31,6 +31,10 @@
     <!-- 这条保留句属于**页面本身**，不能只写在文件里：一个只见过这个屏幕的读者，也该知道它不是什么。 -->
     <el-alert type="info" :closable="false" class="mb-10px" :title="t('keelbase.showcase.caveat')" />
 
+    <!-- 覆盖声明（`D57`）：这一页驱动运行时那条治理链，但到不了另外四条路；每条的程度分开写。 -->
+    <!-- Coverage statement (`D57`): this page drives the runtime's governed chain but cannot reach the other four paths; each is stated by degree. -->
+    <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.showcase') }}</div>
+
     <div v-if="error" class="text-[var(--el-color-danger)] mb-10px">{{ error }}</div>
     <el-table v-loading="loading" :data="rows" stripe>
       <el-table-column :label="t('keelbase.showcase.colId')" prop="id" width="150" />

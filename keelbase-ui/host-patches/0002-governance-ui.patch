@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,343 @@
+@@ -1,4 +1,344 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -176,6 +176,7 @@ index 96269a8..2611a9b 100644
 +      actionCenter: 'This page does not cover: ai1 MCP calls (no engine, no confirmation, no side-effect ledger), the SKILL tools, ai1 RAG retrieval, or the upstream resolver path.',
 +      effectsLedger: 'This page does not cover: ai1 MCP calls (no ledger row), the files and shell commands SKILL writes, ai1 RAG retrieval, or the upstream resolver path.',
 +      policy: 'This page does not cover: the ai1 MCP, SKILL, ai1 RAG and upstream resolver paths — their tools are outside this policy’s scope.',
++      showcase: 'This page drives the runtime’s governed chain, but does not cover: D44-B (ai1 MCP), which is only partially governed (identity, audit and refusal of declared writes — no confirmation, no side-effect ledger); SKILL, which has no governance seam at all; ai1 RAG retrieval, which writes no audit row; or the D42 upstream resolver path, which this line does not govern.',
 +    },
 +    trace: {
 +      title: 'Conversation trace',
@@ -350,7 +351,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,341 @@
+@@ -1,4 +1,342 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -523,6 +524,7 @@ index 35f1e1a..856d201 100644
 +      actionCenter: '本页不覆盖：ai1 MCP 调用（不经引擎、无确认、无副作用台账）、SKILL 工具、ai1 RAG 检索，以及上游解析器路。',
 +      effectsLedger: '本页不覆盖：ai1 MCP 调用（无台账行）、SKILL 写入的文件与执行的 shell、ai1 RAG 检索，以及上游解析器路。',
 +      policy: '本页不覆盖：ai1 MCP、SKILL、ai1 RAG 与上游解析器路 —— 它们的工具不在这份策略的范围内。',
++      showcase: '本页驱动运行时那条治理链，但本页不覆盖：D44-B（ai1 MCP）—— 它在这里只受部分治理（身份、审计、对明确声明的写拒绝；无确认、无副作用台账）；SKILL —— 它一条治理缝都没有；ai1 RAG 检索 —— 它不写审计行；以及 D42 上游解析器路 —— 本线不治理它。',
 +    },
 +    trace: {
 +      title: '决策轨迹',
