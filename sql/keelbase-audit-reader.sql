@@ -16,12 +16,17 @@
 -- 本宿主没有页面）。工具清单与策略中心与 Java 侧审计读者的读面同形，一并授予；策略的写入口在运行时是
 -- `update`，不在本角色的规则里，故保存会 403。
 --
--- **不授予**：对抗证明（它会驱动运行时、产生执行）、决策轨迹（调用方自己的会话，是应用用户面）、
--- 治理边界（构建事实，非四个读面），以及所有系统管理 / 用户 / 配置菜单。
+-- **不授予**：对抗证明（它会驱动运行时、产生执行）、决策轨迹（调用方自己的会话，是应用用户面），
+-- 以及所有系统管理 / 用户 / 配置菜单。
+--
+-- **治理边界（`20029`）是后补的一页**（2026-10-20，用户裁）：`YD-40` 要求审计面**显式显示「哪条路
+-- 未纳入治理」**，不留「默认没写＝已覆盖」；那一页正是这份证据 —— 它是**构建事实**、不是四个读面之一
+-- （所以它此前列在「不授予」里），而裁定的落点是「审计读者要能核对覆盖声明」。不授予它，任何
+-- 「覆盖声明」都无从被审计读者核对。
 --
 -- 只插、幂等：角色按 `code + tenant` 匹配，授予按「角色 + 菜单」对匹配。父目录 `20001` 与各页
--- `20002` / `20003` / `20004` / `20006` / `20008` / `20009` 由 `keelbase-governance-menus.sql` 与
--- 其后的菜单文件落下，故本文件必须排在它们之后。
+-- `20002` / `20003` / `20004` / `20006` / `20008` / `20009` 由 `keelbase-governance-menus.sql` 落下、
+-- `20029` 由 `keelbase-boundary-menu.sql` 落下，故本文件必须排在它们之后。
 --
 -- Read-only audit reader (B11): one role, and its grants on the governance read faces.
 --
@@ -45,13 +50,19 @@
 -- the policy's write entry is `update`, which this role's rules do not contain, so saving answers 403.
 --
 -- **Not granted**: the security showcase (it drives the runtime and produces executions), the
--- conversation trace (the caller's own conversations, an application-user face), the governance boundary
--- (build facts, not one of the four read faces), and every system / user / configuration menu.
+-- conversation trace (the caller's own conversations, an application-user face), and every system /
+-- user / configuration menu.
+--
+-- **The governance boundary (`20029`) was added later** (2026-10-20, the user's ruling): `YD-40` requires
+-- the audit surface to **say which path is not governed**, with no "unwritten means covered". That page is
+-- the evidence — it is **build facts**, not one of the four read faces (which is why it sat in "Not
+-- granted" until now), and the ruling's landing point is that the audit reader has to be able to check a
+-- coverage statement. Without the grant, no coverage statement can be checked at all.
 --
 -- Inserts only, idempotent: the role matches on `code + tenant`, the grants on the role-and-menu pair.
 -- The parent directory `20001` and the pages `20002` / `20003` / `20004` / `20006` / `20008` / `20009`
--- are laid by `keelbase-governance-menus.sql` and the menu files after it, so this file must run after
--- them.
+-- are laid by `keelbase-governance-menus.sql`, and `20029` by `keelbase-boundary-menu.sql`, so this file
+-- must run after them.
 
 -- 1) 角色本身。数据范围取 5（仅本人）——本角色没有任何业务模块菜单，真正的读面由运行时规则源授予；
 --    若将来误挂一个业务页，这个范围只会收窄，不会放宽。
@@ -128,3 +139,15 @@ FROM system_role r
 WHERE r.code = 'audit_reader' AND r.tenant_id = 1 AND r.deleted = 0
   AND NOT EXISTS (SELECT 1 FROM system_role_menu rm
                   WHERE rm.role_id = r.id AND rm.menu_id = 20009 AND rm.deleted = 0);
+
+-- 9) 治理边界（`20029`）—— 构建事实页；`YD-40`：审计面要能显示「哪条路未纳入治理」。
+--    这是一页**读**：它只呈现构建期产出的边界数据，不驱动任何执行。
+-- 9) The governance boundary (`20029`) — the build-facts page; by `YD-40` the audit surface has to be able
+--    to show which path is not governed. It is a **read**: it renders build-time boundary data and drives
+--    no execution.
+INSERT INTO system_role_menu (id, role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)
+SELECT 20048, r.id, 20029, 'keelbase', now(), 'keelbase', now(), 0, 1
+FROM system_role r
+WHERE r.code = 'audit_reader' AND r.tenant_id = 1 AND r.deleted = 0
+  AND NOT EXISTS (SELECT 1 FROM system_role_menu rm
+                  WHERE rm.role_id = r.id AND rm.menu_id = 20029 AND rm.deleted = 0);
