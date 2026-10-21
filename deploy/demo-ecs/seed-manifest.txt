@@ -68,6 +68,15 @@ load keelbase-policy-menu.sql
 # half is supplied by the host rule source `YudaoAuditReaderRules`.
 load keelbase-audit-reader.sql
 
+# M7 走查读者（非管理员）：角色 `m7_reader`、账号 `m7reader`，以及 CRM 客户 create/update 与助手最短那一组
+# 菜单授予。必须排在以上菜单文件之后——授予引用的 `20001`/`20003`/`20004`/`20007`/`20029` 与
+# `20010`/`20019` 由它们落下。**不改 `common`**：普通角色继续做「无码读者」对照。
+# M7 walkthrough reader (non-admin): the role `m7_reader`, the account `m7reader`, and the shortest grant
+# set for CRM customer create/update plus the assistant. It must follow the menu files above — the ids its
+# grants reference (`20001`/`20003`/`20004`/`20007`/`20029`, `20010`/`20019`) are laid by them. **`common`
+# is untouched**: the ordinary role stays the no-code reader control.
+load keelbase-m7-reader.sql
+
 # 本部署显示的名字，以及让操作日志能记「没有登录用户」（PostgreSQL 不接受上游的 NOT NULL）。
 # The names this deployment shows, and letting the operation log record "no login user" (PostgreSQL
 # refuses upstream's NOT NULL).
