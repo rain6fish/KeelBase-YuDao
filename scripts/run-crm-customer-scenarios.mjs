@@ -152,6 +152,24 @@ async function confirm(token, confirmationToken, decision) {
   return json.data || json;
 }
 
+// 同一个写在 REST 那一侧的回答。**要的是信封里的 `code`，不是 HTTP 状态码**：本宿主把业务性拒绝
+// 也包在 HTTP 200 里（`{"code":403,...}`），故拿状态码断言会把 403 读成 200。本门禁权限那半的要点正是
+// REST 继续答 `403`，而工具路径现在也拒。
+//
+// The REST side of the same write. **It is the envelope's `code`, not the HTTP status**: this host wraps
+// business refusals in HTTP 200 (`{"code":403,...}`), so asserting on the status would read 403 as 200.
+// The point of this gate's permission half is that REST keeps answering `403` while the tool path now
+// refuses too.
+async function restCode(path, token, body) {
+  const res = await fetch(`${HOST}/admin-api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'tenant-id': TENANT, Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+  const json = await res.json().catch(() => null);
+  return typeof json?.code === 'number' ? json.code : res.status;
+}
+
 // What is waiting on this caller.
 //
 // **Read from the runtime's own table, and the reason is reported rather than worked around quietly**:
@@ -174,6 +192,70 @@ async function confirm(token, confirmationToken, decision) {
 // 控制台的「待我确认」页在本部署上打不开。
 const pendingToken = (operatorId) =>
   psql(`select token from confirmation_requests where operator_id = '${operatorId}' and status = 'pending' order by id desc limit 1`) || undefined;
+
+// 按**本轮标记**收束，故别的腿留下的待确认不会被认成这一腿提的那一条。标记在提议自己的入参里。
+//
+// Scoped to **this run's marker**, so a pending row another leg left behind cannot be mistaken for
+// the one this leg proposed. The marker is in the proposal's own arguments.
+const pendingTokenFor = (operatorId, marker) =>
+  psql(`select token from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`
+    + ` and args_json like '%${marker}%' order by id desc limit 1`) || undefined;
+
+/**
+ * 一名**持有 REST 那两个权限码**的调用方：新角色 + 新用户，菜单授予直接按 `crm:customer:create` /
+ * `crm:customer:update` 查出来。它**不是**管理员，故行范围仍然管得住（越权那半要的正是这个）。
+ *
+ * 与 `gatesales` 同样的手法：同名就复用。**不给 `common` 加写权**——那会同时放宽 REST，而本门禁要证的
+ * 恰恰是「REST 拒的，工具也拒」。
+ *
+ * A caller **holding the two REST permission codes**: a new role and user, with the menu grants looked
+ * up from `crm:customer:create` / `crm:customer:update`. It is **not** an administrator, so row scope
+ * still binds it (which is what the cross-row half needs).
+ *
+ * Same approach as `gatesales`: reuse by name. **`common` is not given the write codes** — that would
+ * widen REST too, and this gate exists to show "what REST refuses, the tool refuses".
+ */
+async function ensureCrmWriter(adminToken) {
+  const menuIds = psql("select string_agg(id::text, ',') from system_menu"
+    + " where permission in ('crm:customer:create', 'crm:customer:update') and deleted = 0");
+  let roleId = psql("select id from system_role where code = 'gate_crm_writer' and deleted = 0 limit 1");
+  if (!roleId) {
+    const role = await api('/system/role/create', {
+      method: 'POST', token: adminToken,
+      body: { name: 'gate-crm-writer', code: 'gate_crm_writer', sort: 99, status: 0, remark: 'M7 gate: the REST permission codes, granted' }
+    });
+    if (role.code !== 0) throw new Error(`create writer role -> ${role.code}: ${role.msg}`);
+    roleId = role.data;
+  }
+  await api('/system/permission/assign-role-menu', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), menuIds: menuIds.split(',').map(Number) }
+  });
+  // 新角色的数据范围默认是 `ALL`（1），而 `ALL` 会让行范围那半整条放过——越权那半要的是「有权限、
+  // 但没有这一行」。设成 `SELF`（5），与普通调用方一样被约束到自己的行。
+  //
+  // A new role's data scope defaults to `ALL` (1), and `ALL` makes the row-scope half stand down — the
+  // cross-row half needs "has the permission, does not own the row". Set `SELF` (5), held to its own
+  // rows like the ordinary caller.
+  await api('/system/permission/assign-role-data-scope', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), dataScope: 5, dataScopeDeptIds: [] }
+  });
+  const existing = psql("select id from system_users where username = 'gatecrmwriter' and deleted = 0 limit 1");
+  let id = existing ? Number(existing) : null;
+  if (!id) {
+    const created = await api('/system/user/create', {
+      method: 'POST', token: adminToken,
+      body: { username: 'gatecrmwriter', nickname: 'gatecrmwriter', password: 'gate-pass-1234', deptId: 100, postIds: [] }
+    });
+    if (created.code !== 0) throw new Error(`create writer user -> ${created.code}: ${created.msg}`);
+    id = created.data;
+  }
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: adminToken, body: { userId: Number(id), roleIds: [Number(roleId)] }
+  });
+  return { id, username: 'gatecrmwriter', password: 'gate-pass-1234' };
+}
 
 const pendingCount = (operatorId) =>
   Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
@@ -241,6 +323,18 @@ if (!secondId) {
 const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
 
+// 持有 REST 权限码的调用方——权限那半的正向对照。
+// A caller with the REST codes — the positive control for the permission half.
+let writer; let writerToken;
+try {
+  writer = await ensureCrmWriter(admin);
+  writerToken = await login(writer.username, writer.password);
+  ok(`有码调用方就绪（id=${writer.id}）`);
+} catch (e) {
+  bad('有码调用方就绪', 'ok', e.message);
+  throw e;
+}
+
 // ── the rows, written straight into the module's own table ─────────────────────────────────────────
 console.log('== 场景 1 · 上游模块自己的表 ==');
 const marker = `gate-${Date.now()}`;
@@ -262,6 +356,9 @@ putBack = () =>
       // gate's cross-scope write is exactly that refusal). Scoped to **this gate's own tool** plus the caller plus
       // **no effect**: the call was refused, so there is no write to duplicate.
       `delete from write_claims where user_id = '${secondId}' and tool_name = 'update_crm_customer' and effect_id is null`,
+      // 有码调用方的越权写同样可能留下一条没有效应的认领（见上一条的同一条理由）。
+      // The granted caller's cross-row write can leave a claim with no effect behind, for the same reason.
+      `delete from write_claims where user_id = '${writer.id}' and tool_name = 'update_crm_customer' and effect_id is null`,
       `delete from write_claims where effect_id in (select id from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%'))`,
       `delete from side_effects where result_type = '${CUSTOMER}' and result_id in (select id from ${CUSTOMER} where name like '%${marker}%')`,
       // 一次性栈（CI）保留确认行，好让 RY-19 的确认率有分母；共用库上照旧收干净。
@@ -278,10 +375,14 @@ putBack = () =>
 // `BaseDO` 且没带 `@TenantIgnore`。不带它的行，经模块的每条路都看不见。
 psql(`insert into ${CUSTOMER}(id, name, owner_user_id, tenant_id) values (nextval('${CUSTOMER}_seq'), '${adminMarker}', 1, ${TENANT})`);
 psql(`insert into ${CUSTOMER}(id, name, owner_user_id, tenant_id) values (nextval('${CUSTOMER}_seq'), '${salesMarker}', ${secondId}, ${TENANT})`);
+const writerMarker = `${marker}-writer`;
+psql(`insert into ${CUSTOMER}(id, name, owner_user_id, tenant_id) values (nextval('${CUSTOMER}_seq'), '${writerMarker}', ${writer.id}, ${TENANT})`);
 const adminRowId = psql(`select id from ${CUSTOMER} where name = '${adminMarker}'`);
 const salesRowId = psql(`select id from ${CUSTOMER} where name = '${salesMarker}'`);
+const writerRowId = psql(`select id from ${CUSTOMER} where name = '${writerMarker}'`);
 check('admin 那一行已种', true, adminRowId !== '');
 check('第二个调用方那一行已种', true, salesRowId !== '');
+check('有码调用方那一行已种', true, writerRowId !== '');
 
 console.log('== 场景 2 · 身份传递 + 数据范围 ==');
 {
@@ -306,8 +407,9 @@ console.log('== 场景 2 · 身份传递 + 数据范围 ==');
   check('它的执行状态（审计轨）', 2, ranAs('list_crm_customers'));
 }
 
-console.log('== 场景 3 · 高风险写入被扣下，批准后落库 ==');
-const writeMarker = `${marker}-write`;
+console.log('== 场景 3 · 同一权限码：REST 拒的，工具也拒；有码的照做 ==');
+const writeDeniedMarker = `${marker}-write-denied`;
+const writeAllowedMarker = `${marker}-write-allowed`;
 {
   // Both halves of this scene count **this run's own row**, not the table. A whole-table delta
   // (`before` … `before + 1`) reads correctly only while nothing else writes, and two gates running at
@@ -317,43 +419,69 @@ const writeMarker = `${marker}-write`;
   // 本场两半都数**本轮自己那一行**、不数整张表。整表增量（`before` … `before + 1`）只在没有别人写的时候读起来对，
   // 而「两道门禁同时跑」正是它不对的那种情形：它会以 `expected [N], got [N+1]` 失败，而那个失败看上去指着门禁、
   // 不指着另一个写手。按本轮的标记计数**既免疫这个问题、又更强**——它断言的是**这一行**落了，不是表多了一行。
-  const own = () => Number(psql(`select count(*) from ${CUSTOMER} where name like '%${writeMarker}%'`));
+
+  // REST 那半保持原样：`common` 答 403。本改动**不放宽** REST。
+  // The REST half stays as it was: `common` answers 403. The change does not widen REST.
+  check('REST 对 common 仍答 403', 403,
+    await restCode('/crm/customer/create', second, { name: writeDeniedMarker, ownerUserId: secondId }));
+
+  // AI 那半：引擎照旧把写扣下等人（那是 R3 的问题）；批准之后拒绝它的，是工具自己的权限判据。
+  // The AI half: the engine still holds the write for a person (that is R3's question), and the tool's
+  // own permission judgement is what refuses it once approved.
   const held = pendingCount(secondId);
-  await chat(second, `新建客户 ${writeMarker}`);
+  await chat(second, `新建客户 ${writeDeniedMarker}`);
   // "Held" is **one more waiting row for this caller**, which is also where the token comes from: the
   // answer carries neither (core 0.1.5).
   // 「被扣下」就是**这个调用方多了一行**待确认 —— token 也正是从那儿来的：答案两样都不带（core 0.1.5）。
-  check('写被扣下', held + 1, pendingCount(secondId));
-  check('未落库', 0, own());
-  const proposedToken = pendingToken(secondId);
-  checkNot('扣下时给出 token', 'undefined', proposedToken);
+  check('无码调用方的写仍被扣下（确认卡不变）', held + 1, pendingCount(secondId));
+  const deniedToken = pendingTokenFor(secondId, writeDeniedMarker);
+  checkNot('扣下时给出 token', 'undefined', deniedToken);
 
-  const outcome = await confirm(second, proposedToken, 'approve');
-  check('批准后执行', 'executed', outcome.status);
-  check('落库', 1, own());
+  const deniedOutcome = await confirm(second, deniedToken, 'approve');
+  check('批准后仍不执行（受治理失败）', true, deniedOutcome.status !== 'executed');
+  check('失败理由点名所缺权限码', true,
+    psql(`select coalesce(execution_error, '') from confirmation_requests where token = '${deniedToken}'`)
+      .includes('crm:customer:create'));
+  check('无码调用方一行未落库', 0,
+    Number(psql(`select count(*) from ${CUSTOMER} where name like '%${writeDeniedMarker}%'`)));
+  check('审计轨记下这次受治理失败（含权限码）', true,
+    Number(psql(`select count(*) from ai_audit_logs where tool = 'create_crm_customer'`
+      + ` and outcome = 'failed' and detail like '%crm:customer:create%'`)) > 0);
+
+  // 正向对照：**同一个工具**，调用方持有 REST 所问的那条权限码。
+  // The positive control: the **same tool**, a caller holding the same code REST asks for.
+  const allowedHeld = pendingCount(writer.id);
+  await chat(writerToken, `新建客户 ${writeAllowedMarker}`);
+  check('有码调用方的写被扣下', allowedHeld + 1, pendingCount(writer.id));
+  const allowedToken = pendingTokenFor(writer.id, writeAllowedMarker);
+  const allowedOutcome = await confirm(writerToken, allowedToken, 'approve');
+  check('有码调用方批准后执行', 'executed', allowedOutcome.status);
+  check('有码调用方那行落地', 1,
+    Number(psql(`select count(*) from ${CUSTOMER} where name like '%${writeAllowedMarker}%'`)));
   // The owner is stamped by the governance advice, not named by the tool — the write VO carries the
   // column and a client could have pointed it at someone else.
   // 属主由治理通知盖章、不由工具点名——保存 VO 带着那一列，客户端本可以把它指到别人身上。
-  check('新行的属主 = 调用方', secondId,
-    psql(`select owner_user_id from ${CUSTOMER} where name like '%${writeMarker}%'`));
+  check('新行的属主 = 调用方', writer.id,
+    psql(`select owner_user_id from ${CUSTOMER} where name like '%${writeAllowedMarker}%'`));
   // The host's own leg: the row it logged for this write has to name the caller (see `hostLoggedWho`).
   // 宿主那一腿：它为这次写记下的那行，必须说出调用方（见 `hostLoggedWho`）。
-  check('宿主操作日志记下了调用方', secondId, await hostLoggedWho(writeMarker));
+  check('宿主操作日志记下了调用方', writer.id, await hostLoggedWho(writeAllowedMarker));
 }
 
-console.log('== 场景 4 · 越权写：批准也买不到 ==');
+console.log('== 场景 4 · 权限过了，行范围仍拒；没权限连执行都不进 ==');
 const ownMarker = `${marker}-own`;
 const hijackMarker = `${marker}-hijack`;
+const updateDeniedMarker = `${marker}-update-denied`;
 {
-  // A positive control first: the same tool, the same caller, a row that IS the caller's.
-  // 先来一条正对照：同一个工具、同一个调用方，但那一行**是**它自己的。
-  const mineHeld = pendingCount(secondId);
-  await chat(second, `修改客户 ${ownMarker}`, { customerId: Number(salesRowId) });
-  check('改自己的行被扣下', mineHeld + 1, pendingCount(secondId));
-  const mineDone = await confirm(second, pendingToken(secondId), 'approve');
+  // 先来一条正对照：持有 `crm:customer:update` 的调用方，改**自己**那一行。
+  // A positive control first: a caller holding `crm:customer:update`, a row that IS theirs.
+  const mineHeld = pendingCount(writer.id);
+  await chat(writerToken, `修改客户 ${ownMarker}`, { customerId: Number(writerRowId) });
+  check('改自己的行被扣下', mineHeld + 1, pendingCount(writer.id));
+  const mineDone = await confirm(writerToken, pendingTokenFor(writer.id, ownMarker), 'approve');
   check('改自己的行批准后执行', 'executed', mineDone.status);
   check('自己那一行确实改了', true,
-    psql(`select name from ${CUSTOMER} where id = ${salesRowId}`).includes(ownMarker));
+    psql(`select name from ${CUSTOMER} where id = ${writerRowId}`).includes(ownMarker));
 
   // YD-31：账本留下那一行**原先**的样子，于是轨迹答得出「这次改了什么」、而不只是「它现在是什么」。两半都要断，
   // 因为任一半单独都能空过：`before` 必须点名**旧**值、且**不得**点名新值 —— 一条「非空即可」的断言分不出两者。
@@ -362,21 +490,39 @@ const hijackMarker = `${marker}-hijack`;
   // "what is it now". Both halves are asserted because either alone passes vacuously: `before` must
   // name the OLD value and must not name the new one — a "non-empty" check would not tell them apart.
   const beforeSnap = psql(`select coalesce(before_snapshot, '') from side_effects`
-    + ` where tool_name = 'update_crm_customer' and result_id = ${salesRowId} order by id desc limit 1`);
-  check('改动前的那一行被记下（含旧值）', true, beforeSnap.includes(salesMarker));
+    + ` where tool_name = 'update_crm_customer' and result_id = ${writerRowId} order by id desc limit 1`);
+  check('改动前的那一行被记下（含旧值）', true, beforeSnap.includes(writerMarker));
   check('且记的是改之前、不是改之后', true, !beforeSnap.includes(ownMarker));
 
-  // Then the same call against another caller's row. The approval settles the risk question and
-  // nothing else: the row-scope question is answered lower down, at the module's own seam.
   // 然后是同一次调用、打向**别人的**行。批准了结的是**风险**问题、仅此而已：行范围的问题在更下面、在模块
-  // 自己的接缝上回答。
-  const hijackHeld = pendingCount(secondId);
-  await chat(second, `修改客户 ${hijackMarker}`, { customerId: Number(adminRowId) });
-  check('改别人的行也被扣下', hijackHeld + 1, pendingCount(secondId));
-  const hijackDone = await confirm(second, pendingToken(secondId), 'approve');
+  // 自己的接缝上回答。这里的调用方**有**权限——正因如此，这是一次行范围拒绝，不是权限拒绝。
+  //
+  // Then the same call against another caller's row. The approval settles the risk question and
+  // nothing else: the row-scope question is answered lower down, at the module's own seam. The caller
+  // **has** the permission here, which is what makes this a row-scope refusal and not a permission one.
+  const hijackHeld = pendingCount(writer.id);
+  await chat(writerToken, `修改客户 ${hijackMarker}`, { customerId: Number(adminRowId) });
+  check('改别人的行也被扣下', hijackHeld + 1, pendingCount(writer.id));
+  const hijackDone = await confirm(writerToken, pendingTokenFor(writer.id, hijackMarker), 'approve');
   note('越权写批准后的结局', hijackDone.status || JSON.stringify(hijackDone).slice(0, 120));
   check('批准了也没执行', true, hijackDone.status !== 'executed');
   check('别人的行一字未改', adminMarker, psql(`select name from ${CUSTOMER} where id = ${adminRowId}`));
+
+  // 同一个问题的另一半：没有 `crm:customer:update`，这次写根本到不了行范围那道接缝。那一行**是**调用方
+  // 自己的，故除了权限码，没有别的东西能拒它。
+  //
+  // The other half of the same question: without `crm:customer:update`, the write does not even reach
+  // the ownership seam. The row is the caller's own, so nothing but the permission code can refuse it.
+  const deniedHeld = pendingCount(secondId);
+  await chat(second, `修改客户 ${updateDeniedMarker}`, { customerId: Number(salesRowId) });
+  check('无码调用方改自己的行也被扣下', deniedHeld + 1, pendingCount(secondId));
+  const updateDeniedToken = pendingTokenFor(secondId, updateDeniedMarker);
+  const updateDeniedDone = await confirm(second, updateDeniedToken, 'approve');
+  check('无码调用方批准后不执行', true, updateDeniedDone.status !== 'executed');
+  check('失败理由点名 crm:customer:update', true,
+    psql(`select coalesce(execution_error, '') from confirmation_requests where token = '${updateDeniedToken}'`)
+      .includes('crm:customer:update'));
+  check('自己那一行一字未改', salesMarker, psql(`select name from ${CUSTOMER} where id = ${salesRowId}`));
 }
 
 console.log('== 场景 5 · 审计链与被记下的拒绝 ==');

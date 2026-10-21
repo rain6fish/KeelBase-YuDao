@@ -47,8 +47,6 @@ const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
 const DB = process.env.PG_DB || 'ruoyi-vue-pro';
 const TENANT = process.env.TENANT_ID || '1';
-const SECOND_USER = process.env.SECOND_USER || 'gatesales';
-const SECOND_PASS = process.env.SECOND_PASS || 'gate-pass-1234';
 const CUSTOMER = process.env.CRM_TABLE || 'crm_customer';
 
 let pass = 0;
@@ -139,6 +137,57 @@ const pendingToken = (operatorId) =>
 const pendingCount = (operatorId) =>
   Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
 
+/**
+ * 一名持有 `crm:customer:create` / `crm:customer:update` 的非管理员调用方。本门禁要**真落一行**才能撤销它，
+ * 而工具路径现在与 REST 同一条权限判据（`CrmCustomerTools`）；故调用方必须**有**那条权限码。角色与用户同名
+ * 复用，与别的门禁同一手法；`common` **不加写权**（那会同时放宽 REST）。
+ *
+ * 数据范围设成 `SELF`：新角色默认 `ALL`，而 `ALL` 会让行范围那半整条放过——本门禁要的是「有权限、只碰自己的行」。
+ *
+ * A non-administrator holding `crm:customer:create` / `crm:customer:update`. This gate needs a row to
+ * actually land so it can be withdrawn, and the tool path now asks the same permission question REST
+ * does (`CrmCustomerTools`); the caller must therefore **hold** that code. Role and user are reused by
+ * name, like the sibling gates; `common` is **not** given the write codes (that would widen REST too).
+ *
+ * The data scope is set to `SELF`: a new role defaults to `ALL`, which makes the row-scope half stand
+ * down, and this gate wants "has the permission, touches only its own row".
+ */
+async function ensureCrmWriter(adminToken) {
+  const menuIds = psql("select string_agg(id::text, ',') from system_menu"
+    + " where permission in ('crm:customer:create', 'crm:customer:update') and deleted = 0");
+  let roleId = psql("select id from system_role where code = 'gate_crm_writer' and deleted = 0 limit 1");
+  if (!roleId) {
+    const role = await api('/system/role/create', {
+      method: 'POST', token: adminToken,
+      body: { name: 'gate-crm-writer', code: 'gate_crm_writer', sort: 99, status: 0, remark: 'revoke gate: the REST permission codes, granted' }
+    });
+    if (role.code !== 0) throw new Error(`create writer role -> ${role.code}: ${role.msg}`);
+    roleId = role.data;
+  }
+  await api('/system/permission/assign-role-menu', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), menuIds: menuIds.split(',').map(Number) }
+  });
+  await api('/system/permission/assign-role-data-scope', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), dataScope: 5, dataScopeDeptIds: [] }
+  });
+  const existing = psql("select id from system_users where username = 'gatecrmwriter' and deleted = 0 limit 1");
+  let id = existing ? Number(existing) : null;
+  if (!id) {
+    const created = await api('/system/user/create', {
+      method: 'POST', token: adminToken,
+      body: { username: 'gatecrmwriter', nickname: 'gatecrmwriter', password: 'gate-pass-1234', deptId: 100, postIds: [] }
+    });
+    if (created.code !== 0) throw new Error(`create writer user -> ${created.code}: ${created.msg}`);
+    id = created.data;
+  }
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: adminToken, body: { userId: Number(id), roleIds: [Number(roleId)] }
+  });
+  return { id, username: 'gatecrmwriter', password: 'gate-pass-1234' };
+}
+
 // How many withdrawals the audit says were attempted. The whole gate turns on this reading, so it is
 // taken **from the audit**, the same source the conformance column reads — not from the answer.
 // 审计说**试过几次撤销**。整道闸都压在这个读数上，故它与门禁那一栏**同一个来源**：审计，而不是答案。
@@ -150,27 +199,17 @@ check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).
 const admin = await login('admin', 'admin123');
 ok('admin 登录');
 
+// 与 CRM 门禁同一套前置，且同样幂等：两道闸本就该能对着同一个库跑，故已存在的调用方**复用**、不重建。
+// 调用方持有 CRM 那几个写权限码：工具路径现在问 REST 那一问，而本门禁需要一行**真的落地**。
+//
 // The same setup the CRM gate uses, and idempotent for the same reason: the two gates are meant to be
-// able to run against one database, so a second caller that exists is reused rather than recreated.
-// 与 CRM 门禁同一套前置，且同样幂等：两道闸本就该能对着同一个库跑，故已存在的第二个调用方**复用**、不重建。
-let secondId = psql(`select id from system_users where username = '${SECOND_USER}' and deleted = 0 limit 1`);
-if (!secondId) {
-  const created = await api('/system/user/create', {
-    method: 'POST', token: admin,
-    body: { username: SECOND_USER, nickname: SECOND_USER, password: SECOND_PASS, deptId: 100, postIds: [] }
-  });
-  if (created.code !== 0) throw new Error(`create user -> ${created.code}: ${created.msg}`);
-  secondId = created.data;
-  ok(`建第二个调用方 id=${secondId}`);
-} else {
-  ok(`复用第二个调用方 id=${secondId}`);
-}
-{
-  const roles = psql(`select id from system_role where code = 'common' and deleted = 0 limit 1`);
-  await api('/system/permission/assign-user-role', { method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles)] } });
-}
-const second = await login(SECOND_USER, SECOND_PASS);
-ok('第二个调用方登录');
+// able to run against one database, so a caller that exists is reused rather than recreated. The caller
+// holds the CRM write codes, because the tool path now asks REST's permission question and this gate
+// needs a row that really lands.
+const writer = await ensureCrmWriter(admin);
+const writerId = writer.id;
+const writerToken = await login(writer.username, writer.password);
+ok(`有码调用方就绪（id=${writerId}）`);
 
 // ── 1) a write this run owns, taken all the way to a real side effect ────────────────────────────
 console.log('== 场景 1 · 一次真落库的高风险写 ==');
@@ -194,10 +233,10 @@ putBack = () =>
   );
 let customerId = '';
 {
-  const held = pendingCount(secondId);
-  await chat(second, `新建客户 ${marker}`);
-  check('写被扣下', held + 1, pendingCount(secondId));
-  const outcome = await confirm(second, pendingToken(secondId), 'approve');
+  const held = pendingCount(writerId);
+  await chat(writerToken, `新建客户 ${marker}`);
+  check('写被扣下', held + 1, pendingCount(writerId));
+  const outcome = await confirm(writerToken, pendingToken(writerId), 'approve');
   check('批准后执行', 'executed', outcome.status);
   // The tool names the row after the whole message, not after the marker inside it, so the row is
   // found by substring — and the marker is a 13-digit stamp, which no other run's marker contains.
@@ -237,7 +276,7 @@ let effectId = '';
 console.log('== 场景 3 · 试一次撤销，断言两种结局都成立的那一半 ==');
 {
   const before = revokeRows();
-  const r = await revokeEffect(effectId, second);
+  const r = await revokeEffect(effectId, writerToken);
   const status = psql(`select revoke_status from side_effects where id = ${effectId}`);
   const after = revokeRows();
   const body = String(r.body || '');

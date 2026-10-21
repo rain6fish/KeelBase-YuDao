@@ -135,12 +135,39 @@ check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).
 const rootToken = await login('admin', 'admin123', ROOT_TENANT);
 ok('admin@1 登录');
 
+// 闸租户的套餐要**含 CRM 那两个写权限码**：工具路径现在与 REST 同一条判据（`CrmCustomerTools`），而
+// 「普通套餐」（111）里没有 CRM 的菜单。于是本门禁在 111 的菜单表上并进 476 / 477，建一个只给闸租户用的套餐；
+// 否则场景 2 的调用方会因缺 `crm:customer:create` 被拒，而本门禁要证的（租户传递）就没机会发生。
+//
+// The gate tenant's package must **hold the two CRM write codes**: the tool path now asks REST's own
+// permission question (`CrmCustomerTools`), and the "ordinary" package (111) carries no CRM menus. So this
+// gate unions 476 / 477 into 111's menu set and creates a package used only by the gate tenant; otherwise
+// scenario 2's caller is refused for lacking `crm:customer:create` and what this gate proves (tenant
+// propagation) never happens.
+const baseMenuIds = JSON.parse(psql('select menu_ids from system_tenant_package where id = 111'));
+const gateMenuIds = [...new Set([...baseMenuIds, 476, 477])];
+const GATE_PACKAGE_NAME = 'GateTenantPackage';
+let gatePackageId = psql(`select id from system_tenant_package where name = '${GATE_PACKAGE_NAME}' limit 1`);
+if (!gatePackageId) {
+  const pkg = await api('/system/tenant-package/create', {
+    method: 'POST', token: rootToken,
+    body: { name: GATE_PACKAGE_NAME, status: 0, remark: 'tenant gate: package 111 + the CRM write codes', menuIds: gateMenuIds }
+  });
+  if (pkg.code !== 0) throw new Error(`create gate package -> ${pkg.code}: ${pkg.msg}`);
+  gatePackageId = pkg.data;
+} else {
+  await api('/system/tenant-package/update', {
+    method: 'PUT', token: rootToken,
+    body: { id: Number(gatePackageId), name: GATE_PACKAGE_NAME, status: 0, remark: 'tenant gate: package 111 + the CRM write codes', menuIds: gateMenuIds }
+  });
+}
+
 let tenantId = psql(`select id from system_tenant where name = '${GATE_TENANT_NAME}' limit 1`);
 if (!tenantId) {
   const created = await api('/system/tenant/create', {
     method: 'POST', token: rootToken,
     body: {
-      name: GATE_TENANT_NAME, contactName: GATE_TENANT_NAME, status: 0, packageId: 111,
+      name: GATE_TENANT_NAME, contactName: GATE_TENANT_NAME, status: 0, packageId: Number(gatePackageId),
       // yudao's request body takes the expiry as epoch **milliseconds**, not a formatted string: a
       // string is accepted without error and silently stored as the epoch, which then reads as
       // "expired".  yudao 的请求体把过期时间收作**纪元毫秒**，不是格式化字符串：传字符串**不报错**、
@@ -185,6 +212,9 @@ putBack = () => {
       `delete from crm_customer where ${byName}`,
       ...tenantTables.map((t) => `delete from ${t} where tenant_id = ${tenantId}`),
       `delete from system_tenant where id = ${tenantId}`,
+      // 闸租户的套餐只服务这一轮；租户行删掉之后再收它。
+      // The gate package serves only this run; it goes after the tenant row does.
+      `delete from system_tenant_package where id = ${gatePackageId}`,
     ].join('; '),
   );
 };

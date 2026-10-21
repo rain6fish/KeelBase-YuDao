@@ -61,9 +61,21 @@ public class CrmCustomerTools {
         return new ListTool(service);
     }
 
+    /**
+     * REST 路径上这两个写各自要的权限码——**同一份词表**，不是另立一套。工具路径跑在安全过滤器链之外，
+     * 故它必须自己问出 REST 那一问；这里把那条权限码放在它旁边，好让两边一起漂、也一起被看见。
+     *
+     * The permission codes the two writes require on the REST path — the **same vocabulary**, not a
+     * second one. The tool path runs outside the security filter chain, so it has to ask REST's question
+     * itself; the code sits next to the tool so the two drift, and are seen to drift, together.
+     */
+    private static final String CREATE_PERMISSION = "crm:customer:create";
+
+    private static final String UPDATE_PERMISSION = "crm:customer:update";
+
     @Bean
-    AiTool createCrmCustomer(CrmCustomerService service) {
-        return new CreateTool(service);
+    AiTool createCrmCustomer(CrmCustomerService service, YudaoToolPermissions permissions) {
+        return new CreateTool(service, permissions);
     }
 
     @Bean
@@ -72,8 +84,8 @@ public class CrmCustomerTools {
     }
 
     @Bean
-    AiTool updateCrmCustomer(CrmCustomerService service) {
-        return new UpdateTool(service);
+    AiTool updateCrmCustomer(CrmCustomerService service, YudaoToolPermissions permissions) {
+        return new UpdateTool(service, permissions);
     }
 
     @Bean
@@ -164,9 +176,11 @@ public class CrmCustomerTools {
     static final class CreateTool implements AiTool {
 
         private final CrmCustomerService service;
+        private final YudaoToolPermissions permissions;
 
-        CreateTool(CrmCustomerService service) {
+        CreateTool(CrmCustomerService service, YudaoToolPermissions permissions) {
             this.service = service;
+            this.permissions = permissions;
         }
 
         @Override
@@ -201,6 +215,16 @@ public class CrmCustomerTools {
 
         @Override
         public ToolResult execute(Map<String, Object> args, Principal principal) {
+            // REST 路径对同一个写答 403 的那道判据，在这里**执行前**再问一次；缺权限就**不碰 service**，
+            // 并以运行时的结构化失败交回——不抛异常、不靠 500 说话。理由点名那条权限码，便于补齐授权。
+            //
+            // The judgement that answers 403 for the same write on REST is asked **before execution**
+            // here; without the permission the service is **not touched**, and the call comes back as the
+            // runtime's structured failure — no exception, no 500. The reason names the permission code.
+            String refusal = permissions.refusal(principal.userId(), CREATE_PERMISSION);
+            if (refusal != null) {
+                return ToolResult.fail(refusal);
+            }
             CrmCustomerSaveReqVO row = new CrmCustomerSaveReqVO();
             row.setName(str(args.get("name")));
             row.setMobile(str(args.get("mobile")));
@@ -261,9 +285,11 @@ public class CrmCustomerTools {
     static final class UpdateTool implements AiTool {
 
         private final CrmCustomerService service;
+        private final YudaoToolPermissions permissions;
 
-        UpdateTool(CrmCustomerService service) {
+        UpdateTool(CrmCustomerService service, YudaoToolPermissions permissions) {
             this.service = service;
+            this.permissions = permissions;
         }
 
         @Override
@@ -298,6 +324,16 @@ public class CrmCustomerTools {
 
         @Override
         public ToolResult execute(Map<String, Object> args, Principal principal) {
+            // 与创建那半同一条判据、同一个理由：REST 上 `crm:customer:update` 拦下的调用，工具路径也不执行。
+            // 放在读旧值**之前**——被拒的调用连快照都不该去读。
+            //
+            // The same judgement as the create half, for the same reason: a call REST would stop at
+            // `crm:customer:update` is not executed here either. It sits **before** the snapshot read —
+            // a refused call should not even read the row.
+            String refusal = permissions.refusal(principal.userId(), UPDATE_PERMISSION);
+            if (refusal != null) {
+                return ToolResult.fail(refusal);
+            }
             Long id = asLong(args.get("id"));
             CrmCustomerSaveReqVO row = new CrmCustomerSaveReqVO();
             row.setId(id);
