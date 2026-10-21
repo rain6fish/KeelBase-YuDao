@@ -149,7 +149,7 @@ const error = ref('')
 /** 屏幕上那些 id 的调用方姓名，在行落地之后补上。 */
 const names = ref<Record<string, string>>({})
 
-function callerName(id: string | number | null | undefined): string {
+function callerName(id: number | null | undefined): string {
   if (!id) return '—'
   return names.value[String(id)] ?? String(id)
 }

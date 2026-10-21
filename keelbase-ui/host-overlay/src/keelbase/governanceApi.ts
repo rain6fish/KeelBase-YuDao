@@ -359,9 +359,9 @@ export const businessLogApi = {
  */
 export interface OperationAuditRow {
   id: number
-  /** Numeric identity, as the frozen object types it; null when this identity is not numeric. */
-  /** 数字形式的身份，按冻结对象的定型；这个身份不是数字时为 null。 */
-  userId: string | number | null
+  /** Numeric identity, exactly as the frozen object types it (`number | null`); null when this identity is not numeric. */
+  /** 数字形式的身份，与冻结对象的定型一致（`number | null`）；这个身份不是数字时为 null。 */
+  userId: number | null
   /** The identity string the runtime preserved when `userId` is null — not a name joined onto the row. */
   /** `userId` 为 null 时运行时**保留下来**的身份字符串——不是联到这一行上的名字。 */
   username: string | null
