@@ -149,6 +149,17 @@ jobs:
       - name: The deployment's seed manifest must classify every SQL file and carry every menu it serves
         run: node scripts/check-seed-list.mjs
 
+      # `/app/capabilities` 的 `businessModules` 是**声明**而非运行时探测，前端据此显隐导航。本测试把它
+      # 与部署的两处事实对账：种子清单里的 `load` / `skip`，以及 `module-scope.sql` 的保留清单。纯 Node、
+      # 不连库，故与上面那道种子清单检查互补：一道管页面到不了，一道管接口说错模块。
+      #
+      # `/app/capabilities`'s `businessModules` is a **declaration**, not a runtime probe, and the
+      # frontend shows navigation from it. This test reconciles it with two deployment facts: `load` /
+      # `skip` in the seed manifest, and the keep list in `module-scope.sql`. Pure Node, no database, so
+      # it complements the seed check above: one catches an unreachable page, the other a wrong module.
+      - name: The capabilities profile must advertise exactly the modules this deployment loads
+        run: node --test scripts/capabilities-profile.test.mjs
+
       # The runtime's `/ai/chat`, `/ai/chat/stream` and `/ai/task` carry no `@PreAuthorize`, and the
       # engine's gate never consults the rule source. The AI module's send route has the same shape, and
       # AI1's session stream assembles tools. The host closes those entries for the audit reader itself;

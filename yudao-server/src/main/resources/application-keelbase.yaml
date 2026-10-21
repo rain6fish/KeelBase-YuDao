@@ -39,34 +39,37 @@ keelbase:
   assistant:
     agent-id: 9001
   app:
+    # `preset` 是 EASY-3 的**特性预设**（full / small / lite），不是模块清单；模块清单由下面的
+    # `businessModules` 回答。显式写出的 `features` 覆盖预设默认值。
+    #
+    # `preset` is the EASY-3 **feature preset** (full / small / lite), not a module inventory; the
+    # inventory is `businessModules` below. Explicit `features` values override the preset's defaults.
     preset: full
+    # 只把本部署真正跑的业务面写成 true：crm 与产品目录（见 `deploy/demo-ecs/seed-manifest.txt` 的
+    # `load` 与 `module-scope.sql` 的保留清单）。其余模块的种子是 `skip`、菜单被停用，故显式 false，
+    # 让「问一个模块开没开」得到 false 而不是 undefined。
+    #
+    # Only the business faces this deployment actually runs are true: crm and the product catalogue
+    # (see `load` in `deploy/demo-ecs/seed-manifest.txt` and the keep list in `module-scope.sql`). The
+    # other modules' seeds are `skip` and their menus are switched off, so they are explicitly false —
+    # asking whether one of them is on returns false, not undefined.
     features:
       crm: true
-      bpm: true
-      oa: true
-      hrm: true
-      fms: true
-      report: true
+      bpm: false
+      oa: false
+      hrm: false
+      fms: false
+      report: false
       products: true
+    # 这里只列 `features` 为 true 的业务模块，且必须与本部署加载的业务种子一致；
+    # `scripts/capabilities-profile.test.mjs` 把这条一致性钉住。
+    #
+    # Only business modules whose `features` value is true are listed here, and the list must match the
+    # business seeds this deployment loads; `scripts/capabilities-profile.test.mjs` holds that.
     businessModules:
       - id: crm
         label: CRM 系统
         description: 线索、客户、商机与合同
-      - id: bpm
-        label: 工作流程
-        description: 流程定义与待我审批的任务
-      - id: oa
-        label: OA 办公协同
-        description: 工作台、笔记、通讯录与企业云盘
-      - id: hrm
-        label: HRM 人力资源
-        description: 组织、员工、考勤与薪酬
-      - id: fms
-        label: FMS 财务管理
-        description: 财务基础资料与账务
-      - id: report
-        label: 报表管理
-        description: 积木报表与大屏设计器
       - id: products
         label: 产品目录
         description: 销售维护的产品目录，只有属主能改自己的产品
