@@ -53,9 +53,13 @@ const SHOWCASE_OUTCOMES: Record<string, string> = {
   'unknown-scenario': 'unknownScenario',
 }
 
-// The `type` of a `trace-step`, as this runtime fills it.
-// `trace-step` 的 `type`，按本运行时填的样子。
-const TRACE_STEPS = ['input', 'assistant', 'notice']
+// `trace-step` v3 冻结的 `type` 枚举 —— 六个取值全在，任何实现会发的步都有词。这个集合取自**契约**，
+// 不是从本运行时眼下发的那几种推出来的：一份词表要认得出**别人**送来的步。枚举之外的类型仍原样显示。
+// The frozen `type` enum of `trace-step` v3 — all six values, so every step any implementation can
+// send has a word. The set comes from the **contract**, not from the handful this runtime happens to
+// emit today: one vocabulary has to recognise a step sent by **another** implementation. A type
+// outside the enum is still shown as itself.
+const TRACE_STEPS = ['input', 'assistant', 'tool_call', 'confirmation', 'effect', 'notice']
 
 // The operations audit's own word for the act — `operation-audit-log-row`'s `action` values, which
 // its interceptor derives from the method and the path.

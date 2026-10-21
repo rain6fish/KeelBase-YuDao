@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,344 @@
+@@ -1,4 +1,347 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -172,7 +172,7 @@ index 96269a8..2611a9b 100644
 +      auditChain: 'This page does not cover: the SKILL tools and ai1 RAG retrieval (they write no audit rows), or the upstream resolver path (it does not pass through this governance).',
 +      opAudit: 'This page does not cover: the AI audit rows (a separate chain), or the SKILL shell/file execution, ai1 RAG retrieval, ai1 MCP calls and the upstream resolver path — none of them writes a business operation log.',
 +      toolInventory: 'This page does not cover: the ai1 MCP tools discovered per agent, the shell/file tools SKILL assembles, ai1 RAG retrieval, or the upstream resolver path — none is in the governed tool inventory.',
-+      trace: 'This page does not cover: tool calls, confirmation decisions and side effects (they carry no conversation link here), or the SKILL, ai1 RAG and upstream resolver paths.',
++      trace: 'This page does not cover: rows written outside any conversation (a task run, an MCP caller) or the call\'s argument string (this runtime does not store it), nor the SKILL, ai1 RAG and upstream resolver paths.',
 +      actionCenter: 'This page does not cover: ai1 MCP calls (no engine, no confirmation, no side-effect ledger), the SKILL tools, ai1 RAG retrieval, or the upstream resolver path.',
 +      effectsLedger: 'This page does not cover: ai1 MCP calls (no ledger row), the files and shell commands SKILL writes, ai1 RAG retrieval, or the upstream resolver path.',
 +      policy: 'This page does not cover: the ai1 MCP, SKILL, ai1 RAG and upstream resolver paths — their tools are outside this policy’s scope.',
@@ -319,6 +319,9 @@ index 96269a8..2611a9b 100644
 +      traceStep: {
 +        input: 'Input',
 +        assistant: 'Reply',
++        tool_call: 'Tool call',
++        confirmation: 'Confirmation',
++        effect: 'Side effect',
 +        notice: 'Disclosure',
 +      },
 +      opAction: {
@@ -351,7 +354,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,342 @@
+@@ -1,4 +1,345 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -520,7 +523,7 @@ index 35f1e1a..856d201 100644
 +      auditChain: '本页不覆盖：SKILL 工具与 ai1 RAG 检索（它们不写审计行），以及上游解析器路（它不经本治理）。',
 +      opAudit: '本页不覆盖：AI 审计行（另一条链），以及 SKILL 的 shell/文件执行、ai1 RAG 检索、ai1 MCP 调用与上游解析器路 —— 它们都不写业务操作日志。',
 +      toolInventory: '本页不覆盖：ai1 按 agent 动态发现的 MCP 工具、SKILL 装配出的 shell/文件工具、ai1 RAG 检索，以及上游解析器路 —— 它们都不在受治理的工具清单里。',
-+      trace: '本页不覆盖：工具调用、确认裁决与副作用（它们在这里没有会话链接），以及 SKILL、ai1 RAG 与上游解析器路。',
++      trace: '本页不覆盖：**没有会话**时写下的行（一次任务运行、一个 MCP 调用方），以及调用的参数串（本运行时不存它）；也不覆盖 SKILL、ai1 RAG 与上游解析器路。',
 +      actionCenter: '本页不覆盖：ai1 MCP 调用（不经引擎、无确认、无副作用台账）、SKILL 工具、ai1 RAG 检索，以及上游解析器路。',
 +      effectsLedger: '本页不覆盖：ai1 MCP 调用（无台账行）、SKILL 写入的文件与执行的 shell、ai1 RAG 检索，以及上游解析器路。',
 +      policy: '本页不覆盖：ai1 MCP、SKILL、ai1 RAG 与上游解析器路 —— 它们的工具不在这份策略的范围内。',
@@ -666,6 +669,9 @@ index 35f1e1a..856d201 100644
 +      traceStep: {
 +        input: '输入',
 +        assistant: '回复',
++        tool_call: '工具调用',
++        confirmation: '确认决策',
++        effect: '副作用',
 +        notice: '披露',
 +      },
 +      opAction: {
