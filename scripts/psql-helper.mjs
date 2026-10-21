@@ -17,12 +17,16 @@
 //   2. PSQL_HELPER_PG_NODE_MODULES  — path to a `node_modules` directory that contains `pg`;
 //   3. require('pg')                — normal resolution, honouring NODE_PATH;
 //   4. <repo>/../.yd39-infra/node_modules/pg and <repo>/.yd39-infra/node_modules/pg — the layout the
-//      recipe documents for the embedded stack.
+//      recipe documents for the embedded stack;
+//   5. D:/Rain6fish/.yd39-infra/node_modules/pg — the same embedded stack at its absolute host path, so
+//      a clone anywhere on that host (not only beside .yd39-infra) still finds it with no configuration.
 // Nothing is installed; if none of these finds `pg` the helper fails loudly and names the variables.
 //
 // Output follows `-tA` (tuples only, unaligned): one row per line, columns joined by `|`, NULL as an
-// empty field — the same shape the gates' `psql()` consumes. Without `-t` a header line is printed
-// first; this is deliberately minimal and not a byte-for-byte psql emulation.
+// empty field — the same shape the gates' `psql()` consumes. Values are read by column **ordinal**
+// (node-postgres `rowMode: 'array'`), so two selected columns with the same name stay two fields:
+// `select 21, 79` prints `21|79`, not `79|79`. Without `-t` a header line is printed first; this is
+// deliberately minimal and not a byte-for-byte psql emulation.
 //
 // 给没有 psql 客户端的机器用的 psql 形状助手。门禁经 `PSQL_HELPER_SCRIPT` 调用它，实参与 psql 相同：
 //
@@ -39,15 +43,18 @@
 //   2. PSQL_HELPER_PG_NODE_MODULES  —— 含 `pg` 的 `node_modules` 目录路径；
 //   3. require('pg')                —— 常规解析，认 NODE_PATH；
 //   4. <repo>/../.yd39-infra/node_modules/pg 与 <repo>/.yd39-infra/node_modules/pg —— recipe 写明的
-//      embedded 栈布局。
-// 不安装任何东西；四处都找不到 `pg` 时助手大声失败，并点名该设哪个变量。
+//      embedded 栈布局；
+//   5. D:/Rain6fish/.yd39-infra/node_modules/pg —— 同一个 embedded 栈的绝对路径；克隆在该机的任何位置
+//      （不必与 .yd39-infra 相邻）都零配置找得到。
+// 不安装任何东西；五处都找不到 `pg` 时助手大声失败，并点名该设哪个变量。
 //
 // 输出照 `-tA`（只出元组、不对齐）：一行一记录，列以 `|` 连接，NULL 为空字段 —— 正是门禁 `psql()` 消费的
-// 形状。不带 `-t` 时先打一行表头；这是刻意的最小实现，不是逐字节复刻 psql。
+// 形状。取值按列的**序号**（node-postgres `rowMode: 'array'`），故两个同名列仍是两个字段：
+// `select 21, 79` 打印 `21|79`，不再是 `79|79`。不带 `-t` 时先打一行表头；这是刻意的最小实现，不是逐字节复刻 psql。
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +102,10 @@ function loadPg() {
   for (const candidate of [
     resolve(repoRoot, '..', '.yd39-infra', 'node_modules', 'pg'),
     resolve(repoRoot, '.yd39-infra', 'node_modules', 'pg'),
+    // Absolute host path of the embedded stack the recipe documents: a clone can live anywhere (for
+    // example D:/Rain6fish/.recipe-final-cold/KeelBase-YuDao) and still find pg without configuration.
+    // 绝对路径的 embedded 栈：克隆可以在任意位置（如 D:/Rain6fish/.recipe-final-cold/...），仍零配置。
+    'D:/Rain6fish/.yd39-infra/node_modules/pg',
   ]) {
     const mod = attempt(candidate, () => require(candidate));
     if (mod) return mod;
@@ -182,7 +193,7 @@ function parseArgs(argv) {
   return options;
 }
 
-function render(result, tuplesOnly) {
+export function render(result, tuplesOnly) {
   const lines = [];
   const results = Array.isArray(result) ? result : [result];
   const last = results[results.length - 1];
@@ -191,10 +202,10 @@ function render(result, tuplesOnly) {
     lines.push(last.fields.map((field) => field.name).join('|'));
   }
   for (const row of last.rows) {
-    lines.push(last.fields.map((field) => {
-      const value = row[field.name];
-      return value === null || value === undefined ? '' : String(value);
-    }).join('|'));
+    // Rows arrive as arrays (rowMode: 'array') so duplicate column names keep their own position.
+    // 行以数组返回（rowMode: 'array'），同名列各占各位，不会互相覆盖。
+    const values = Array.isArray(row) ? row : last.fields.map((field) => row[field.name]);
+    lines.push(values.map((value) => (value === null || value === undefined ? '' : String(value))).join('|'));
   }
   return lines.join('\n');
 }
@@ -218,7 +229,9 @@ async function main() {
   });
   await client.connect();
   try {
-    const result = await client.query(sql);
+    // rowMode: 'array' makes each row positional, which is what fixes `select 21, 79` (same column
+    // name) and matches psql's unaligned output. / rowMode: 'array' 让行按位置返回，修同名列，贴合 psql。
+    const result = await client.query({ text: sql, rowMode: 'array' });
     const output = render(result, options.tuplesOnly);
     if (output) process.stdout.write(`${output}\n`);
   } finally {
@@ -226,7 +239,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error && error.message ? error.message : error}\n`);
-  process.exitCode = 1;
-});
+// Run only when invoked as a script; the test imports `render` from here. 仅直接执行时跑 main；测试会 import render。
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (invokedDirectly) {
+  main().catch((error) => {
+    process.stderr.write(`${error && error.message ? error.message : error}\n`);
+    process.exitCode = 1;
+  });
+}
