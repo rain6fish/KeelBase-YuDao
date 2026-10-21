@@ -170,6 +170,31 @@ jobs:
       - name: The audit reader cannot reach any AI execution entry
         run: node scripts/check-audit-reader-execution-guard.mjs
 
+      # The audit reader is also offered no write control on the governance pages: the server refuses
+      # those writes, but a button that only refuses when pressed should not have been drawn. The role
+      # rule is shared, and this check pins which controls obey it on all four pages.
+      # 审计读者在治理页上也**不被递给**写控件：服务端会拒那些写，但一个点了才被拒的按钮本来就不该画出来。
+      # 角色规则是共用的，这道检查钉住四个页面上哪些控件受它管。
+      - name: The audit reader is offered no write control
+        run: node scripts/check-audit-reader-write-controls.mjs
+
+      # The truth table itself: audit_reader off, admin and every other role unchanged. Runs the
+      # predicate extracted from the Vue helper, so the rule is executed rather than only pattern-matched.
+      # 真值表本身：audit_reader 关、admin 与其余角色不变。跑的是从 Vue helper 里拆出的判据，故规则被
+      # **执行**而不只是被模式匹配。
+      - name: The write-control role rule is audit_reader, and only audit_reader
+        run: node --test scripts/console-role.test.mjs
+
+      # The ledger's `targetExists` used to answer only for the runtime's own `follow_up`, so every
+      # host result type read as "no longer there" (Proxy-1, 2026-10-21: customer #1 still present).
+      # This check keeps the compensator types and the host-side probes equal, and pins the three
+      # rules the correction must obey.
+      # 台账的 `targetExists` 曾只回答运行时自己的 `follow_up`，于是每种宿主结果类型都读作「已不在」
+      # （Proxy-1，2026-10-21：客户 #1 仍在）。这道检查让补偿器类型与宿主探针保持一致，并钉住更正必须
+      # 遵守的三条规则。
+      - name: The ledger's target existence covers every host result type
+        run: node scripts/check-effect-target-existence.mjs
+
   generator:
     name: The generated files are still a Spec's output
     runs-on: ubuntu-latest

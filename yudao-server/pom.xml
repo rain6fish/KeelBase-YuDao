@@ -246,6 +246,15 @@
             <artifactId>yudao-spring-boot-starter-protection</artifactId>
         </dependency>
 
+        <!-- Test 测试相关 -->
+        <!-- This host had no test class before; the ledger target probe is plain Java logic, pinned here in both directions. -->
+        <!-- 本宿主此前没有测试类；台账目标存在性的探针是纯 Java 逻辑，用单测钉住正/反向。 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>

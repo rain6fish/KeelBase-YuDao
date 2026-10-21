@@ -30,7 +30,9 @@
       <el-button class="ml-auto" size="small" :loading="loading" @click="load">
         {{ t('keelbase.common.refresh') }}
       </el-button>
-      <el-button size="small" type="primary" :loading="saving" :disabled="!dirty" @click="save">
+      <!-- The audit reader is offered no write surface: no save, and the controls below are disabled. -->
+      <!-- 审计读者不出现写面：没有保存，下面的控件也禁用。 -->
+      <el-button v-if="canWrite" size="small" type="primary" :loading="saving" :disabled="!dirty" @click="save">
         {{ t('keelbase.policy.save') }}
       </el-button>
     </template>
@@ -46,7 +48,7 @@
 
     <div class="granularity">
       <span>{{ t('keelbase.policy.granularity') }}</span>
-      <el-radio-group v-model="granularity" size="small">
+      <el-radio-group v-model="granularity" size="small" :disabled="!canWrite">
         <el-radio value="all">{{ t('keelbase.policy.granularityAll') }}</el-radio>
         <el-radio value="write">{{ t('keelbase.policy.granularityWrite') }}</el-radio>
         <el-radio value="off">{{ t('keelbase.policy.granularityOff') }}</el-radio>
@@ -73,7 +75,7 @@
       <!-- 门槛取的是清单里的声明，但显示的是**读者语言**的词；「用默认」＝这份策略没有覆盖它。 -->
       <el-table-column :label="t('keelbase.toolInv.colGate')" width="180">
         <template #default="{ row }">
-          <el-select :model-value="row.mode || USE_DEFAULT" size="small" class="!w-160px" @update:model-value="(v: string) => setMode(row, v)">
+          <el-select :model-value="row.mode || USE_DEFAULT" size="small" class="!w-160px" :disabled="!canWrite" @update:model-value="(v: string) => setMode(row, v)">
             <!-- The "default" arm carries a real value, not an empty string: el-select reads `''` as
                  "nothing chosen" and shows the placeholder, so the effective gate would be invisible —
                  which is the one thing this column exists to show. -->
@@ -88,7 +90,7 @@
       </el-table-column>
       <el-table-column :label="t('keelbase.policy.colEnabled')" width="110" align="center">
         <template #default="{ row }">
-          <el-switch :model-value="row.enabled" @update:model-value="(v: boolean) => setEnabled(row, v)" />
+          <el-switch :model-value="row.enabled" :disabled="!canWrite" @update:model-value="(v: boolean) => setEnabled(row, v)" />
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.toolInv.colRoles')" width="200">
@@ -98,6 +100,7 @@
             multiple
             clearable
             size="small"
+            :disabled="!canWrite"
             :placeholder="t('keelbase.policy.useDefault')"
             @update:model-value="(v: string[]) => setRoles(row, v)"
           >
@@ -108,7 +111,7 @@
       </el-table-column>
       <el-table-column :label="t('keelbase.policy.colReset')" width="110" align="center">
         <template #default="{ row }">
-          <el-button v-if="row.override" link type="danger" @click="resetRow(row)">
+          <el-button v-if="row.override && canWrite" link type="danger" @click="resetRow(row)">
             {{ t('keelbase.policy.resetRow') }}
           </el-button>
           <span v-else class="muted">—</span>
@@ -132,10 +135,14 @@ import {
 } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { gateLabelKey, toolDescriptionKey, toolLabelKey } from '@/keelbase/labels'
+import { useConsoleWriteAllowed } from '@/keelbase/consoleRole'
 
 defineOptions({ name: 'KeelbaseGovernancePolicyCenter' })
 
 const { t } = useI18n()
+/** The audit reader sees no write control (save, reset) and no editable gate/enabled/roles. */
+/** 审计读者不出现写控件（保存、恢复默认），闸门/启用/角色也不可编辑。 */
+const { canWrite } = useConsoleWriteAllowed()
 
 /** A real value for the "no override" arm — see the select's comment for why it is not `''`. */
 /** 「不覆盖」那一项的真取值 —— 为什么不是 `''` 见那个 select 的注释。 */

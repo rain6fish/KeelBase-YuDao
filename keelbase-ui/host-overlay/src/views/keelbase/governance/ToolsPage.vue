@@ -105,7 +105,9 @@
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colActions')" width="110" align="center">
         <template #default="{ row }">
-          <el-button v-if="row.revocable" link type="danger" @click="revoke(row)">
+          <!-- The audit reader gets no write control; the server would refuse the call anyway. -->
+          <!-- 审计读者不给写控件；服务端本来也会拒这次调用。 -->
+          <el-button v-if="row.revocable && canWrite" link type="danger" @click="revoke(row)">
             {{ t('keelbase.effects.revoke') }}
           </el-button>
           <span v-else class="text-[var(--el-text-color-secondary)]">—</span>
@@ -129,10 +131,14 @@ import { resolveCallerNames } from '@/keelbase/callerNames'
 import { toolLabelKey } from '@/keelbase/labels'
 import { timeText } from '@/keelbase/time'
 import { maskTitle } from '@/keelbase/mask'
+import { useConsoleWriteAllowed } from '@/keelbase/consoleRole'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
 const { t } = useI18n()
+/** The audit reader sees no write control (revoke); the server's verdict is unchanged. */
+/** 审计读者不出现写控件（撤销）；服务端裁决不变。 */
+const { canWrite } = useConsoleWriteAllowed()
 
 /** The tool in the reader's language, falling back to the registered name. */
 /** 工具名，用读者的语言；不认识就保留注册名。 */

@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+//
+// 台账的 `targetExists` 必须按宿主真实记录回答：每个宿主补偿器认识的结果类型，都要有同名的目标探针。
+//
+//   node scripts/check-effect-target-existence.mjs
+//
+// 为什么需要这道检查：运行时的 `EffectController.view()` 只认它自己的 `follow_up`，宿主结果类型
+// （`crm_customer` 等）一律得到 `targetExists=false`，页面于是把它们都画成「已不在」。宿主侧新增的
+// `YudaoEffectTargetExistence` 在出口处按模块 mapper 更正这个字段；一旦补偿器加了新类型而探针没跟上，
+// 那一类写就会再次误报。本检查读两份源码，确认两边的类型集合相同，并钉住「只在 `/ai/tool-effects`
+// 上、在信封 advice 之前、读失败不改答案」这三条。
+//
+// English:
+//
+// The ledger's `targetExists` must answer from the host's real records: every result type a host
+// compensator knows must have a probe of the same name.
+//
+// Why this check exists: the runtime's `EffectController.view()` only knows its own `follow_up`, so
+// every host result type (`crm_customer`, ...) reached it as `targetExists=false` and the console drew
+// them all as "no longer there". The host-side `YudaoEffectTargetExistence` corrects the field from
+// each module's mapper; if a compensator gains a type and the probe does not, that class of write goes
+// back to lying. This check reads both sources, confirms the two type sets are equal, and pins the
+// three rules — only `/ai/tool-effects`, before the envelope advice, and a failed read changes nothing.
+
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+const ROOT = process.cwd()
+const COMPENSATORS = join(
+  ROOT, 'yudao-server', 'src', 'main', 'java', 'cn', 'iocoder', 'yudao', 'server', 'keelbase',
+  'YudaoLocalCompensators.java',
+)
+const ADVICE = join(
+  ROOT, 'yudao-server', 'src', 'main', 'java', 'cn', 'iocoder', 'yudao', 'server', 'keelbase',
+  'YudaoEffectTargetExistence.java',
+)
+
+const failures = []
+const fail = (message) => failures.push(message)
+const read = (file) => {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    fail(`missing ${file}`)
+    return ''
+  }
+}
+
+const compensators = read(COMPENSATORS)
+const advice = read(ADVICE)
+
+const resultTypes = (source) =>
+  [...source.matchAll(/resultType\s*\(\)\s*\{\s*return\s+"([^"]+)"/g)].map((match) => match[1])
+
+const compensated = new Set(resultTypes(compensators))
+const probed = new Set([...advice.matchAll(/found\.put\("([^"]+)"/g)].map((match) => match[1]))
+
+for (const type of compensated) {
+  if (!probed.has(type)) {
+    fail(`补偿器认识 "${type}"，但台账探针没有它 —— 这一类写会再次显示「已不在」`)
+  }
+}
+for (const type of probed) {
+  if (!compensated.has(type)) {
+    fail(`台账探针认识 "${type}"，但没有补偿器产出它 —— 探针在回答一个本宿主不写的类型`)
+  }
+}
+
+if (compensated.size === 0 || probed.size === 0) {
+  fail('没有读到任何结果类型（源码形状变了？）')
+}
+
+if (!/EFFECTS_PATH\s*=\s*"\/ai\/tool-effects"/.test(advice)) {
+  fail('探针没有钉在 `/ai/tool-effects` 上')
+}
+if (!/@Order\s*\(\s*Ordered\.HIGHEST_PRECEDENCE\s*\)/.test(advice)) {
+  fail('探针必须排在运行时信封 advice 之前，否则正文已是信封')
+}
+if (!/row\.put\("targetExists",\s*exists\)/.test(advice)) {
+  fail('探针没有把真实存在性写回 targetExists')
+}
+if (!/probe\s*==\s*null[\s\S]*?return;/.test(advice)) {
+  fail('未知结果类型必须原样保留运行时的答案')
+}
+if (!/catch\s*\(RuntimeException[\s\S]*?return;/.test(advice)) {
+  fail('读失败必须保留运行时的答案，不能把一次故障写成「已不在」')
+}
+
+if (failures.length > 0) {
+  console.error(`check-effect-target-existence: ${failures.length} failed`)
+  for (const message of failures) console.error(`  FAIL ${message}`)
+  process.exit(1)
+}
+
+console.log(`check-effect-target-existence: ${probed.size} probed types, 0 failed`)

@@ -61,7 +61,9 @@
             <template v-if="c.expiresAt"> · {{ t('keelbase.actionCenter.expiresAt', { at: timeText(c.expiresAt) }) }}</template>
           </div>
         </div>
-        <div v-if="c.mode === 'immediate'" class="row-actions">
+        <!-- The audit reader gets no write control at all; the server would refuse it anyway. -->
+        <!-- 审计读者一个写控件都不给；服务端本来也会拒。 -->
+        <div v-if="c.mode === 'immediate' && canWrite" class="row-actions">
           <el-button size="small" type="primary" :loading="deciding === c.token" :disabled="deciding !== null" @click="decide(c, 'approve')">
             {{ t('keelbase.actionCenter.approve') }}
           </el-button>
@@ -69,7 +71,7 @@
             {{ t('keelbase.actionCenter.decline') }}
           </el-button>
         </div>
-        <div v-else class="row-actions text-12px text-[var(--el-text-color-secondary)]">
+        <div v-else-if="c.mode !== 'immediate'" class="row-actions text-12px text-[var(--el-text-color-secondary)]">
           {{ t('keelbase.actionCenter.notDecidableHere') }}
         </div>
       </div>
@@ -181,7 +183,7 @@
         <template #default="{ row }">
           <!-- The server decides revocability, and the page believes it rather than re-deriving it. -->
           <!-- 可撤性由**服务端**定，页面信它，而不是自己重算一遍。 -->
-          <el-button v-if="row.revocable" link type="danger" @click="confirmRevoke(row)">
+          <el-button v-if="row.revocable && canWrite" link type="danger" @click="confirmRevoke(row)">
             {{ t('keelbase.effects.revoke') }}
           </el-button>
           <span v-else class="text-[var(--el-text-color-secondary)]">—</span>
@@ -211,10 +213,14 @@ import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { toolLabelKey } from '@/keelbase/labels'
 import { maskTitle } from '@/keelbase/mask'
 import { timeText } from '@/keelbase/time'
+import { useConsoleWriteAllowed } from '@/keelbase/consoleRole'
 
 defineOptions({ name: 'KeelbaseGovernanceActionCenter' })
 
 const { t } = useI18n()
+/** The audit reader sees no write control (revoke, approve, decline); the server's verdict is unchanged. */
+/** 审计读者不出现写控件（撤销、批准、拒绝）；服务端裁决不变。 */
+const { canWrite } = useConsoleWriteAllowed()
 
 /** The tool in the reader's language, falling back to the registered name. */
 /** 工具名，用读者的语言；不认识就保留注册名。 */
