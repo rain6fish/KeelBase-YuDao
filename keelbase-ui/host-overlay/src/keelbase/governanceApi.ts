@@ -231,13 +231,37 @@ export interface ConversationData {
   messages: ConversationMessageRow[]
 }
 
-/** One step of a trace, in the frozen `trace-step` shape. Only four of its fields are filled here. */
-/** 轨迹的一步，按冻结对象 `trace-step` 的形状。这里只填了它四个字段。 */
+/**
+ * The side effect a trace step produced, narrowed to what this page reads. The frozen shape carries
+ * more (`effectId`, `targetTitle`, `revocable`, before/after snapshots); none of it is drawn here.
+ *
+ * 轨迹一步产出的那条副作用，收窄到本页读的那几项。冻结形状里还有更多（`effectId`、
+ * `targetTitle`、`revocable`、前后快照）；这里一项都不画。
+ */
+export interface TraceEffect {
+  resultType?: string | null
+  resultId?: number | string | null
+  status?: string | null
+}
+
+/**
+ * One step of a trace, in the frozen `trace-step` shape. The runtime writes no prose into `content`
+ * for tool calls, decisions or effects, so the page composes a line from the fields below. `args` is
+ * deliberately absent: the coverage statement promises the call's argument string is never shown.
+ *
+ * 轨迹的一步，按冻结对象 `trace-step` 的形状。运行时不给工具调用、裁决与副作用写 `content` 的文字，
+ * 故页面用下面这些字段拼出一行。**`args` 刻意不在此**：覆盖声明承诺调用的参数串从不显示。
+ */
 export interface TraceStep {
   id: string
   type: string
   time: string
   content: string | null
+  toolName?: string | null
+  success?: boolean | null
+  errorMessage?: string | null
+  outcome?: string | null
+  effect?: TraceEffect | null
 }
 
 export interface ConversationTrace {

@@ -76,7 +76,7 @@
              disclosure and not as one more thing that happened. -->
         <!-- 一条 `notice` 步，是运行时在**披露**它放不进这里的东西，故按披露画、不按「又发生了一件事」画。 -->
         <el-tag v-else size="small" type="warning">{{ t('keelbase.trace.noticeTag') }}</el-tag>
-        <span class="step-content" :class="{ 'text-[var(--el-color-warning)]': s.type === 'notice' }">{{ s.content || '—' }}</span>
+        <span class="step-content" :class="{ 'text-[var(--el-color-warning)]': s.type === 'notice' }">{{ stepTextOf(s) }}</span>
       </div>
     </div>
   </ContentWrap>
@@ -86,9 +86,15 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
-import { conversationApi, type ConversationData, type ConversationTrace } from '@/keelbase/governanceApi'
+import {
+  conversationApi,
+  type ConversationData,
+  type ConversationTrace,
+  type TraceStep,
+} from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { traceStepLabelKey } from '@/keelbase/labels'
+import { stepText } from '@/keelbase/traceStepText'
 import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceConversationTrace' })
@@ -100,6 +106,18 @@ const { t } = useI18n()
 function stepTypeText(type: string): string {
   const key = traceStepLabelKey(type)
   return key ? t(key) : type
+}
+
+/**
+ * What the step says. The runtime's own `content` when it sent one; otherwise the step's fields —
+ * the tool and how the call ended, the decision, or the record and its status — and never the call's
+ * arguments.
+ *
+ * 这一步说什么。运行时给了 `content` 就用它；否则用该步的字段 —— 哪个工具、这次调用怎么收场，
+ * 裁决是什么，或者哪条记录、它什么状态 —— 且绝不带调用的参数。
+ */
+function stepTextOf(step: TraceStep): string {
+  return stepText(step, (key) => t(key))
 }
 
 const conversations = ref<ConversationData[]>([])

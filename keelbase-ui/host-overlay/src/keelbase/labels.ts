@@ -105,6 +105,45 @@ export function traceStepLabelKey(type: string | null | undefined): string | nul
   return code ? `keelbase.vocab.traceStep.${code}` : null
 }
 
+// `trace-step` v3's `confirmation.outcome` enum — the decision a person took. It is its own closed
+// set, and its words are the audit row's (`approve`/`decline` are the act, `approved`/`declined` the
+// state; `pending_approval` is the state `pending` names). So the reader gets one vocabulary, not two.
+// `trace-step` v3 的 `confirmation.outcome` 枚举 —— 有人作的裁决。它是自成一套的封闭集合，而它的词就是
+// 审计行那套（`approve`/`decline` 是动作，`approved`/`declined` 是状态；`pending_approval` 即 `pending`
+// 所指的状态）。于是读者拿到的是一套词，不是两套。
+const TRACE_CONFIRMATION_OUTCOMES: Record<string, string> = {
+  approve: 'approved',
+  decline: 'declined',
+  timeout: 'timeout',
+  pending_approval: 'pending',
+}
+
+/** The i18n key for a trace confirmation step's outcome, or null. */
+/** 轨迹**确认**步结局的 i18n key；否则 null。 */
+export function traceOutcomeLabelKey(outcome: string | null | undefined): string | null {
+  const word = outcome ? TRACE_CONFIRMATION_OUTCOMES[outcome] : null
+  return word ? `keelbase.vocab.outcome.${word}` : null
+}
+
+// `traceEffect.status` v3's in-flight readings. `executed` and `revoked` already have words in the
+// audit `outcome` set; the two the projection normalises for a revocation do not, so they get keys of
+// their own. A status outside either set reads as itself.
+// `traceEffect.status` v3 的两个**进行中**读数。`executed` 与 `revoked` 在审计 `outcome` 集合里已有词；
+// 投影为一次撤销归一的另外两个没有，故单独给它们 key。两个集合都不认的状态如实显示为它自己。
+const TRACE_EFFECT_STATUS_KEYS: Record<string, string> = {
+  revoking_external: 'revokingExternal',
+  revoke_failed: 'revokeFailed',
+}
+
+/** The i18n key for a trace effect step's status, or null. */
+/** 轨迹**副作用**步状态的 i18n key；否则 null。 */
+export function traceEffectStatusLabelKey(status: string | null | undefined): string | null {
+  const outcome = outcomeLabelKey(status)
+  if (outcome) return outcome
+  const name = status ? TRACE_EFFECT_STATUS_KEYS[status] : null
+  return name ? `keelbase.vocab.traceEffectStatus.${name}` : null
+}
+
 /** The i18n key for an operations row's action, or null. */
 /** 操作审计行**动作**的 i18n key；否则 null。 */
 export function opActionLabelKey(action: string | null | undefined): string | null {

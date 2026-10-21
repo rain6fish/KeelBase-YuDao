@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,347 @@
+@@ -1,4 +1,353 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -324,6 +324,12 @@ index 96269a8..2611a9b 100644
 +        effect: 'Side effect',
 +        notice: 'Disclosure',
 +      },
++      // The two in-flight revocation readings of `traceEffect.status`; `executed` and `revoked`
++      // reuse the audit outcome words above.
++      traceEffectStatus: {
++        revokingExternal: 'Being revoked',
++        revokeFailed: 'Revocation failed',
++      },
 +      opAction: {
 +        login: 'Sign-in',
 +        logout: 'Sign-out',
@@ -354,7 +360,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,345 @@
+@@ -1,4 +1,350 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -673,6 +679,11 @@ index 35f1e1a..856d201 100644
 +        confirmation: '确认决策',
 +        effect: '副作用',
 +        notice: '披露',
++      },
++      // `traceEffect.status` 的两个「进行中」撤销读数；`executed` 与 `revoked` 复用上面的审计结局词。
++      traceEffectStatus: {
++        revokingExternal: '撤销中',
++        revokeFailed: '撤销失败',
 +      },
 +      opAction: {
 +        login: '登录',
