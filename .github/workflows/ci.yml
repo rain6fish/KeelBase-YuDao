@@ -106,6 +106,15 @@ jobs:
       - name: Our tools must not be reachable by a model without KeelBase
         run: node scripts/check-ungoverned-tool-beans.mjs
 
+      # 同一条边界还有面向读者的一半：控制台那页必须把「它扣不住的」区块画出来，中英都要有，且取自门禁
+      # 记录。这道测试把模板、双语词条与记录放在一起读 —— 块不再渲染时，是门禁变红，而不是等走查时才被发现。
+      # The same boundary has a reader-facing half: the console page must draw the "not held by it"
+      # block, in both languages, from the gate's record. This reads the template, the bilingual
+      # messages and the record together, so a block that stops rendering turns the gate red rather
+      # than being noticed only when someone walks the page.
+      - name: The boundary page must draw its not-held block, in both languages
+        run: node --test scripts/boundary-page.test.mjs
+
   governance-registry:
     name: Every governed module declares itself
     runs-on: ubuntu-latest

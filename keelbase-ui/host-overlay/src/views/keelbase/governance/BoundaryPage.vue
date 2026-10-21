@@ -101,6 +101,28 @@
         </el-table-column>
       </el-table>
 
+      <!-- 它扣不住的：独立成块，读者从上到下走一遍就能读到上游那条路与「只差一个 bean」的告诫。
+           内容来自 `stated.notHeld`，路径名来自 `path.<id>` —— 与上面那张表同一份记录，页面不另算。 -->
+      <!-- Not held by it: its own block, so a reader walking the page top to bottom meets upstream's
+           path and the "one bean away" warning. The content comes from `stated.notHeld`, the path name
+           from `path.<id>` — the same record as the table above; the page derives nothing new. -->
+      <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.notHeldTitle') }}</div>
+      <div class="text-12px mb-4px">{{ t('keelbase.boundary.notHeldWhat') }}</div>
+      <div class="mb-4px">
+        <el-tag size="small" effect="plain">
+          {{ t(`keelbase.boundary.path.${boundary.stated.notHeld.id}`) }}
+        </el-tag>
+      </div>
+      <div class="text-12px text-[var(--el-text-color-secondary)] mb-6px">
+        {{ t('keelbase.boundary.notHeldWhy') }}
+      </div>
+      <el-alert
+        v-if="boundary.stated.notHeld.oneBeanAway"
+        type="warning"
+        :closable="false"
+        :title="t('keelbase.boundary.notHeldOneBean')"
+      />
+
       <!-- 会绕过它的 bean：有才画，且是这一页唯一「坏了」的样子 / only when there are any -->
       <template v-if="boundary.computed.offenders.length">
         <div class="font-medium mt-16px mb-6px">{{ t('keelbase.boundary.offendersTitle') }}</div>
