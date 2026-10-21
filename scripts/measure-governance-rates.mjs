@@ -53,8 +53,6 @@
 //
 // 本文件服务的那条判据 = `D28` 红线 ⑤：**换了底座，不等于放弃上一条线已有的可复现性**。
 //
-// **仍有一处要读文本**：单位是按**工具**折叠的，而工具名是 `detail` 的第一个词——契约今天还没有那一列。
-// 其余各格一律按 `action` 计数。等契约加上那一列，要删的就是 `SPLIT_TOOL` 里那一句。
 import { execFileSync } from 'node:child_process';
 
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
