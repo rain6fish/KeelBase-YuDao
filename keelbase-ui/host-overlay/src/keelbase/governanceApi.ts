@@ -349,17 +349,22 @@ export const businessLogApi = {
  *
  * The frozen object declares more than this runtime fills; what is absent — the request body, the
  * field-level diff, the feature names, the two hash columns — is absent because nothing here
- * produces it. The page draws the ten the runtime answers and says nothing about the rest.
+ * produces it. The page draws the eleven the runtime answers and says nothing about the rest.
  *
  * `/audit/operations/logs` 的一行 —— 对**业务**的一次写，含没有 AI 参与的那些。它读的是与旁边那条 AI
  * 审计**不同**的链，且没有任何东西把两者连起来。
  *
  * 冻结对象声明的比本运行时填的多；缺的那些 —— 请求正文、字段级差异、功能名、两个哈希列 —— 之所以缺，
- * 是因为这里没有东西产出它们。页面只画运行时答得出的那十个，其余一个字不说。
+ * 是因为这里没有东西产出它们。页面只画运行时答得出的那十一个，其余一个字不说。
  */
 export interface OperationAuditRow {
   id: number
-  userId: string | null
+  /** Numeric identity, as the frozen object types it; null when this identity is not numeric. */
+  /** 数字形式的身份，按冻结对象的定型；这个身份不是数字时为 null。 */
+  userId: string | number | null
+  /** The identity string the runtime preserved when `userId` is null — not a name joined onto the row. */
+  /** `userId` 为 null 时运行时**保留下来**的身份字符串——不是联到这一行上的名字。 */
+  username: string | null
   /** `LOGIN` | `LOGOUT` | `UPLOAD` | `CREATE` | `UPDATE` | `DELETE` — the row's own word for the act. */
   /** `LOGIN` | `LOGOUT` | `UPLOAD` | `CREATE` | `UPDATE` | `DELETE` —— 这一行对这次动作自己的叫法。 */
   action: string | null

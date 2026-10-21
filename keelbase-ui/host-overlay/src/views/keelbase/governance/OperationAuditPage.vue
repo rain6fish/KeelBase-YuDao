@@ -12,7 +12,7 @@
   the same reason the audit page does not offer `agentId`/`orgId`, which that runtime *refuses*
   rather than ignores. And **no columns for what the runtime does not answer**: the request body, the
   field-level diff, the feature names and the two hash columns are declared by the frozen object and
-  filled by nobody here, so the page draws the ten fields it is given.
+  filled by nobody here, so the page draws the eleven fields it is given.
 
   对**业务**做了什么，最新的在前 —— 按**审计人员读它的方式**读：**谁**、**什么时候**、**做了什么**、
   **结果**如何。
@@ -23,7 +23,7 @@
   有两样东西这一页**刻意没有**。**不打筛选**：这条面只收一个窗口、别的都不收，故提供一个调用方或一段
   时间，回出来的会是一份**看着像筛过、其实没有**的列表 —— 与审计页不提供 `agentId`/`orgId` 是同一条
   理由（那个运行时是**拒绝**它们、不是忽略）。**不为运行时不答的东西画列**：请求正文、字段级差异、功能名
-  与两个哈希列都是**冻结对象声明了、而这里没有东西填**的，故页面只画**给到它的那十个字段**。
+  与两个哈希列都是**冻结对象声明了、而这里没有东西填**的，故页面只画**给到它的那十一个字段**。
 -->
 <template>
   <ContentWrap :title="t('keelbase.opAudit.title')">
@@ -48,7 +48,7 @@
           <div class="row-detail">
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colWho') }}</span>
-              <span>{{ callerName(row.userId) }} <span v-if="row.userId" class="muted">#{{ row.userId }}</span></span>
+              <span>{{ whoText(row) }} <span v-if="row.userId" class="muted">#{{ row.userId }}</span></span>
             </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colTime') }}</span>
@@ -85,8 +85,12 @@
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colWho')" width="170">
         <template #default="{ row }">
-          <div>{{ callerName(row.userId) }}</div>
-          <!-- 没有 id 的行**不画那一行**：`#—` 读起来像一个坏掉的 id，而不是「这次没人可挂」。 -->
+          <div>{{ whoText(row) }}</div>
+          <!-- A row with no numeric id draws no id line: `#—` reads as a broken id rather than as no
+               caller to hang the row on. When the runtime kept a string identity, `whoText` shows that
+               string itself — it is not given a made-up id beside it. -->
+          <!-- 没有数字 id 的行**不画那一行 id**：`#—` 读起来像一个坏掉的 id，而不是「这次没人可挂」。
+               运行时留下了字符串身份时，`whoText` 直接显示那个字符串——不在旁边给它编一个 id。 -->
           <div v-if="row.userId" class="muted">#{{ row.userId }}</div>
         </template>
       </el-table-column>
@@ -145,9 +149,24 @@ const error = ref('')
 /** 屏幕上那些 id 的调用方姓名，在行落地之后补上。 */
 const names = ref<Record<string, string>>({})
 
-function callerName(id: string | null | undefined): string {
+function callerName(id: string | number | null | undefined): string {
   if (!id) return '—'
   return names.value[String(id)] ?? String(id)
+}
+
+/**
+ * The caller as this row states it. A numeric id goes through the host's directory exactly as before;
+ * when there is none but the runtime kept the identity string in `username`, that string is the answer
+ * — it is what the row actually says, so it is shown as it is, with no id invented beside it. Only a
+ * row with neither falls back to the dash.
+ *
+ * 这一行**自己说的**调用方。数字 id 照旧经宿主名录配名；没有数字 id、而运行时把身份字符串留在了
+ * `username` 里时，那个字符串就是答案——它正是这一行**实际说出来的东西**，故原样显示，不在旁边编一个
+ * id。两样都没有的行才回落到破折号。
+ */
+function whoText(row: OperationAuditRow): string {
+  if (row.userId) return callerName(row.userId)
+  return row.username || '—'
 }
 
 function actionText(action: string | null | undefined): string {
