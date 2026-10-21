@@ -220,6 +220,15 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     private Ai1LocalToolProvider localToolProvider;
 
     /**
+     * Optional deployments' own copies of the turns — see {@link Ai1TranscriptListener}. Empty means
+     * this module records only its own tables.
+     *
+     * 部署方自己的回合副本（可选）——见 {@link Ai1TranscriptListener}。为空即本模块只记自己的表。
+     */
+    @Autowired
+    private List<Ai1TranscriptListener> transcriptListeners = List.of();
+
+    /**
      * 结果流 TTL 上次续期时刻：助手消息编号 → 毫秒时间戳，用于 EXPIRE 节流
      */
     private final Map<Long, Long> resultExpireTimes = new ConcurrentHashMap<>();
@@ -480,7 +489,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             Long tenantId = Convert.toLong(fields.get(FIELD_TENANT_ID));
             Long userId = Convert.toLong(fields.get(FIELD_USER_ID));
             TenantUtils.execute(tenantId, () -> withCaller(userId,
-                    () -> executeTask(recordId, fields, messageId, lock, workerThreadId, reclaimed)));
+                    () -> executeTask(recordId, fields, messageId, userId, lock, workerThreadId, reclaimed)));
         } catch (Exception e) {
             // Redis 或回填失败时保留 pending，后续接管不会重新生成
             log.error("[handleTask][助手消息({}) 处理失败]", messageId, e);
@@ -529,7 +538,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
      * 持有执行锁后处理任务：清理异常记录、补齐已完成任务、收尾中断任务，或执行新一轮生成
      */
     private void executeTask(StreamMessageId recordId, Map<String, String> fields, Long messageId,
-                             RLock lock, long workerThreadId, boolean reclaimed) {
+                             Long userId, RLock lock, long workerThreadId, boolean reclaimed) {
         // 1.1 查询助手消息，不存在或不是助手角色时确认丢弃
         Ai1SessionMessageDO message = sessionMessageService.getSessionMessage(messageId);
         if (message == null || !Ai1SessionMessageRoleEnum.isAssistant(message.getRole())) {
@@ -551,7 +560,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             Ai1LlmChatTool.ChatText partialText = readPartialResult(messageId);
             // 1.3.2 回填部分结果并标记失败；每次写入前校验执行权，防止旧 worker 继续写入
             checkTaskLock(lock, workerThreadId);
-            saveAssistantMessage(messageId, sessionId, partialText, Ai1SessionMessageStatusEnum.FAILED.getStatus());
+            saveAssistantMessage(messageId, sessionId, userId, partialText, Ai1SessionMessageStatusEnum.FAILED.getStatus());
             // 1.3.3 写入错误提示和结束事件，续传连接可及时退出
             checkTaskLock(lock, workerThreadId);
             appendResult(messageId, Ai1SessionStreamEventEnum.ERROR.getEvent(), INTERRUPTED_MESSAGE);
@@ -587,7 +596,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             appendResult(messageId, Ai1SessionStreamEventEnum.PING.getEvent(), "");
             Ai1LlmChatTool.ChatText chatText = generate(messageId, agentId, sessionId, content, onThinking, onContent);
             checkTaskLock(lock, workerThreadId);
-            saveAssistantMessage(messageId, sessionId, chatText, Ai1SessionMessageStatusEnum.SUCCESS.getStatus());
+            saveAssistantMessage(messageId, sessionId, userId, chatText, Ai1SessionMessageStatusEnum.SUCCESS.getStatus());
         } catch (Exception e) {
             // 失去锁的旧 worker 不得再写结果、终态或 XACK，留给新持有者处理
             if (!lock.isHeldByThread(workerThreadId)) {
@@ -597,7 +606,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             log.warn("[handleTask][助手消息({}) 生成失败]", messageId, e);
             appendResult(messageId, Ai1SessionStreamEventEnum.ERROR.getEvent(), StrUtil.blankToDefault(e.getMessage(), "生成失败"));
             checkTaskLock(lock, workerThreadId);
-            saveAssistantMessage(messageId, sessionId, new Ai1LlmChatTool.ChatText(contentText.toString(),
+            saveAssistantMessage(messageId, sessionId, userId, new Ai1LlmChatTool.ChatText(contentText.toString(),
                     thinkingText.toString()), Ai1SessionMessageStatusEnum.FAILED.getStatus());
         }
         // 4. 回填后写终态并确认；失败时由后续接管清理，不能在 finally 中无条件确认
@@ -772,12 +781,31 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     /**
      * 回填助手消息（占位记录）的内容、思考过程与生成状态，并刷新会话活跃时间
      */
-    private void saveAssistantMessage(Long messageId, Long sessionId, Ai1LlmChatTool.ChatText chatText, Integer status) {
+    private void saveAssistantMessage(Long messageId, Long sessionId, Long userId,
+                                      Ai1LlmChatTool.ChatText chatText, Integer status) {
         sessionMessageService.updateSessionMessage(new Ai1SessionMessageDO().setId(messageId)
                 .setContent(StrUtil.nullToEmpty(chatText.getContent()))
                 .setReasoning(StrUtil.emptyToNull(chatText.getThinking()))
                 .setStatus(status));
         sessionService.touchSession(sessionId);
+        notifyAssistantTurn(sessionId, userId, chatText.getContent());
+    }
+
+    /**
+     * Tells the deployment that the assistant's reply has been stored. Same rule as the caller's turn:
+     * a listener failure is logged, never raised, so the deployment's copy cannot fail the generation.
+     *
+     * 告知部署方：助手的回复已经落库。与调用方那一轮同一条规矩：监听器失败只记日志、绝不向上抛，故部署方的
+     * 副本不能让这次生成失败。
+     */
+    private void notifyAssistantTurn(Long sessionId, Long userId, String content) {
+        for (Ai1TranscriptListener listener : transcriptListeners) {
+            try {
+                listener.assistantTurn(sessionId, userId, content);
+            } catch (RuntimeException failed) {
+                log.warn("[notifyAssistantTurn][会话({}) 转录写入失败]", sessionId, failed);
+            }
+        }
     }
 
     // ==================== 结果流 ====================

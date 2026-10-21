@@ -13,8 +13,10 @@ import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.service.agent.Ai1AgentService;
 import cn.iocoder.yudao.module.ai1.harness.session.Ai1SessionStreamTool;
+import cn.iocoder.yudao.module.ai1.harness.session.Ai1TranscriptListener;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -48,6 +50,15 @@ public class Ai1SessionMessageServiceImpl implements Ai1SessionMessageService {
 
     @Resource
     private Ai1SessionStreamTool sessionStreamTool;
+
+    /**
+     * Optional deployments' own copies of the turns. Empty means this module records only its own
+     * tables, exactly as it does on its own.
+     *
+     * 部署方自己的回合副本（可选）。为空即本模块只记自己的表，与它单独使用时完全一样。
+     */
+    @Autowired
+    private List<Ai1TranscriptListener> transcriptListeners = List.of();
 
     @Override
     public List<Ai1SessionMessageDO> getSessionMessageListBySessionId(Long sessionId) {
@@ -141,6 +152,7 @@ public class Ai1SessionMessageServiceImpl implements Ai1SessionMessageService {
         sessionMessageMapper.insert(new Ai1SessionMessageDO().setSessionId(session.getId())
                 .setRole(Ai1SessionMessageRoleEnum.USER.getRole()).setContent(content)
                 .setStatus(Ai1SessionMessageStatusEnum.SUCCESS.getStatus()));
+        notifyUserTurn(session, content);
         Ai1SessionMessageDO assistantMessage = new Ai1SessionMessageDO().setSessionId(session.getId())
                 .setRole(Ai1SessionMessageRoleEnum.ASSISTANT.getRole()).setContent("")
                 .setStatus(Ai1SessionMessageStatusEnum.GENERATING.getStatus());
@@ -149,6 +161,22 @@ public class Ai1SessionMessageServiceImpl implements Ai1SessionMessageService {
         // 3. 刷新会话活跃时间
         sessionService.touchSession(session.getId());
         return assistantMessage.getId();
+    }
+
+    /**
+     * Tells the deployment that the caller's turn has been stored. A listener that fails is logged,
+     * not raised: the deployment's copy is not allowed to fail the user's turn.
+     *
+     * 告知部署方：调用方这一轮已经落库。监听器失败只记日志、不向上抛：部署方的副本不许让用户这一轮失败。
+     */
+    private void notifyUserTurn(Ai1SessionDO session, String content) {
+        for (Ai1TranscriptListener listener : transcriptListeners) {
+            try {
+                listener.userTurn(session.getId(), session.getUserId(), content);
+            } catch (RuntimeException failed) {
+                log.warn("[notifyUserTurn][会话({}) 转录写入失败]", session.getId(), failed);
+            }
+        }
     }
 
     @Override

@@ -28,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.redisson.api.RStream;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -95,6 +96,8 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
     private Ai1SkillToolFactory skillToolFactory;
     @Mock
     private Ai1RagTool ragTool;
+    @Mock
+    private Ai1TranscriptListener transcriptListener;
 
     @BeforeEach
     public void before() {
@@ -185,7 +188,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
                 .thenReturn(new ArrayList<>());
         when(llmChatTool.chat(any(), anyString(), anyList(), eq("你好"), anyList(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
-                    Consumer<String> onContent = invocation.getArgument(8);
+                    Consumer<String> onContent = invocation.getArgument(7);
                     onContent.accept("您好");
                     return new Ai1LlmChatTool.ChatText("您好", "");
                 });
@@ -203,6 +206,28 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         assertEquals(Ai1SessionMessageStatusEnum.SUCCESS.getStatus(), messageCaptor.getValue().getStatus());
         verify(sessionService).touchSession(SESSION_ID);
         assertEquals(List.of("ping", "message", "done"), captureResultTypes());
+    }
+
+    @Test
+    public void testHandleTask_notifiesTranscriptListener() {
+        // mock 方法
+        when(agentService.validateAgentExists(AGENT_ID)).thenReturn(
+                new Ai1AgentDO().setId(AGENT_ID).setName("客服").setProviderId(1L).setModelId(2L));
+        when(modelService.getModelRespBO(1L, 2L))
+                .thenReturn(new Ai1ModelRespBO().setModelType(Ai1ModelTypeEnum.CHAT.getType()));
+        when(sessionMessageService.getSessionMessageListBySessionIdAndIdLessThan(eq(SESSION_ID), eq(MESSAGE_ID), anyInt()))
+                .thenReturn(new ArrayList<>());
+        when(llmChatTool.chat(any(), anyString(), anyList(), eq("你好"), anyList(), anyList(), any(), any()))
+                .thenReturn(new Ai1LlmChatTool.ChatText("您好", ""));
+        ReflectionTestUtils.setField(sessionStreamTool, "transcriptListeners", List.of(transcriptListener));
+        Map<String, String> fields = buildTaskFields();
+        fields.put("userId", "100");
+
+        // 调用
+        sessionStreamTool.handleTask(RECORD_ID, fields);
+
+        // 断言：助手这一轮被告知给部署方，属主取投递它的调用方
+        verify(transcriptListener).assistantTurn(SESSION_ID, 100L, "您好");
     }
 
     @Test
@@ -313,7 +338,7 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
         when(llmChatTool.chat(any(), anyString(), anyList(), anyString(), anyList(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
                     when(taskLock.isHeldByThread(anyLong())).thenReturn(false);
-                    Consumer<String> onContent = invocation.getArgument(8);
+                    Consumer<String> onContent = invocation.getArgument(7);
                     onContent.accept("旧 worker 输出");
                     return new Ai1LlmChatTool.ChatText("旧 worker 输出", "");
                 });

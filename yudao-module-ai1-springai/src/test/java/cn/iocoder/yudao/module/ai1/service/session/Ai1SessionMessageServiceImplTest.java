@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.service.agent.Ai1AgentService;
 import cn.iocoder.yudao.module.ai1.harness.session.Ai1SessionStreamTool;
+import cn.iocoder.yudao.module.ai1.harness.session.Ai1TranscriptListener;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
@@ -55,6 +56,8 @@ public class Ai1SessionMessageServiceImplTest extends BaseDbUnitTest {
     private Ai1AgentService agentService;
     @MockitoBean
     private Ai1SessionStreamTool sessionStreamTool;
+    @MockitoBean
+    private Ai1TranscriptListener transcriptListener;
 
     @BeforeEach
     public void before() {
@@ -227,6 +230,34 @@ public class Ai1SessionMessageServiceImplTest extends BaseDbUnitTest {
         sessionMessageService.createRoundMessages(session, "已有消息不覆盖标题");
         // 断言
         verify(sessionService, never()).updateSessionTitle(anyLong(), anyString());
+    }
+
+    @Test
+    public void testCreateRoundMessages_notifiesTranscriptListener() {
+        // 准备参数
+        Ai1SessionDO session = new Ai1SessionDO().setId(10L).setAgentId(1L).setUserId(USER_ID)
+                .setTitle("已有标题");
+
+        // 调用
+        sessionMessageService.createRoundMessages(session, "你好");
+
+        // 断言：调用方这一轮被告知给部署方
+        verify(transcriptListener).userTurn(10L, USER_ID, "你好");
+    }
+
+    @Test
+    public void testCreateRoundMessages_transcriptFailureDoesNotFailTheTurn() {
+        // mock 方法：部署方的副本写入失败
+        doThrow(new IllegalStateException("transcript store down")).when(transcriptListener)
+                .userTurn(anyLong(), anyLong(), anyString());
+        Ai1SessionDO session = new Ai1SessionDO().setId(10L).setAgentId(1L).setUserId(USER_ID)
+                .setTitle("已有标题");
+
+        // 调用
+        assertDoesNotThrow(() -> sessionMessageService.createRoundMessages(session, "你好"));
+
+        // 断言：本模块自己的两行照常落库
+        assertEquals(2, sessionMessageMapper.selectListBySessionId(10L).size());
     }
 
     @Test
