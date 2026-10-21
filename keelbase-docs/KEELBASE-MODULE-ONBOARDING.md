@@ -35,6 +35,12 @@ get: the per-module work is a **constant**, and it stays a constant, because the
 upstream's code and upstream does not converge. It also produced the first **pair** owner
 (`user_id + user_type`, §4.1) and the first module that already narrows itself (§4.3).
 
+**Revised 2026-10-21**: a **fifth** module followed — the infra module's demo contact
+(`yudao_demo01_contact`), the first whose rows carry **no owner column** and whose module has **no
+permission table of its own**. It turned two costs this file had only implied into rules: the page
+total when there is no caller filter to pass down (§2.1), and the owner stamp a tool-path create
+needs after the insert (§2.2). Its gate is `scripts/run-demo01-contact-scenarios.mjs`.
+
 ## 1. Which half is which
 
 | Half | Where it lives | A new module touches it? |
@@ -84,6 +90,18 @@ module:
 Each module answers these differently, and some will answer "nothing to close here". That reading is
 the work, and it does not compress.
 
+**When the page has no owner filter to pass down, the total must say which total it is.** Some
+modules have no caller or owner column in the page VO — the owner is only the audit string `creator`,
+filled by the persistence layer. The advice cannot narrow the query; it lets the module answer and
+then filters the page it got back. That is narrower than a count-preserving filter, and it changes
+what `total` means: the module's own total counts the table, while the narrowed total can only count
+**this page's** rows. The honest form is to recompute `total = rows kept` and to **declare** the
+choice where a reader can see it — the module's comments and this file — so nobody reads the number
+as a table count. A module that needs a true per-caller total needs a caller filter (or a count query
+with the same filter) in **its own** query; the advice cannot invent one. The gate must fix the
+semantics with a pair: an exempt caller sees the module total, a narrowed caller sees the page-local
+total (`run-demo01-contact-scenarios.mjs`, scenario 3.5).
+
 **Declare a narrowing *as* a narrowing.** CRM's advice asks only the owner question, while upstream's
 `crm_permission` grants READ and WRITE to participants as well as the owner. The advice is therefore
 **stricter than the module, not equal to it** — its file says so, and widening it is a decision about
@@ -110,6 +128,15 @@ twice`). Both are runtime behaviour, not module bugs; both are recorded on the p
 **Carry the caller.** Upstream's own page query takes the user id **as an argument**, so identity has
 to travel rather than merely be available: `ActingCaller.as(principal.userId(), …)`, plus the host's
 tenant (`TenantUtils.execute(...)`) — a host-service call is refused without one.
+
+**Stamp the owner after a tool-path create.** The framework's audit-field handler fills `creator`
+from the security context; the AI tool path publishes its caller through `ActingCaller` instead, so a
+row created through a tool lands with an empty `creator` and is invisible to its own owner. The
+module's service must write the acting caller back **after** the insert — by id, inside the same
+governed call (hence the same tenant context). Precedent: `Demo01ContactGovernance.stampCreator`
+(read `scope.creatingCaller()`, call the service, then update only `{id, creator}`); the gate asserts
+the stamped value, not merely that the row exists. This is per-module code rather than a host helper:
+the save VO and mapper belong to the module, and a shared helper would have to guess both.
 
 **Project.** Drop the identity and contact fields on the way out; the admin console's red line is
 that identity fields are masked at the edge.
@@ -151,6 +178,15 @@ write unrecorded (`D36` ①, 2026-10-11). Claim it as "in principle recorded", n
 on the chain". **Scope every assertion by a name unique to this run, never by a count of the whole
 table**, so the gate holds on a database it has already been run against and alongside another run of
 itself.
+
+A module whose owner is an audit string also owes two assertions beyond the four: the page total's
+declared semantics (§2.1) and the owner stamp on a tool-created row (§2.2). Both are checked in
+`run-demo01-contact-scenarios.mjs` (scenarios 3 and 3.5).
+
+Cleanup must take back **every confirmation row this run marked**, not only `pending` ones. An
+approved row is this run's leftover too; deleting by `status = 'pending'` leaves it for the next run
+to trip over. Match the run's unique marker and its fixture row ids, and include `approved` and
+`rejected` in the delete.
 
 ## 3. The generated path is the same three things, by machine
 
@@ -220,13 +256,15 @@ wrote, there is no Spec to write — see §2.
 
 ## 5. What this file does not claim
 
-- Four modules is four samples — three upstream (`crm`, BPM's leave request, and the system module's
-  messages) and one generated (`products`). Everything above describes the shape they repeated, not a
-  contract. What the four together say is a **number**: a second module cost 642 lines and a third
-  cost 647, so the per-module work is flat rather than falling.
-- **CRM, the BPM leave slice and the system message slice have been run end to end** (`YD-2`'s gate,
-  `YD-14`'s gate, `YD-15`'s gate). `products` has been generated and built, not put through the same
-  gate.
+- Five modules is five samples — four upstream (`crm`, BPM's leave request, the system module's
+  messages, and infra's demo contact) and one generated (`products`). Everything above describes the
+  shape they repeated, not a contract. What the first four together say is a **number**: a second
+  module cost 642 lines and a third cost 647, so the per-module work is flat rather than falling. The
+  fifth is the one they did not cover: no owner column, no permission table, and therefore the two
+  rules added on 2026-10-21.
+- **CRM, the BPM leave slice, the system message slice and the infra demo contact have been run end
+  to end** (`YD-2`'s gate, `YD-14`'s gate, `YD-15`'s gate, and `run-demo01-contact-scenarios.mjs`).
+  `products` has been generated and built, not put through the same gate.
 - The scope machine's administrator test is still a **placeholder**: "administrator" means user 1
   until a role mapping is decided. That half is unchanged. What changed on **2026-10-11** is the other
   half — the host's role table *is* read now (`YudaoRowScope`), for the every-row exemption only.

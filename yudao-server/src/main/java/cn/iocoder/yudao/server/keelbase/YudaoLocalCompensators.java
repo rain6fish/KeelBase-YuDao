@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.crm.service.followup.CrmFollowUpRecordService;
 import cn.iocoder.yudao.module.fms.dal.dataobject.voucher.FmsVoucherDO;
 import cn.iocoder.yudao.module.fms.dal.mysql.voucher.FmsVoucherMapper;
 import cn.iocoder.yudao.module.fms.service.voucher.FmsVoucherService;
+import cn.iocoder.yudao.module.infra.service.demo.demo01.Demo01ContactService;
 import cn.iocoder.yudao.module.products.service.products.ProductsService;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -69,6 +70,11 @@ public class YudaoLocalCompensators {
     @Bean
     SideEffectCompensator fmsVoucherCompensator(FmsVoucherService service, FmsVoucherMapper mapper) {
         return new FmsVoucherCompensator(service, mapper);
+    }
+
+    @Bean
+    SideEffectCompensator demo01ContactCompensator(Demo01ContactService service) {
+        return new Demo01ContactCompensator(service);
     }
 
     /**
@@ -209,6 +215,34 @@ public class YudaoLocalCompensators {
                 service.updateVoucherReviewStatus(voucher.getAccountSetId(), List.of(effect.getResultId()),
                         FMS_PENDING_REVIEW, asId(effect.getUserId()));
             });
+        }
+    }
+
+    /**
+     * {@code infra_demo01_contact}: a create is deleted; a rename is refused. The face's two writes share
+     * one result type, and the create prefix is what tells them apart — a rename records no earlier
+     * shape, so undoing it would be a guess.
+     *
+     * {@code infra_demo01_contact}：**建**的就删，**改名**的拒。本面的两笔写共用一个结果类型，而 `create_`
+     * 前缀正是区分它们的地方——改名没有留下早先的样子，撤销它只能是猜。
+     */
+    static final class Demo01ContactCompensator implements SideEffectCompensator {
+
+        private final Demo01ContactService service;
+
+        Demo01ContactCompensator(Demo01ContactService service) {
+            this.service = service;
+        }
+
+        @Override
+        public String resultType() {
+            return "infra_demo01_contact";
+        }
+
+        @Override
+        public void compensate(SideEffect effect) {
+            requireCreate(effect);
+            as(effect, () -> service.deleteDemo01Contact(effect.getResultId()));
         }
     }
 
