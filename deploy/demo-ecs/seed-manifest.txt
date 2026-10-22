@@ -108,12 +108,12 @@ separate keelbase-local-images.sql
 skip keelbase-ai.sql # 模块 ai 仍随 jar 编译，但应用面已关停（菜单整支停用 + /admin-api/ai/** 答 404），表不需要灌 | module ai still ships, but its surface is off (menus disabled wholesale + /admin-api/ai/** answers 404), so its tables are not seeded
 skip keelbase-ai-app-surface-off.sql # 同上：菜单已由 module-scope 整支停用，这一份只关其中几页 | same: module-scope already switches the menus off wholesale, so switching off individual pages adds nothing
 
-# ⚠ 待裁，不是已裁：部署 README 说 jar 含 `bpm`，而 `module-scope.sql` 的保留清单没有 `/bpm`。
-# 两者只能有一个对。若 `bpm` 是展示模块 ⇒ 本文件要加这一份，保留清单也要加 `/bpm`。
-# ⚠ Undecided, not decided: the deployment README says the jar carries `bpm`, while the keep list in
-# `module-scope.sql` has no `/bpm`. Only one can be right. If `bpm` is a shown module ⇒ this file adds
-# this entry, and the keep list adds `/bpm`.
-skip keelbase-bpm.sql # 待裁：README 说 jar 含 bpm，保留清单却不留 /bpm；未裁前不导入 | UNDECIDED: README says the jar carries bpm, the keep list has no /bpm; not loaded until decided
+# 已裁（2026-10-19）：bpm 的菜单**不展示**、`bpm_*` 表**不导入**，但 jar **仍含 `bpm`**——`yudao-module-crm`
+# 依赖它，CRM 的合同与回款审批调用 `BpmProcessInstanceApi`。故这里是 `skip`，不是「待裁」。
+# Ruled (2026-10-19): bpm's menus are **not shown** and its `bpm_*` tables are **not seeded**, but the jar
+# **still carries `bpm`** — `yudao-module-crm` depends on it, and CRM's contract and receivable approvals
+# call `BpmProcessInstanceApi`. So this is a `skip`, not an open question.
+skip keelbase-bpm.sql # 已裁：菜单不展示、bpm_* 表不导入；jar 仍含 bpm（CRM 合同/回款审批依赖） | RULED: menus hidden, bpm_* tables not seeded; the jar still carries bpm (CRM contract/receivable approval depends on it)
 
 # 样例业务数据：它自己的文件头写明**带外灌入、不进部署引导**。
 # Sample business data: its own header says it is loaded out of band, not by the bootstrap.
@@ -126,9 +126,10 @@ skip keelbase-demo-data.sql # 样例数据，文件头写明带外灌入、不�
 # and empty tables for modules that are not there.
 #
 # `fms` 单独标一句：roadmap 的 `YD-41` 行曾把它写成第六个模块，而部署 README 与 module-scope 都不含它
-# —— 与 bpm 同一条待裁项的反面。
+# —— 与 bpm 不同：bpm 在 jar 里、只是不展示，fms 根本不在 jar 里。
 # `fms` gets its own note: the `YD-41` roadmap line once called it a sixth module, while the deployment
-# README and module-scope both exclude it — the other side of the same undecided item as bpm.
+# README and module-scope both exclude it — unlike bpm, which is in the jar but not shown, fms is not in
+# the jar at all.
 skip keelbase-fms.sql # 模块 fms 不在部署 jar 里（与 roadmap 原文冲突，见上） | module fms is not in the deployment jar (conflicts with the roadmap line; see above)
 skip keelbase-hrm.sql # 模块 hrm 不在部署 jar 里 | module hrm is not in the deployment jar
 skip keelbase-oa.sql # 模块 oa 不在部署 jar 里 | module oa is not in the deployment jar
