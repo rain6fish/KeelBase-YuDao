@@ -126,6 +126,65 @@ export const auditApi = {
   logs: (query: AuditLogQuery) => runtime.get<AuditRow[]>('/audit/logs', { params: query }).then((r) => r.data),
 }
 
+/**
+ * 一份覆盖声明（`AW-3`），按运行时 `CoverageStatement` 的 wire 形状：判断所依据的登记表版本、读过的口径、
+ * **真的问过**的源、算出的结论、以及适用的缺口。`origin` 与 `verdictImpact` 留在登记表里、不上 wire，
+ * 故这里也没有它们。
+ *
+ * A coverage statement (`AW-3`), in the runtime's `CoverageStatement` wire shape: the registry revision it
+ * was judged against, the scope it was read over, the sources **actually consulted**, the derived
+ * verdict, and the gaps that apply. `origin` and `verdictImpact` stay in the registry and never reach
+ * the wire, so they are absent here too.
+ */
+export interface CoverageScope {
+  kind: string
+  since: string
+  to: string
+  subjectRef: string | null
+}
+
+export interface CoverageSource {
+  id: string
+  state: string
+  rows: number | null
+}
+
+export interface CoverageGap {
+  id: string
+  severity: string
+  affects: string
+  /** 登记表给读者的话，原样转述 —— 前端没有一张会漂开的缺口清单。 */
+  /** The registry's own words for the reader, repeated verbatim — no frontend list to drift. */
+  statement: string
+}
+
+export interface CoverageStatement {
+  registryRevision: string
+  scope: CoverageScope
+  sources: CoverageSource[]
+  verdict: string
+  gaps: CoverageGap[]
+}
+
+export interface CoverageQuery {
+  since?: string
+  until?: string
+  userId?: string
+}
+
+export const coverageApi = {
+  /**
+   * 读覆盖声明。闸与其余审计读面相同（`read AuditLog`）：审计读者够得到、普通调用方够不到 —— 这不是
+   * 本页要遮的事，是运行时自己会答 403 的事。不给时间窗时默认最近 30 天。
+   *
+   * Read the coverage statement. It is gated like the rest of the audit reads (`read AuditLog`): an
+   * audit reader reaches it and an ordinary caller does not — nothing for this page to hide, the
+   * runtime answers 403 by itself. With no window it defaults to the last 30 days.
+   */
+  read: (query: CoverageQuery = {}) =>
+    runtime.get<CoverageStatement>('/audit/coverage', { params: query }).then((r) => r.data),
+}
+
 export const confirmationApi = {
   mine: (status?: string) =>
     runtime

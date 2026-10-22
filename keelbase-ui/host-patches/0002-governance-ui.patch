@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,353 @@
+@@ -1,4 +1,361 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -177,6 +177,14 @@ index 96269a8..2611a9b 100644
 +      effectsLedger: 'This page does not cover: ai1 MCP calls (no ledger row), the files and shell commands SKILL writes, ai1 RAG retrieval, or the upstream resolver path.',
 +      policy: 'This page does not cover: the ai1 MCP, SKILL, ai1 RAG and upstream resolver paths — their tools are outside this policy’s scope.',
 +      showcase: 'This page drives the runtime’s governed chain, but does not cover: D44-B (ai1 MCP), which is only partially governed (identity, audit and refusal of declared writes — no confirmation, no side-effect ledger); SKILL, which has no governance seam at all; ai1 RAG retrieval, which writes no audit row; or the D42 upstream resolver path, which this line does not govern.',
++      cardTitle: 'Coverage statement',
++      verdict_complete: 'Complete',
++      verdict_partial: 'Partial',
++      verdict_unknown: 'Unknown (what is missing cannot be said)',
++      sources: 'Read from',
++      noGaps: 'No known gaps for this window',
++      registry: 'Gap registry revision {rev}',
++      unavailable: 'Coverage statement unavailable — do not read this page as complete',
 +    },
 +    trace: {
 +      title: 'Conversation trace',
@@ -360,7 +368,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,350 @@
+@@ -1,4 +1,358 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -534,6 +542,14 @@ index 35f1e1a..856d201 100644
 +      effectsLedger: '本页不覆盖：ai1 MCP 调用（无台账行）、SKILL 写入的文件与执行的 shell、ai1 RAG 检索，以及上游解析器路。',
 +      policy: '本页不覆盖：ai1 MCP、SKILL、ai1 RAG 与上游解析器路 —— 它们的工具不在这份策略的范围内。',
 +      showcase: '本页驱动运行时那条治理链，但本页不覆盖：D44-B（ai1 MCP）—— 它在这里只受部分治理（身份、审计、对明确声明的写拒绝；无确认、无副作用台账）；SKILL —— 它一条治理缝都没有；ai1 RAG 检索 —— 它不写审计行；以及 D42 上游解析器路 —— 本线不治理它。',
++      cardTitle: '覆盖声明',
++      verdict_complete: '完整',
++      verdict_partial: '部分',
++      verdict_unknown: '未知（连漏了什么都说不出）',
++      sources: '读数来自',
++      noGaps: '本口径下没有已知缺口',
++      registry: '缺口登记表版本 {rev}',
++      unavailable: '覆盖声明取不到 —— 别把这一页读成完整',
 +    },
 +    trace: {
 +      title: '决策轨迹',

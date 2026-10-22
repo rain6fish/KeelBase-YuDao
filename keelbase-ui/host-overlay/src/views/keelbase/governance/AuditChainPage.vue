@@ -63,6 +63,46 @@
     <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
     <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.auditChain') }}</div>
 
+    <!--
+      `AW-3` 的**动态**那一半：缺口登记表自己说话。这张卡上每一行都来自运行时（`GET /audit/coverage`），
+      故往登记表里加一条、这里就自动多一行 —— 前端没有会漂开的清单。**取不到就出声**：一句取不到的告诫
+      会被读成「这里没有问题」，而那正是这个特性要防的事。
+
+      `AW-3`'s **dynamic** half: the gap registry speaks for itself. Every line here comes from the
+      runtime (`GET /audit/coverage`), so a new registry entry shows up with no frontend change —
+      there is no list here to drift. **A failed read is loud**: a missing caveat reads as "nothing
+      is wrong", which is the one thing this feature exists to prevent.
+    -->
+    <el-alert
+      v-if="coverage"
+      :type="coverage.verdict === 'complete' ? 'success' : coverage.verdict === 'partial' ? 'warning' : 'info'"
+      :closable="false"
+      show-icon
+      class="mb-10px"
+    >
+      <template #title>
+        {{ t('keelbase.coverage.cardTitle') }} · {{ t(`keelbase.coverage.verdict_${coverage.verdict}`) }}
+      </template>
+      <div class="coverage-line">{{ t('keelbase.coverage.sources') }}：{{ coverageSourceText }}</div>
+      <div v-if="coverage.gaps.length" class="coverage-gaps">
+        <div v-for="gap in coverage.gaps" :key="gap.id" class="coverage-row">
+          <el-tag :type="gapTagType(gap.severity)" size="small">{{ gap.severity }}</el-tag>
+          <span>{{ gap.statement }}</span>
+          <code class="coverage-gap-id">{{ gap.id }}</code>
+        </div>
+      </div>
+      <div v-else class="coverage-line">{{ t('keelbase.coverage.noGaps') }}</div>
+      <div class="coverage-line">{{ t('keelbase.coverage.registry', { rev: coverage.registryRevision }) }}</div>
+    </el-alert>
+    <el-alert
+      v-else-if="coverageLoaded"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="mb-10px"
+      :title="t('keelbase.coverage.unavailable')"
+    />
+
     <div v-if="rowsError" class="text-[var(--el-color-danger)] mb-10px">{{ rowsError }}</div>
     <!-- A description of this page, said as such — the window is all the face gives. -->
     <!-- **本页**的描述，并如实这么说 —— 这条面给的就是一个窗口。 -->
@@ -223,10 +263,12 @@ import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 import {
   auditApi,
+  coverageApi,
   effectApi,
   toolApi,
   type AuditRow,
   type ChainVerification,
+  type CoverageStatement,
   type EffectRow,
   type ToolInventoryItem,
 } from '@/keelbase/governanceApi'
@@ -263,6 +305,17 @@ const verifyError = ref('')
 const rows = ref<AuditRow[]>([])
 const rowsLoading = ref(false)
 const rowsError = ref('')
+
+/**
+ * 缺口登记表读回来的那份声明（`AW-3`）。`coverageLoaded` 单拎出来，是为了让「取不到」**不静默**：
+ * 一句取不到的告诫，读者会把这一页读成完整 —— 那正是这个特性要防的事。
+ *
+ * The gap registry's statement, read back (`AW-3`). `coverageLoaded` is separate so a failed read is
+ * **not silent**: a missing caveat reads as completeness, which is the one thing this feature exists
+ * to prevent.
+ */
+const coverage = ref<CoverageStatement | null>(null)
+const coverageLoaded = ref(false)
 const offset = ref(0)
 const hasMore = ref(false)
 const since = ref<Date | null>(null)
@@ -452,6 +505,40 @@ function short(v: string | null | undefined): string {
   return (v || '—').slice(0, 10)
 }
 
+/** 这份声明**真的问过**哪些源 —— 是「问过谁」，不是「系统里有什么」，故照运行时的答复画。 */
+/** The sources this statement **actually consulted** — "what was asked", not "what exists". */
+const coverageSourceText = computed(() =>
+  (coverage.value?.sources ?? [])
+    .map((s) => `${s.id}=${s.state}${s.rows === null || s.rows === undefined ? '' : `(${s.rows})`}`)
+    .join(' · '),
+)
+
+/** 缺口的严重度，用屏幕上读得懂的那种标签颜色。 */
+/** A gap's severity, in the tag colour that reads as the same thing on screen. */
+function gapTagType(severity: string): 'danger' | 'warning' | 'info' {
+  if (severity === 'high') return 'danger'
+  if (severity === 'medium') return 'warning'
+  return 'info'
+}
+
+/**
+ * 按与行**同一个时间窗**读登记表的声明。它刻意不放进 `loadRows`：这里失败不能连累那些行，也不能
+ * **无声**过去 —— 卡片会变成一条明确的警告。
+ *
+ * Read the registry's statement over the same window the rows are read over. It is kept out of
+ * `loadRows` on purpose: a failure here must not take the rows down with it, and it must not pass
+ * silently either — the card turns into an explicit warning.
+ */
+async function loadCoverage() {
+  try {
+    coverage.value = await coverageApi.read({ since: since.value ? since.value.toISOString() : undefined })
+  } catch {
+    coverage.value = null
+  } finally {
+    coverageLoaded.value = true
+  }
+}
+
 async function loadVerify() {
   verifyLoading.value = true
   verifyError.value = ''
@@ -511,6 +598,9 @@ async function loadRows() {
 function reload() {
   offset.value = 0
   void loadRows()
+  // 声明跟的是**时间窗**、不是页码 —— 翻一页还是同一个窗口。
+  // The statement follows the window, not the page cursor — a new page is the same window.
+  void loadCoverage()
 }
 
 function step(delta: number) {
@@ -521,6 +611,7 @@ function step(delta: number) {
 onMounted(() => {
   void loadVerify()
   void loadRows()
+  void loadCoverage()
 })
 </script>
 
@@ -593,6 +684,27 @@ onMounted(() => {
 }
 .pager-pos {
   font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.coverage-line {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+.coverage-gaps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0;
+}
+.coverage-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+.coverage-gap-id {
+  font-family: monospace;
+  font-size: 11px;
   color: var(--el-text-color-secondary);
 }
 </style>

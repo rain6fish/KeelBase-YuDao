@@ -36,7 +36,7 @@
         <dependency>
             <groupId>cn.com.keelbase</groupId>
             <artifactId>keelbase4j-core</artifactId>
-            <version>0.1.9</version>
+            <version>0.1.10</version>
         </dependency>
 
         <!-- KeelBase's Spring AI adapter — the model loop on KeelBase's **own** path. It implements the
@@ -52,7 +52,7 @@
         <dependency>
             <groupId>cn.com.keelbase</groupId>
             <artifactId>keelbase4j-springai</artifactId>
-            <version>0.1.9</version>
+            <version>0.1.10</version>
         </dependency>
 
         <!-- The model that seam talks to, when it is switched on. KeelBase's adapter activates off a
