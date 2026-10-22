@@ -58,6 +58,7 @@
         <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
         <flatten-maven-plugin.version>1.7.2</flatten-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
         <!-- maven-surefire-plugin 暂时无法通过 bom 的依赖读取（兼容老版本 IDEA 2024 及以前版本） -->
         <lombok.version>1.18.48</lombok.version>
         <spring.boot.version>4.1.0</spring.boot.version>
@@ -129,10 +130,49 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>flatten-maven-plugin</artifactId>
                 </plugin>
+                <!-- 覆盖率量尺：只锁版本，不设阈值。此处只登记、真正启用见下方 plugins 段。 -->
+                <!-- The coverage measuring stick: version only, no threshold. Registered here,
+                     enabled under `plugins` below. -->
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco-maven-plugin.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
 
         <plugins>
+            <!--
+              覆盖率是量尺，不是闸门。JaCoCo 在构建期收集执行数据，`verify` 阶段为每个模块把 HTML/XML/CSV
+              写到 `target/site/jacoco`。这里**刻意**不加 `check` goal、不设阈值：新增一行没测到的代码
+              不该让构建变红 —— 那是与「装一把量尺」不同的另一个决定。
+
+              Coverage is a measuring stick, not a gate. JaCoCo records execution data during the
+              build and writes per-module HTML/XML/CSV under `target/site/jacoco` at `verify`. There
+              is deliberately no `check` goal and no threshold: adding an untested line must not turn
+              the build red, because that is a different decision.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <!-- 绑 `initialize`：agent 必须在 surefire 起 JVM 之前就位。 -->
+                    <!-- Binds to `initialize`: the agent has to be in place before surefire forks. -->
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- 统一 revision 版本 -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
