@@ -149,7 +149,11 @@ public class CodegenEngineUniappTest extends CodegenEngineAbstractTest {
         // 调用
         Map<String, String> result = codegenEngine.execute(DbType.MYSQL, table, columns, null, null);
         // 断言
-        String index = result.get("yudao-ui-admin-uniapp/src/pages-infra/demo/index.vue");
+        // 归一化行尾，避免 Windows 检出（core.autocrlf=true）把模板落成 CRLF 后多行断言误判；断言内容不变。
+        // Normalize line endings so a Windows checkout (core.autocrlf=true) turning templates into CRLF does not
+        // make the multi-line assertion fail; the asserted content is unchanged.
+        String index = result.get("yudao-ui-admin-uniapp/src/pages-infra/demo/index.vue")
+                .replace("\r\n", "\n");
         assertTrue(index.contains("currentParentId.value === 0\n  ? list.value"));
         assertFalse(index.contains("list.value.filter"));
         String breadcrumb = result.get("yudao-ui-admin-uniapp/src/pages-infra/demo/components/breadcrumb.vue");
