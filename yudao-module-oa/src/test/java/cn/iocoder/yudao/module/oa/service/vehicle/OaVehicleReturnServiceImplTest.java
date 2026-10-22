@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -540,8 +541,8 @@ public class OaVehicleReturnServiceImplTest extends BaseDbUnitTest {
     private static OaVehicleReturnDO randomVehicleReturnDO() {
         return randomPojo(OaVehicleReturnDO.class, record -> record.setId(null).setApplyId(20L)
                 .setVehicleId(30L).setUserId(10L).setDeptId(40L)
-                .setActualStartTime(LocalDateTime.now().minusHours(2))
-                .setActualReturnTime(LocalDateTime.now().minusHours(1))
+                .setActualStartTime(LocalDateTime.now().minusHours(2).truncatedTo(ChronoUnit.MICROS))
+                .setActualReturnTime(LocalDateTime.now().minusHours(1).truncatedTo(ChronoUnit.MICROS))
                 .setStatus(-1).setProcessInstanceId(null));
     }
 
@@ -553,7 +554,8 @@ public class OaVehicleReturnServiceImplTest extends BaseDbUnitTest {
     private static OaVehicleApplyDO randomVehicleApplyDO() {
         return randomPojo(OaVehicleApplyDO.class, apply -> apply.setId(20L)
                 .setVehicleId(30L).setUserId(10L).setDeptId(40L)
-                .setStartTime(LocalDateTime.now().minusHours(3)).setEndTime(LocalDateTime.now())
+                .setStartTime(LocalDateTime.now().minusHours(3).truncatedTo(ChronoUnit.MICROS))
+                .setEndTime(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS))
                 .setStatus(2).setReturnStatus(1));
     }
 

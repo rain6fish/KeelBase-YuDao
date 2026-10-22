@@ -26,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -107,7 +108,7 @@ public class OaAnnouncementServiceImplTest extends BaseDbUnitTest {
     public void testUpdateAnnouncement_preservePublisherAndCreateTimeAndNullFields() {
         // mock 数据
         Long userId = randomLongId();
-        LocalDateTime createTime = LocalDateTime.now().minusDays(1);
+        LocalDateTime createTime = LocalDateTime.now().minusDays(1).truncatedTo(ChronoUnit.MICROS);
         OaAnnouncementDO announcement = buildAnnouncementDO(userId)
                 .setContent("原内容").setUrl("https://old.example.com");
         announcement.setCreateTime(createTime);

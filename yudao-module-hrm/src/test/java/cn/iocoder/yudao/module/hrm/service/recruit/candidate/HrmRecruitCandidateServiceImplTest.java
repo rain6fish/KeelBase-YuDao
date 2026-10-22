@@ -34,6 +34,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -388,7 +389,7 @@ public class HrmRecruitCandidateServiceImplTest extends BaseDbUnitTest {
         HrmRecruitCandidateDO candidate = randomRecruitCandidateDO(o -> o
                 .setStatus(HrmRecruitCandidateStatusEnum.PENDING_ENTRY.getStatus()));
         recruitCandidateMapper.insert(candidate);
-        LocalDateTime entryTime = LocalDateTime.now().minusMinutes(1);
+        LocalDateTime entryTime = LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS);
 
         // 调用
         recruitCandidateService.confirmRecruitCandidateEntry(candidate.getId(), entryTime);

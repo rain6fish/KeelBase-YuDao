@@ -69,6 +69,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
@@ -189,7 +190,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         employeeMapper.insert(employee);
         HrmEmployeeConfirmEntryReqVO confirmReqVO = BeanUtils.toBean(
                 randomEmployeeSaveReqVO(o -> o.setId(employee.getId())
-                        .setEntryTime(LocalDateTime.now().minusMinutes(1)).setCandidateId(candidateId)
+                        .setEntryTime(LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS))
+                        .setCandidateId(candidateId)
                         .setDeptId(null).setPostName(null).setPostLevel(null)
                         .setWorkAddress(null).setLeaderEmployeeId(null)
                         .setType(HrmEmployeeTypeEnum.INFORMAL.getType())
@@ -472,7 +474,7 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus())
                 .setCompanyAgeStartTime(effectTime.minusYears(3).atStartOfDay()));
         employeeMapper.insert(employee);
-        LocalDateTime planQuitTime = LocalDateTime.now().minusMinutes(1);
+        LocalDateTime planQuitTime = LocalDateTime.now().minusMinutes(1).truncatedTo(ChronoUnit.MICROS);
         HrmEmployeeQuitInfoDO quitInfo = HrmEmployeeQuitInfoDO.builder()
                 .employeeId(employee.getId()).planQuitTime(planQuitTime).build();
 

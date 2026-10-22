@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -123,7 +124,7 @@ public class PmsIterationServiceImplTest extends BaseDbUnitTest {
         when(projectMemberService.validateProjectWritable(iteration.getProjectId(), userId))
                 .thenReturn(randomProjectDO(iteration.getProjectId()));
         // 准备参数
-        LocalDateTime startTime = LocalDateTime.now();
+        LocalDateTime startTime = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         PmsIterationStartReqVO reqVO = new PmsIterationStartReqVO().setId(iteration.getId())
                 .setStartTime(startTime).setEndTime(startTime.plusDays(14));
 

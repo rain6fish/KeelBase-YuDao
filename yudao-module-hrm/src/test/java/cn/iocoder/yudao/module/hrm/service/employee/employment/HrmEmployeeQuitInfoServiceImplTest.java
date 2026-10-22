@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -42,7 +43,8 @@ public class HrmEmployeeQuitInfoServiceImplTest extends BaseDbUnitTest {
         // 准备参数
         Long employeeId = randomLongId();
         HrmEmployeeQuitInfoSaveReqVO reqVO = randomPojo(HrmEmployeeQuitInfoSaveReqVO.class,
-                o -> o.setEmployeeId(employeeId).setPlanQuitTime(LocalDateTime.now().plusDays(10))
+                o -> o.setEmployeeId(employeeId).setPlanQuitTime(LocalDateTime.now().plusDays(10)
+                                .truncatedTo(ChronoUnit.MICROS))
                         .setType(1).setReason(1).setOldEmployeeStatus(1));
 
         // 调用
@@ -62,7 +64,8 @@ public class HrmEmployeeQuitInfoServiceImplTest extends BaseDbUnitTest {
         quitInfoMapper.insert(dbQuitInfo);
         // 准备参数
         HrmEmployeeQuitInfoSaveReqVO reqVO = randomPojo(HrmEmployeeQuitInfoSaveReqVO.class,
-                o -> o.setEmployeeId(employeeId).setPlanQuitTime(LocalDateTime.now().plusDays(20))
+                o -> o.setEmployeeId(employeeId).setPlanQuitTime(LocalDateTime.now().plusDays(20)
+                                .truncatedTo(ChronoUnit.MICROS))
                         .setType(2).setReason(11).setOldEmployeeStatus(2));
 
         // 调用

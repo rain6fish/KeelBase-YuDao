@@ -7,6 +7,8 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
@@ -28,9 +30,15 @@ public class FmsAuxiliaryCombinationServiceImplTest extends BaseDbUnitTest {
         FmsAuxiliaryCombinationDO deletedCombination = new FmsAuxiliaryCombinationDO().setAccountSetId(1L)
                 .setSubjectId(101L).setItems(Collections.singletonList(deletedItem));
         auxiliaryCombinationMapper.insert(deletedCombination);
+        // 数据库时间列只存微秒，夹具显式给出微秒精度的值，避免自动填充的纳秒被存储层舍入
+        // The database time columns store microseconds, so the fixture supplies microsecond-precision
+        // values, keeping auto-filled nanoseconds from being rounded by the storage layer.
+        LocalDateTime fixtureTime = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         FmsAuxiliaryCombinationDO retainedCombination = new FmsAuxiliaryCombinationDO().setAccountSetId(1L)
                 .setSubjectId(101L).setItems(Collections.singletonList(
                         FmsAuxiliaryCombinationDO.AuxiliaryItem.builder().typeId(31L).itemId(42L).build()));
+        retainedCombination.setCreateTime(fixtureTime);
+        retainedCombination.setUpdateTime(fixtureTime);
         auxiliaryCombinationMapper.insert(retainedCombination);
 
         // 调用
