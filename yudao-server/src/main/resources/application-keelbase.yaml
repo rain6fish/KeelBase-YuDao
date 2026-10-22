@@ -38,6 +38,23 @@ keelbase:
   # empty picker. Changing the model or the prompt means editing that seed, not this line.
   assistant:
     agent-id: 9001
+  # 覆盖声明（`AW-3`）需要的**部署事实** —— 运行时从自己的表里看不见它们，只有部署方说得出来。三项都照
+  # 本部署的真实情况填：运行时嵌在芋道里（`host: yudao`）；业务那一行由**宿主**写（工具调的是宿主的
+  # service）；宿主**自己**有一条不经本引擎的 AI 路径（ai1 MCP / SKILL / ai1 RAG，见边界页）。不写这一段时
+  # 运行时答成 `host: none`，`host-write-not-in-same-transaction` 与 `host-ai-path-not-governed` 两条
+  # 缺口**永不出现** —— 那是一份**少报**的声明。
+  #
+  # The **deployment facts** a coverage statement (`AW-3`) needs — the runtime cannot see them from its own
+  # tables; only the deployment can say them. All three follow what this deployment actually is: the
+  # runtime is embedded in YuDao (`host: yudao`); the **host** writes the business row (a tool calls the
+  # host's own service); and the host runs an AI path of its own that does not pass through this engine
+  # (ai1 MCP / SKILL / ai1 RAG — see the boundary page). Without this block the runtime answers as
+  # `host: none`, and `host-write-not-in-same-transaction` and `host-ai-path-not-governed` never appear —
+  # a statement that **under-reports**.
+  coverage:
+    host: yudao
+    host-owns-business-write: true
+    host-own-ai-path: true
   app:
     # `preset` 是 EASY-3 的**特性预设**（full / small / lite），不是模块清单；模块清单由下面的
     # `businessModules` 回答。显式写出的 `features` 覆盖预设默认值。
