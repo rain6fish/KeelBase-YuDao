@@ -7,9 +7,11 @@ import cn.hutool.core.thread.ExecutorBuilder;
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.com.keelbase.runtime.audit.ExecutionTraceHolder;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -168,6 +170,13 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
      */
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_TENANT_ID = "tenantId";
+    /**
+     * The submitting request's trace id, carried the same way as the caller: known on the request
+     * thread, needed on the worker thread that runs the tool loop.
+     *
+     * 投递请求的 trace id，与调用方同一条路带过来：在请求线程上知道、在跑工具循环的 worker 线程上需要。
+     */
+    private static final String FIELD_TRACE_ID = "traceId";
     private static final String FIELD_TYPE = "type";
     private static final String FIELD_DATA = "data";
 
@@ -355,6 +364,13 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         if (userId != null) {
             fields.put(FIELD_USER_ID, String.valueOf(userId));
         }
+        // The trace id travels with the task for the same reason as the caller: the tool loop runs on
+        // a worker thread that never saw the request.
+        // trace id 与调用方同路：工具循环跑在一条从未见过该请求的 worker 线程上。
+        String traceId = TracerUtils.getTraceId();
+        if (StrUtil.isNotBlank(traceId)) {
+            fields.put(FIELD_TRACE_ID, traceId);
+        }
         // 1.2 生成所需的业务字段
         fields.put(FIELD_MESSAGE_ID, String.valueOf(messageId));
         fields.put(FIELD_AGENT_ID, String.valueOf(agentId));
@@ -488,8 +504,9 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         try {
             Long tenantId = Convert.toLong(fields.get(FIELD_TENANT_ID));
             Long userId = Convert.toLong(fields.get(FIELD_USER_ID));
-            TenantUtils.execute(tenantId, () -> withCaller(userId,
-                    () -> executeTask(recordId, fields, messageId, userId, lock, workerThreadId, reclaimed)));
+            String traceId = fields.get(FIELD_TRACE_ID);
+            TenantUtils.execute(tenantId, () -> withTrace(traceId, () -> withCaller(userId,
+                    () -> executeTask(recordId, fields, messageId, userId, lock, workerThreadId, reclaimed))));
         } catch (Exception e) {
             // Redis 或回填失败时保留 pending，后续接管不会重新生成
             log.error("[handleTask][助手消息({}) 处理失败]", messageId, e);
@@ -531,6 +548,21 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
             body.run();
         } finally {
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    /**
+     * Runs the body with the submitting request's trace id on the runtime's thread-local, and clears
+     * it afterwards for the same reason as the caller: this thread picks up the next task.
+     *
+     * 让 body 在**投递请求**的 trace id 下运行，并在之后清掉；理由与调用方相同：这条线程还要接下一个任务。
+     */
+    private static void withTrace(String traceId, Runnable body) {
+        ExecutionTraceHolder.set(traceId);
+        try {
+            body.run();
+        } finally {
+            ExecutionTraceHolder.clear();
         }
     }
 
