@@ -1,0 +1,64 @@
+diff --git a/src/hooks/web/useCache.ts b/src/hooks/web/useCache.ts
+index 1acb03b..b42f29f 100644
+--- a/src/hooks/web/useCache.ts
++++ b/src/hooks/web/useCache.ts
+@@ -14,7 +14,9 @@ export const CACHE_KEY = {
+   // 系统设置
+   IS_DARK: 'isDark',
+   LANG: 'lang',
+-  THEME: 'theme',
++  // Bumped once so a browser holding the previous palette picks up the new defaults.
++  // 抬一版：缓存过旧配色的浏览器会重新取一次新默认值。
++  THEME: 'theme-v2',
+   LAYOUT: 'layout',
+   DICT_CACHE: 'dictCache',
+   // 登录表单
+diff --git a/src/store/modules/app.ts b/src/store/modules/app.ts
+index f010ba4..a119f31 100644
+--- a/src/store/modules/app.ts
++++ b/src/store/modules/app.ts
+@@ -76,33 +76,33 @@ export const useAppStore = defineStore('app', {
+       currentSize: wsCache.get('default') || 'default', // 组件尺寸
+       theme: wsCache.get(CACHE_KEY.THEME) || {
+         // 主题色
+-        elColorPrimary: '#409eff',
++        elColorPrimary: '#1d4ed8',
+         // 左侧菜单边框颜色
+-        leftMenuBorderColor: 'inherit',
++        leftMenuBorderColor: 'transparent',
+         // 左侧菜单背景颜色
+-        leftMenuBgColor: '#001529',
++        leftMenuBgColor: 'var(--el-bg-color-page)',
+         // 左侧菜单浅色背景颜色
+-        leftMenuBgLightColor: '#0f2438',
++        leftMenuBgLightColor: 'transparent',
+         // 左侧菜单选中背景颜色
+         leftMenuBgActiveColor: 'var(--el-color-primary)',
+         // 左侧菜单收起选中背景颜色
+         leftMenuCollapseBgActiveColor: 'var(--el-color-primary)',
+         // 左侧菜单字体颜色
+-        leftMenuTextColor: '#bfcbd9',
++        leftMenuTextColor: 'var(--el-text-color-regular)',
+         // 左侧菜单选中字体颜色
+         leftMenuTextActiveColor: '#fff',
+         // logo字体颜色
+-        logoTitleTextColor: '#fff',
++        logoTitleTextColor: 'var(--el-text-color-primary)',
+         // logo边框颜色
+-        logoBorderColor: 'inherit',
++        logoBorderColor: 'transparent',
+         // 头部背景颜色
+-        topHeaderBgColor: '#fff',
++        topHeaderBgColor: 'var(--el-bg-color-page)',
+         // 头部字体颜色
+-        topHeaderTextColor: 'inherit',
++        topHeaderTextColor: 'var(--el-text-color-primary)',
+         // 头部悬停颜色
+-        topHeaderHoverColor: '#f6f6f6',
++        topHeaderHoverColor: 'var(--el-color-primary-light-9)',
+         // 头部边框颜色
+-        topToolBorderColor: '#eee'
++        topToolBorderColor: 'transparent'
+       }
+     }
+   },

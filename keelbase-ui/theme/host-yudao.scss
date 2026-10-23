@@ -34,23 +34,20 @@
 // 独立核对，代价是一些重复。
 
 :root {
-  // sidebar: same ground as the content area, so the whole page reads as one surface and the active
-  // item is what floats. 侧边栏与内容区同底色，整页一体；悬浮感由激活项提供。
-  --left-menu-bg-color: var(--el-bg-color-page) !important;
-  --left-menu-bg-light-color: transparent !important;
-  --left-menu-bg-active-color: var(--el-color-primary) !important;
-  --left-menu-collapse-bg-active-color: var(--el-color-primary) !important;
-  --left-menu-text-color: var(--el-text-color-regular) !important;
-  --left-menu-text-active-color: #fff !important;
-  --left-menu-border-color: transparent !important;
-
-  --logo-title-text-color: var(--el-text-color-primary) !important;
-  --logo-border-color: transparent !important;
-
-  --top-header-bg-color: var(--el-bg-color-page) !important;
-  --top-header-text-color: var(--el-text-color-primary) !important;
-  --top-header-hover-color: var(--el-color-primary-light-9) !important;
-  --top-tool-border-color: transparent !important;
+  // The colour group that used to sit here — `--left-menu-*`, `--logo-*`, `--top-header-*` — moved to
+  // the host's own theme defaults (patch 0004), for one reason: every declaration here had to carry
+  // `!important` to outrank what yudao writes inline on `<html>` at boot, and an `!important`
+  // stylesheet rule also outranks the same runtime writes made by the settings drawer — so the
+  // host's colour switches did nothing. As defaults the values still apply on a fresh browser, and a
+  // user who changes a colour wins over them: the layer keeps its look without disabling the setting.
+  // What stays here is the part no setting owns — the band's geometry and the sidebar's width.
+  //
+  // 原先在这一组里的颜色变量（`--left-menu-*` · `--logo-*` · `--top-header-*`）已挪到宿主自己的
+  // 主题默认值里（补丁 0004）。原因只有一条：这里每条都必须带 `!important` 才压得过 yudao 启动时
+  // 写在 `<html>` 上的行内值，而一条带 `!important` 的样式表规则，同样会压过设置面板在运行时的
+  // 同类写入 —— 于是宿主的换色全部失效。改成「默认值」之后，新浏览器仍看到这套样子，用户改了颜色
+  // 则以用户为准：视觉层保住了样子，又没有关掉设置。留在这里的是没有设置管的东西 —— 色带的几何与
+  // 侧边栏宽度。
 
   // The sidebar's width. The stock 200px is what a two-level tree fits into; with three levels the
   // third one runs out of room for a label, an icon and the arrow. The product's own shell runs at
