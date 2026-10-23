@@ -13,9 +13,12 @@ import static org.mockito.Mockito.when;
 
 import cn.com.keelbase.runtime.identity.Principal;
 import cn.com.keelbase.runtime.tool.ToolResult;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.crm.controller.admin.customer.vo.customer.CrmCustomerPageReqVO;
 import cn.iocoder.yudao.module.crm.controller.admin.customer.vo.customer.CrmCustomerSaveReqVO;
 import cn.iocoder.yudao.module.crm.dal.dataobject.customer.CrmCustomerDO;
 import cn.iocoder.yudao.module.crm.service.customer.CrmCustomerService;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +44,7 @@ class CrmCustomerToolsTest {
     private YudaoToolPermissions permissions;
     private CrmCustomerTools.UpdateTool updateTool;
     private CrmCustomerTools.CreateTool createTool;
+    private CrmCustomerTools.ListTool listTool;
 
     @BeforeEach
     void setUp() {
@@ -48,6 +52,7 @@ class CrmCustomerToolsTest {
         permissions = mock(YudaoToolPermissions.class);
         updateTool = new CrmCustomerTools.UpdateTool(service, permissions);
         createTool = new CrmCustomerTools.CreateTool(service, permissions);
+        listTool = new CrmCustomerTools.ListTool(service);
     }
 
     @Test
@@ -121,6 +126,24 @@ class CrmCustomerToolsTest {
                 ArgumentCaptor.forClass(CrmCustomerSaveReqVO.class);
         verify(service).createCustomer(captor.capture(), eq(42L));
         assertEquals("新客户", captor.getValue().getName());
+    }
+
+    @Test
+    void theListScopesThroughTheModulesOwnQueryAndDropsContactFields() {
+        CrmCustomerDO row = new CrmCustomerDO();
+        row.setId(1L);
+        row.setName("临海制造");
+        row.setMobile("13800000000");
+        when(service.getCustomerPage(any(CrmCustomerPageReqVO.class), eq(42L)))
+                .thenReturn(new PageResult<>(List.of(row), 1L));
+
+        ToolResult result = listTool.execute(Map.of(), caller());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) result.data();
+        assertEquals(List.of("id", "name", "ownerUserId", "dealStatus", "followUpStatus", "level", "source"),
+                List.copyOf(rows.get(0).keySet()), "the identity travels as the query's own argument");
+        assertFalse(result.data().toString().contains("13800000000"));
     }
 
     private CrmCustomerSaveReqVO written() {
