@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -39,12 +40,14 @@ class CrmCustomerToolsTest {
     private CrmCustomerService service;
     private YudaoToolPermissions permissions;
     private CrmCustomerTools.UpdateTool updateTool;
+    private CrmCustomerTools.CreateTool createTool;
 
     @BeforeEach
     void setUp() {
         service = mock(CrmCustomerService.class);
         permissions = mock(YudaoToolPermissions.class);
         updateTool = new CrmCustomerTools.UpdateTool(service, permissions);
+        createTool = new CrmCustomerTools.CreateTool(service, permissions);
     }
 
     @Test
@@ -91,6 +94,33 @@ class CrmCustomerToolsTest {
         assertEquals("update_crm_customer", updateTool.name());
         assertEquals("R3", updateTool.riskLevel());
         assertEquals("crm_customer", updateTool.resultType());
+    }
+
+    @Test
+    void aRefusedCreateNeverReachesTheService() {
+        when(permissions.refusal(CALLER, "crm:customer:create"))
+                .thenReturn("not permitted: this caller lacks the 'crm:customer:create' permission");
+
+        ToolResult result = createTool.execute(Map.of("name", "新客户"), caller());
+
+        assertFalse(result.success());
+        verify(service, never()).createCustomer(any(CrmCustomerSaveReqVO.class), any());
+    }
+
+    @Test
+    void anAllowedCreatePassesTheCallerAndReturnsTheId() {
+        when(permissions.refusal(CALLER, "crm:customer:create")).thenReturn(null);
+        when(service.createCustomer(any(CrmCustomerSaveReqVO.class), eq(42L))).thenReturn(77L);
+
+        ToolResult result = createTool.execute(Map.of("name", "新客户", "mobile", "13800000000"), caller());
+
+        assertTrue(result.success());
+        assertEquals(77L, ((Map<?, ?>) result.data()).get("id"));
+
+        ArgumentCaptor<CrmCustomerSaveReqVO> captor =
+                ArgumentCaptor.forClass(CrmCustomerSaveReqVO.class);
+        verify(service).createCustomer(captor.capture(), eq(42L));
+        assertEquals("新客户", captor.getValue().getName());
     }
 
     private CrmCustomerSaveReqVO written() {
