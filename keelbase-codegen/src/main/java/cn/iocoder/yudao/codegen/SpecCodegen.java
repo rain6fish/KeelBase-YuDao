@@ -217,7 +217,19 @@ public final class SpecCodegen {
             // boundary page added in `3374c3be4d`) are hand-written too and produced by no Spec; they were
             // not declared when they landed, so the check has called the file UNDECLARED ever since.
             // Declaring it lets the declaration catch up with fact; no judgement is relaxed.
-            "sql/keelbase-audit-reader.sql");
+            "sql/keelbase-audit-reader.sql",
+            // 走查读者的种子（`sql/keelbase-m7-reader.sql`，`b785afb033` 引入）：一个**非管理员**角色 `m7_reader`、
+            // 它的账号 `m7reader`，以及最小的菜单授予。它同样是手写、任何 Spec 都不产出——只插、幂等，动的是
+            // `system_role` / `system_users` / `system_user_role` / `system_role_menu`，且**不改** `common`；
+            // 引入时同样漏了在此声明，边界检查自那时起把它判成 UNDECLARED。补声明 = 让声明**追上事实**；判据未松。
+            //
+            // The walkthrough reader's seed (`sql/keelbase-m7-reader.sql`, landed in `b785afb033`): a **non-admin**
+            // role `m7_reader`, its account `m7reader`, and the smallest set of menu grants. It is hand-written too
+            // and produced by no Spec — inserts only, idempotent, touching `system_role` / `system_users` /
+            // `system_user_role` / `system_role_menu` while leaving `common` alone; it was likewise not declared
+            // here when it landed, so the check has called the file UNDECLARED ever since. Declaring it lets the
+            // declaration catch up with fact; no judgement is relaxed.
+            "sql/keelbase-m7-reader.sql");
 
     private SpecCodegen() {
     }
