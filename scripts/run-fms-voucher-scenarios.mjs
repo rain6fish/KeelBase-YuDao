@@ -219,6 +219,51 @@ check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).
 const admin = await login('admin', 'admin123');
 ok('admin 登录');
 
+// 场景 2 要断**页的内容**，而运行时不上线工具的结果：冻结的 `chat-response` 没有 `data`，流式的 `tool_end`
+// 也只有成功与否。故「页里有没有那一行」只能从**模块自己的分页端点**读 —— 它与工具走的是**同一个**服务方法
+// `FmsVoucherService.getVoucherPage`，而收窄那条通知正切在它上面。第二个调用方因此要持有 `fms:voucher:query`：
+// `common` 没有这个码（也不该为一道门禁去放宽它），故本轮给它一条**只带这一个码**的角色。数据范围必须是
+// `SELF`(5) —— 新角色默认 `ALL`(1)，而 `callerToEnforce()` 对「范围 = 全部行」的调用方返回 null，收窄就整条
+// 不发；这一场要证的恰恰是它发。
+//
+// Scenario 2 asserts the **page's content**, and the runtime puts no tool result on the wire: the frozen
+// `chat-response` has no `data`, and the streaming `tool_end` carries only success. So "is that row on the page"
+// can only be read from the **module's own page endpoint** — it and the tool cross the **same** service method
+// `FmsVoucherService.getVoucherPage`, which is where the narrowing advice sits. The second caller therefore needs
+// `fms:voucher:query`: `common` does not hold it (and should not be widened for a gate), so this run gives it a
+// role carrying **that one code**. The data scope must be `SELF` (5) — a new role defaults to `ALL` (1), and
+// `callerToEnforce()` answers null for a caller whose scope is every row, which stands the narrowing down; what
+// this scene needs is exactly that it stands up.
+async function ensureFmsReader(adminToken) {
+  const menuIds = psql("select string_agg(id::text, ',') from system_menu"
+    + " where permission = 'fms:voucher:query' and deleted = 0");
+  if (!menuIds) {
+    throw new Error('fms:voucher:query 不在 system_menu 里 —— 这套库的菜单种子缺这一条，场景 2 的页就读不到');
+  }
+  let roleId = psql("select id from system_role where code = 'gate_fms_reader' and deleted = 0 limit 1");
+  if (!roleId) {
+    const role = await api('/system/role/create', {
+      method: 'POST', token: adminToken,
+      body: { name: 'gate-fms-reader', code: 'gate_fms_reader', sort: 99, status: 0,
+        remark: 'FMS gate: the page permission only, so the read narrowing is asserted by content' }
+    });
+    if (role.code !== 0) throw new Error(`create reader role -> ${role.code}: ${role.msg}`);
+    roleId = role.data;
+  }
+  await api('/system/permission/assign-role-menu', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), menuIds: menuIds.split(',').map(Number) }
+  });
+  await api('/system/permission/assign-role-data-scope', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), dataScope: 5, dataScopeDeptIds: [] }
+  });
+  // 与 `gatesales` 一样**按名复用、不收尾**：这条角色是夹具的一部分，不是本轮的业务行。
+  // Reused by name and **not** removed on the way out, like `gatesales`: the role is part of the fixture, not
+  // this run's business rows.
+  return Number(roleId);
+}
+
 console.log('== 前置 · 第二个调用方 ==');
 let secondId = psql(`select id from system_users where username = '${SECOND_USER}' and deleted = 0 limit 1`);
 if (!secondId) {
@@ -235,7 +280,11 @@ if (!secondId) {
 }
 {
   const roles = psql(`select id from system_role where code = 'common' and deleted = 0 limit 1`);
-  await api('/system/permission/assign-user-role', { method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles)] } });
+  const readerRoleId = await ensureFmsReader(admin);
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: admin,
+    body: { userId: Number(secondId), roleIds: [Number(roles), readerRoleId] }
+  });
 }
 const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
@@ -300,22 +349,35 @@ const salesVoucherId = psql(`select id from ${VOUCHER} where account_set_id = ${
 check('甲录的那一张已种', true, adminVoucherId !== '');
 check('乙录的那一张已种', true, salesVoucherId !== '');
 const statusOf = (id) => psql(`select status from ${VOUCHER} where id = ${id}`);
+// 「一字未改」比「状态没变」宽一点：越权那次若落成了，改的不止 `status` —— 审核人也会被记上。
+// "Unchanged" is wider than "the status did not move": a landed review would have written the reviewer too.
+const reviewerOf = (id) => psql(`select coalesce(reviewer_user_id::text, '') from ${VOUCHER} where id = ${id}`);
 
-console.log('== 场景 2 · 身份传递：读被路由到本模块的工具 ==');
+console.log('== 场景 2 · 身份传递与读侧收窄：断页的内容，不只数调用次数 ==');
 {
-  // 断言的是这一回合**跑过了**（从审计轨读）。**返回的行在这里断言不了**，理由与兄弟门禁记的一样：core 0.1.5 的答案
-  // 是冻结的 `chat-response`、不带 `data`。**收窄本身也在这里断言不了**，而这一点比兄弟门禁更值得写下来：那三家的收窄
-  // 要么落在行上、要么落在入参上，都会在**写**那条路上以一次拒绝显形；本模块的收窄落在**读**的一个筛选位上，而读没有
-  // 拒绝可言。⇒ 它由**同一条规则**在场景 4 的写拒绝里被证到（那里的收窄读的是同一列 `creator`），而「读确实按调用方
-  // 跑了」由审计轨证到。这两句加起来是这道门禁能给的，不是更多。
+  // 前半：两个调用方各触发一次读工具。它断言的是这一回合**跑过了**（从审计轨读），证明的是**路由** —— 身份被
+  // 传到了本模块的工具上。它**不**证明收窄：把收窄删掉，这个计数照样是 2（2026-10-23 复核，本门禁的反向实验
+  // 复现了这一点）。收窄也不在**写**那条路上显形 —— 场景 4 的拒绝来自 `requireOwned`（读行看 `creator`），而
+  // 收窄落在**读**的另一个筛选位上，两条是不同的机制。
   //
-  // What is asserted is that the turn **ran**, read from the trail. **The returned rows cannot be asserted here** for
-  // the reason the sibling gates record: core 0.1.5's answer is the frozen `chat-response` with no `data`. **The
-  // narrowing itself cannot be asserted here either**, and that is worth writing down more than in the siblings: their
-  // narrowing lands on a row or an argument and shows up as a **refusal on the write path**, while this module's lands
-  // in a **read** filter, and a read has no refusal. So it is proven by the **same rule** showing up in scenario 4's
-  // write refusal (that narrowing reads the same `creator` column), and "the read really ran per caller" is proven by
-  // the trail. Those two sentences are what this gate can say, and not more.
+  // 后半：**页的内容**，这才是收窄的效果。两条都要断 —— 只断「乙的页里没有甲那一行」，一处根本没种甲那行的
+  // 夹具也会绿；只断「甲的页里有那一行」，收窄被删掉也绿。第三条（乙的页里有自己那一行）挡住第三种假绿：页
+  // 整个空着。页从**模块自己的分页端点**读、不走工具，因为运行时不上线工具的结果（见 `ensureFmsReader` 上方
+  // 的注解）；而该端点与工具调用的是**同一个**被切的服务方法，故它读到的就是这条通知作用之后的那一页。
+  //
+  // The first half: each caller drives the tool once. It asserts the turn **ran** (read from the trail), which proves
+  // **routing** — the identity reached this module's tool. It does **not** prove the narrowing: delete it and the
+  // count is still 2 (2026-10-23 review; this gate's negative experiment reproduces it). The narrowing does not show
+  // on the **write** path either — scenario 4's refusal comes from `requireOwned` (which reads the row's `creator`),
+  // while the narrowing lands in a different, **read**-side filter: two mechanisms.
+  //
+  // The second half: the **page's content**, which is what the narrowing does. Both halves are required — "the
+  // second caller's page lacks the admin's row" alone is green on a fixture that never seeded it, and "the admin's
+  // page has it" alone is green with the narrowing deleted. A third check (the second caller's page has its own row)
+  // blocks a third false green: a page that is empty entirely. The page is read from the **module's own page
+  // endpoint** rather than the tool because the runtime puts no tool result on the wire (see the note above
+  // `ensureFmsReader`); that endpoint and the tool cross the **same** advised service method, so what it reads is
+  // the page this advice produced.
   const a = await chat(admin, '看我的凭证');
   check('甲触发 FMS 读工具', 'list_my_fms_vouchers', (a.toolCalls || [])[0]);
   check('甲的执行状态（审计轨）', 1, ranAs('list_my_fms_vouchers'));
@@ -323,6 +385,16 @@ console.log('== 场景 2 · 身份传递：读被路由到本模块的工具 =='
   const s = await chat(second, '看我的凭证');
   check('乙触发同一个工具', 'list_my_fms_vouchers', (s.toolCalls || [])[0]);
   check('它的执行状态（审计轨）', 2, ranAs('list_my_fms_vouchers'));
+
+  const pageOf = (token) => api(`/fms/voucher/page?accountSetId=${accountSetId}&pageSize=100`, { token });
+  const idsOn = (answer) => (((answer || {}).data || {}).list || []).map((row) => String(row.id));
+  const adminPage = await pageOf(admin);
+  const secondPage = await pageOf(second);
+  check('甲的页取到了', 0, adminPage.code);
+  check('乙的页取到了', 0, secondPage.code);
+  check('甲的页里有甲那一行（夹具确实种了它）', true, idsOn(adminPage).includes(String(adminVoucherId)));
+  check('乙的页里没有甲那一行（收窄真的发生了）', false, idsOn(secondPage).includes(String(adminVoucherId)));
+  check('乙的页里有乙自己那一行（页不是空着蒙对的）', true, idsOn(secondPage).includes(String(salesVoucherId)));
 }
 
 console.log('== 场景 3 · 高风险写入被扣下，批准后落库 ==');
@@ -353,7 +425,8 @@ console.log('== 场景 4 · 越权写：批准也买不到 ==');
   const hijackDone = await confirm(second, pendingToken(secondId), 'approve');
   note('越权写批准后的结局', hijackDone.status || JSON.stringify(hijackDone).slice(0, 120));
   check('批准了也没执行', true, hijackDone.status !== 'executed');
-  check('别人的行一字未改', PENDING_REVIEW, statusOf(adminVoucherId));
+  check('别人的行一字未改（仍是待审核）', PENDING_REVIEW, statusOf(adminVoucherId));
+  check('别人的行一字未改（没记上审核人）', '', reviewerOf(adminVoucherId));
   // **只断言「没执行」是不够的** —— 任何一次失败都会让它绿，包括与本条无关的那种。实测过一次：这条工具在租户
   // 上下文之外读那一行，于是它每次都以「`TenantContextHolder` 不存在租户编号」失败，而「批准了也没执行」照样绿。
   // 故这里断言**拒绝的理由**：它必须点名行范围，且必须不是别的故障。
