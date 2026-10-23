@@ -39,16 +39,30 @@
 # The tokens themselves are vendored by scripts/sync-ui-theme.sh; edit them in Web-Admin-Vue, never
 # here. 令牌由 scripts/sync-ui-theme.sh 入库；要改请改 Web-Admin-Vue，不要改这里。
 #
+# 可覆盖：
+#   KEELBASE_YUDAO_UI        检出位置（默认 <repo>/target/yudao-ui-admin-vue3）
+#   KEELBASE_YUDAO_UI_REPO   克隆地址（默认 Gitee 镜像）
+#   KEELBASE_YUDAO_UI_REF    要取的提交 / 分支 / 标签（默认钉在上游 9bd6a91 —— 四份补丁所针对的那个提交）
+#
+#   默认值钉在**提交**上，不是分支上：四份补丁是在那一个上游提交上写的，上游 master 一往前动，补丁就地失效。
+#   抬这个默认值是**刻意的编辑**，必须**与补丁一起**做：四份补丁要重基到新提交，不能只改这一行。
+#
 # Overridable:
 #   KEELBASE_YUDAO_UI        checkout location   (default <repo>/target/yudao-ui-admin-vue3)
 #   KEELBASE_YUDAO_UI_REPO   clone URL           (default the Gitee mirror)
-#   KEELBASE_YUDAO_UI_REF    branch/tag to clone  (default the remote's default branch)
+#   KEELBASE_YUDAO_UI_REF    commit / branch / tag to fetch
+#                            (default pinned to upstream 9bd6a91, the commit the four patches target)
+#
+#   The default is pinned to a **commit**, not a branch: the four patches were written against that one
+#   upstream commit, and upstream master moving past it makes them stop applying. Raising the pin is a
+#   deliberate edit made **together with the patches** — all four have to be rebased onto the new
+#   commit; this line is never changed on its own.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UI_DIR="${KEELBASE_YUDAO_UI:-$REPO_ROOT/target/yudao-ui-admin-vue3}"
 UI_REPO="${KEELBASE_YUDAO_UI_REPO:-https://gitee.com/yudaocode/yudao-ui-admin-vue3.git}"
-UI_REF="${KEELBASE_YUDAO_UI_REF:-}"
+UI_REF="${KEELBASE_YUDAO_UI_REF:-9bd6a91286573af70874ebd9c23d73177dd8001d}"
 BUILD_SCRIPT="${KEELBASE_YUDAO_UI_BUILD:-build:prod}"
 OUT_NAME="${KEELBASE_YUDAO_UI_OUT:-dist-prod}"
 PNPM_VERSION="${KEELBASE_YUDAO_UI_PNPM:-9.15.9}"
@@ -160,11 +174,30 @@ if [[ "$SKIP_BUILD" == "0" ]] && ! is_own_checkout "$UI_DIR"; then
   echo "fetching the admin UI into $UI_DIR (upstream keeps it out of this repository)…"
   mkdir -p "$(dirname "$UI_DIR")"
   clone_args=(--depth 1)
-  if [[ -n "$UI_REF" ]]; then clone_args+=(--branch "$UI_REF"); fi
   if ! git clone "${clone_args[@]}" "$UI_REPO" "$UI_DIR"; then
     echo "cloning the admin UI failed: $UI_REPO -> $UI_DIR" >&2
     echo "the checkout is fetched only when it is missing, so either retry, or point KEELBASE_YUDAO_UI at a checkout you already have" >&2
     exit 2
+  fi
+
+  # 钉住的默认值按**提交**取，不走 `--branch`：`--branch` 只接受 ref，而补丁所针对的 `9bd6a91` 是
+  # master 上的普通提交、上游也没有对应 tag；克隆 master 现在会落到补丁已贴不上的树（2026-10-23 实测：
+  # 默认 clone 在 `0003` 处失败，上游 HEAD 为 `b30cd8c`）。故先克隆默认分支，再把钉住的提交浅取回来、
+  # 分离检出；覆盖值传分支或标签时走的是同一条路径。
+  #
+  # The pinned default is fetched as a **commit**, not through `--branch`: `--branch` takes a ref only,
+  # and `9bd6a91` — the commit our patches target — is a plain commit on master with no tag upstream;
+  # cloning master now lands on a tree the patches no longer fit (measured 2026-10-23: the default
+  # clone fails at `0003`, upstream HEAD `b30cd8c`). So clone the default branch, then shallow-fetch the
+  # pinned commit and check it out detached; an override naming a branch or tag takes the same path.
+  if [[ -n "$UI_REF" ]]; then
+    if ! git -C "$UI_DIR" fetch --depth 1 origin "$UI_REF"; then
+      echo "取不到钉住的界面提交 $UI_REF（来自 $UI_REPO）——默认分支的克隆已丢弃，重跑即可重试。" >&2
+      echo "could not fetch the pinned UI ref $UI_REF from $UI_REPO — the default-branch clone was discarded; re-run to retry." >&2
+      wipe_checkout "$UI_DIR"
+      exit 2
+    fi
+    git -C "$UI_DIR" checkout --quiet --detach FETCH_HEAD
   fi
 fi
 
