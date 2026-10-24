@@ -4,7 +4,9 @@
 # dormant here: they trigger on `master`, while this repository's branch is `main`. They are
 # upstream's files and are left as they were found; this repository adds its own rather than editing
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
-# what we *have* touched is `YD-T4`).
+# what we *have* touched is `YD-T4`). Their test-skip flags are therefore moot rather than
+# authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
+# run for real in `conformance`, below.
 #
 # Seven jobs, and each answers a question the others cannot:
 #
@@ -30,15 +32,18 @@
 #
 # `conformance` is the one job that needs a service stack, because calling the scenario scripts without
 # a host would not be running them. It brings up PostgreSQL (with pgvector) and Redis as service
-# containers, builds the host, loads the seed, starts the server, waits for `/actuator/health`, and
-# then runs `scripts/run-app-conformance.mjs`. Two of that suite's columns have the **model path** as
-# their subject (MCP's two real model steps, and the assistant drawer's real session), so the job sets
+# containers, builds the host and runs its own Java tests, loads the seed, starts the server, waits
+# for `/actuator/health`, and then runs `scripts/run-app-conformance.mjs`. Two of that suite's
+# columns have the **model path** as their subject (MCP's two real model steps, and the assistant
+# drawer's real session), so the job sets
 # `CONFORMANCE_NO_MODEL_KEY=1`: those two columns are recorded `SKIP` with that reason, never `PASS`,
 # and every deterministic column is still driven. No model key is needed or present.
 #
 # 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
-# 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。
+# 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。故它们里的
+# 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试在下面的
+# `conformance` 里**真跑**。
 #
 # 七道 job，各答一个别的 job 答不了的问题：
 #
@@ -58,8 +63,8 @@
 #                        —— 驱动门禁，不誊抄门禁。
 #
 # 前六道是 pure Node 或离线检查、几秒到几分钟。第七道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
-# service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主 → 灌种子 → 起服务 → 等
-# `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调那些脚本，那不叫跑过它。
+# service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主并跑它自己的 Java 测试 → 灌种子 →
+# 起服务 → 等 `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调那些脚本，那不叫跑过它。
 # 套件里有两栏的主语是**模型那条路**（MCP 的两个真模型步、抽屉的真会话），故这道 job 置
 # `CONFORMANCE_NO_MODEL_KEY=1`：那两栏记 `SKIP` 并写出原因、**绝不记 `PASS`**，其余确定性的栏照常驱动。
 # 这道 job **不接**任何真模型 key。
@@ -291,10 +296,40 @@ jobs:
           java-version: '25'
           cache: maven
 
+      # 宿主的 20 个 Java 测试类是纯 JUnit 5 + Mockito：假 mapper、假服务顶住数据面，故不需要数据库、
+      # Redis 或端口。用 JDK 25 在本机实测：151 条，0 失败、0 跳过；构建之后单跑约 16 秒，故这一步的上限
+      # 取 10 分钟（冷 runner 也够）。
+      #
+      # 先 `install` 而不是 `package`，是为了让下一步能在**单个模块**上跑测试：测试步不带 `-am`，兄弟模块
+      # 从本步装进 `~/.m2` 的产物解析。这也让 surefire 的默认行为成为一道守卫——过滤范围一旦写错、一条都
+      # 匹配不上，构建是**红**的（实测 exit 1），而不是「零测试也绿」。
+      #
+      # 范围**刻意**只到宿主的测试类：依赖模块自带上游的测试套件（本地量到 1531 条），那是上游的文件，本仓
+      # 照原样保留，不在这道 job 的范围里。
+      #
+      # The host's 20 Java test classes are plain JUnit 5 + Mockito: fake mappers and services stand in
+      # for the data face, so they need no database, Redis or port. Measured locally on JDK 25: 151
+      # tests, 0 failures, 0 skipped; about 16 seconds on its own after the build, so this step's
+      # ceiling is 10 minutes (enough on a cold runner).
+      #
+      # `install` rather than `package` lets the next step run tests on a **single module**: it omits
+      # `-am`, resolving the sibling modules from what this step puts in `~/.m2`. That also makes
+      # surefire's default a guard — if the filter is ever written wrong and matches nothing, the build
+      # goes **red** (measured exit 1) instead of passing with zero tests.
+      #
+      # The scope is **deliberately** the host's test classes only: the dependency modules carry
+      # upstream's own suites (1531 tests measured locally), and those are upstream's files, kept as
+      # found — out of this job's scope.
       - name: Build the host
         run: >-
           KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
-          -pl yudao-server -am -DskipTests -Dmaven.test.skip=true package
+          -pl yudao-server -am -DskipTests install
+
+      - name: Run the host's Java tests
+        timeout-minutes: 10
+        run: >-
+          KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
+          -pl yudao-server test -Dtest='cn.iocoder.yudao.server.**.*Test'
 
       - name: Load the seed into the service database
         env:
