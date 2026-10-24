@@ -53,7 +53,9 @@ licence surface of upstream's module dependency tree are all unmeasured.
 
 > **⚠ Rechecked 2026-10-11** — three items above have since landed: the **model-driven path** runs with a real model (`scripts/run-model-loop-scenarios.mjs`), the **generator face** is adapted (`keelbase-codegen`, `scripts/run-host-generator.mjs`), and the **conformance suite and the four rates** have scripts here (`scripts/run-app-conformance.mjs`, `scripts/measure-governance-rates.mjs`). Kept as written (a 2026-10-08 snapshot).
 
-> **Runtime pin, 2026-10-24** — this line pins the runtime at **0.1.11**, which ships the core-side execution↔trace link. **The host does not consume that link**: nothing in this repository references `ExecutionTrace*`, and it stays unconsumed until `plan/yd-trace-link` (`441e1be4`) merges into `main`. This is the CTO's ruling of **2026-10-24**; the pin move itself landed in `16e5f4b9fb`.
+> **Runtime pin, 2026-10-24** — this line pins the runtime at **0.1.11**, which ships the core-side execution↔trace link. **The host does not consume that link**: nothing in this repository references `ExecutionTrace*`, and it stays unconsumed until `plan/yd-trace-link` (`441e1be4`) merges into `main`. This is the CTO's ruling of **2026-10-24**; the pin move itself landed in `16e5f4b9fb`. Kept as written (a pre-merge snapshot).
+
+> **⚠ Updated 2026-10-24** — that ruling is **superseded**: `plan/yd-trace-link` (`441e1be4`) merged into `main` as **`0e76496651`**, and the host now **consumes** the link. `YudaoExecutionTraceFilter` starts or reuses a span on every request and puts its trace id on the runtime's `ExecutionTraceHolder`; ai1's submit carries that id into the Redis stream, so the tool loop on the worker thread runs under the same trace and the audit rows it writes are paired with the host's own operation log. What stands behind that today: the filter's unit test and `Ai1SessionStreamToolTest`. The isolated-stack E2E that showed `execution_trace_links` rows carrying a non-null `trace_id` ran **before** this merge and was not re-run on it.
 
 ## What this line does not do
 
