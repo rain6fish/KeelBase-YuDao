@@ -28,6 +28,12 @@
 #
 # 它是**我们自己的文件**、不是上游 `application.yaml` 里的一行，理由是本线赖以运行的那一条：上游的文件保持
 # 一字未动，部署自己的设置住在部署自己的文件里。`scripts/run-server.sh` 激活该 profile，别的什么都不必知道。
+#
+# 运行时 pin：`keelbase4j-core` 与 `keelbase4j-springai` 为 0.1.11。本宿主**不消费** execution ↔ trace
+# 关联——该关联由 `plan/yd-trace-link` 另行排期。
+#
+# Runtime pins: `keelbase4j-core` and `keelbase4j-springai` are 0.1.11. This host does **not** consume
+# the execution ↔ trace link; that link is scheduled separately under `plan/yd-trace-link`.
 keelbase:
   # 控制台助手的**常驻 agent** —— `sql/keelbase-assistant-agent.sql` 建的那一条（id 9001）。右侧抽屉据此
   # 知道跟谁说话；**没配时它如实说「未配置」**，而不是画一个空选择器。改模型 / 改提示词改的是那份种子，
