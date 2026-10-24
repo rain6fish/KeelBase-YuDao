@@ -46,6 +46,8 @@
 
 > **⚠ 2026-10-11 复核** —— 上面**三条已落地**：**模型驱动那条路**接了真模型（`scripts/run-model-loop-scenarios.mjs`）、**生成器那一面**已适配（`keelbase-codegen`、`scripts/run-host-generator.mjs`）、**符合性套件与四率**已在此有脚本（`scripts/run-app-conformance.mjs`、`scripts/measure-governance-rates.mjs`）。按原样保留（2026-10-08 快照）。
 
+> **运行时 pin，2026-10-24** —— 本线把运行时钉在 **0.1.11**，该版本带上了**核心侧**的 execution↔trace 关联。**宿主不消费该关联**：本仓没有任何地方引用 `ExecutionTrace*`，且在 `plan/yd-trace-link`（`441e1be4`）并入 `main` 之前，它一直不被消费。这是 **2026-10-24** 的 CTO 裁定；抬 pin 本身落在 `16e5f4b9fb`。
+
 ## 这条线不做什么
 
 - **不主张验证。** 没有用户、客户或试点走过它。这里写的都是**在开发宿主上跑过的**——**仅此而已**。
