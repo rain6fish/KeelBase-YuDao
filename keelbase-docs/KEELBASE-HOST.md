@@ -53,6 +53,8 @@ licence surface of upstream's module dependency tree are all unmeasured.
 
 > **⚠ Rechecked 2026-10-11** — three items above have since landed: the **model-driven path** runs with a real model (`scripts/run-model-loop-scenarios.mjs`), the **generator face** is adapted (`keelbase-codegen`, `scripts/run-host-generator.mjs`), and the **conformance suite and the four rates** have scripts here (`scripts/run-app-conformance.mjs`, `scripts/measure-governance-rates.mjs`). Kept as written (a 2026-10-08 snapshot).
 
+> **Runtime pin, 2026-10-24** — this line pins the runtime at **0.1.11**, which ships the core-side execution↔trace link. **The host does not consume that link**: nothing in this repository references `ExecutionTrace*`, and it stays unconsumed until `plan/yd-trace-link` (`441e1be4`) merges into `main`. This is the CTO's ruling of **2026-10-24**; the pin move itself landed in `16e5f4b9fb`.
+
 ## What this line does not do
 
 - **It does not claim verification.** No user, customer or trial has been through it. What is written
