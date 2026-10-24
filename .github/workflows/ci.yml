@@ -8,7 +8,8 @@
 # authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
 # run for real in `conformance`, below.
 #
-# Eight jobs, and each answers a question the others cannot:
+# Seven jobs, and each answers a question the others cannot (one carries a step that answers a
+# question of its own, marked where it appears):
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
@@ -16,8 +17,9 @@
 #                        boundary rests on and is one `@Bean` away from no longer being true;
 #   governance-registry  every module this host governs declares itself, and the name it declares is
 #                        the one its own pointcuts point at — the set `YD-13` made countable;
-#   console-pages        every page the assistant offers is a route the menus we ship compose, so a
-#                        curated list cannot quietly point at a page that moved;
+#   console-pages        *a step inside `governance-registry`* — every page the assistant offers is a
+#                        route the menus we ship compose, so a curated list cannot quietly point at a
+#                        page that moved;
 #   generator            the committed generated files are still a Spec's output (`--check-boundary`)
 #                        and still what that Spec says (`--check`);
 #   family-block         the generated "KeelBase family" section at the top of this repository's
@@ -49,7 +51,7 @@
 # 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试在下面的
 # `conformance` 里**真跑**。
 #
-# 八道 job，各答一个别的 job 答不了的问题：
+# 七道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
@@ -57,8 +59,8 @@
 #                        而它离「不再成立」只差一个 `@Bean`；
 #   governance-registry  本宿主治理的每个模块都**自报**，而它报的名字**就是**它自己 pointcut 所指的那一个
 #                        —— `YD-13` 让它**数得出来**的那个集合；
-#   console-pages        助手提供的每一页，都是**我们发布的菜单**解得出来的一条路径 —— 策展清单因而不会
-#                        悄悄指向一个已经挪走的页面；
+#   console-pages        *`governance-registry` 里的一个 step* —— 助手提供的每一页，都是**我们发布的菜单**
+#                        解得出来的一条路径，策展清单因而不会悄悄指向一个已经挪走的页面；
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
 #                        东西（`--check`）；
 #   family-block         本仓 README 开头生成的「KeelBase 家族」段仍与生成时的戳相符 —— 副本自带哈希，
@@ -284,14 +286,16 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      # 本机 JDK 25 实测：20 个类、151 条，0 失败、0 跳过；`~/.m2` 已热时整条命令约 29 秒（冷 runner
-      # 要先编完 reactor）。10 分钟是本步的上限（沿用 `conformance` 里同一道的量），不是整道 job 的上限。
+      # 本机 JDK 25 实测：20 个类、151 条，0 失败、0 跳过；`~/.m2` 已热时整条命令约 1 分钟。**这一步同时
+      # 承担构建与测试**（`conformance` 是拆成两步、由整道 job 兜 45 分钟的），冷 runner 上要先编完
+      # reactor、再下载依赖，故上限取 20 分钟而不是沿用那边测试步的 10 分钟。
       #
-      # Measured locally on JDK 25: 20 classes, 151 tests, 0 failures, 0 skipped; about 29 seconds
-      # for the whole command with a warm `~/.m2` (a cold runner builds the reactor first). The
-      # 10-minute ceiling is this step's, matching the same step in `conformance`, not the job's.
+      # Measured locally on JDK 25: 20 classes, 151 tests, 0 failures, 0 skipped; about a minute for
+      # the whole command with a warm `~/.m2`. This step **builds and tests in one go** (conformance
+      # splits the two and lets its 45-minute job cover them), and a cold runner compiles the reactor
+      # and downloads dependencies first — hence 20 minutes rather than conformance's 10.
       - name: Run the governance test package
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: >-
           KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
           -pl yudao-server -am test -Dtest='cn.iocoder.yudao.server.keelbase.*Test'
