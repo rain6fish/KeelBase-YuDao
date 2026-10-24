@@ -8,7 +8,7 @@
 # authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
 # run for real in `conformance`, below.
 #
-# Seven jobs, and each answers a question the others cannot:
+# Eight jobs, and each answers a question the others cannot:
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
@@ -23,12 +23,16 @@
 #   family-block         the generated "KeelBase family" section at the top of this repository's
 #                        READMEs still matches the stamp it was generated with — the copy carries its
 #                        own hash, so this needs neither the sibling repositories nor the network;
+#   governance-tests     the host's governance test package passes on its own — 20 classes, no
+#                        database, Redis or port — so a broken governance fact fails fast instead of
+#                        waiting behind the full-stack `conformance` job;
 #   conformance          the application conforms end to end against a **running** stack (PostgreSQL
 #                        + Redis + the host), and the four governance rates are readable — driven, not
 #                        quoted.
 #
-# All but `generator` and `conformance` are pure Node and finish in seconds. `generator` wants a JDK 25
-# toolchain and a Maven build, so it costs minutes; it is kept to those two **offline** checks.
+# All but `generator`, `governance-tests` and `conformance` are pure Node and finish in seconds.
+# `generator` and `governance-tests` want a JDK 25 toolchain and a Maven build, so they cost minutes;
+# `generator` is kept to its two **offline** checks, and `governance-tests` to the governance package.
 #
 # `conformance` is the one job that needs a service stack, because calling the scenario scripts without
 # a host would not be running them. It brings up PostgreSQL (with pgvector) and Redis as service
@@ -45,7 +49,7 @@
 # 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试在下面的
 # `conformance` 里**真跑**。
 #
-# 七道 job，各答一个别的 job 答不了的问题：
+# 八道 job，各答一个别的 job 答不了的问题：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
@@ -59,10 +63,13 @@
 #                        东西（`--check`）；
 #   family-block         本仓 README 开头生成的「KeelBase 家族」段仍与生成时的戳相符 —— 副本自带哈希，
 #                        故既不需要兄弟仓、也不需要联网；
+#   governance-tests     宿主治理测试包自己就能过 —— 20 个类，不需要数据库、Redis 或端口 —— 故一条治理
+#                        事实坏了会**先**红，而不是排在整套栈的 `conformance` 后面等；
 #   conformance          应用对着**跑着的栈**（PostgreSQL + Redis + 宿主）端到端符合，且四个治理率可读
 #                        —— 驱动门禁，不誊抄门禁。
 #
-# 前六道是 pure Node 或离线检查、几秒到几分钟。第七道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
+# 前六道是 pure Node 或离线检查、几秒到几分钟。`generator` 与 `governance-tests` 要 JDK 25 工具链与
+# Maven 构建，以分钟计。第八道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
 # service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主并跑它自己的 Java 测试 → 灌种子 →
 # 起服务 → 等 `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调那些脚本，那不叫跑过它。
 # 套件里有两栏的主语是**模型那条路**（MCP 的两个真模型步、抽屉的真会话），故这道 job 置
@@ -241,6 +248,50 @@ jobs:
       # 仓里的闸来说，这是唯一行得通的形状。
       - name: The family section in the READMEs must match its stamp
         run: node scripts/check-family-block.mjs
+
+  # 这道 job **只**跑治理测试包 `cn.iocoder.yudao.server.keelbase`：那 20 个 `*Test` 类是纯 JUnit 5 +
+  # Mockito，假 mapper、假服务顶住数据面，故不需要数据库、Redis 或端口。范围刻意这么窄，是为了让一条坏掉的
+  # 治理事实在几分钟内**自己**变红、并且红在一个能指名道姓的 job 上，而不是排在需要整套栈、45 分钟上限的
+  # `conformance` 后面才被发现。`-Dtest` 只在上面那一包里选；`-am` 只为让兄弟模块现编而不是从 `~/.m2` 取；
+  # `failIfNoSpecifiedTests=false` 是给 `-am` 带上的那些模块用的——它们一条也匹配不上，不算失败。
+  #
+  # **不覆盖**：宿主其余包里的测试（它们仍只在 `conformance` 里跑、或在本机跑），以及依赖模块自带的上游
+  # 测试套件（本仓照原样保留，从不在这里跑）。
+  #
+  # This job runs **only** the governance test package `cn.iocoder.yudao.server.keelbase`: those 20
+  # `*Test` classes are plain JUnit 5 + Mockito, with fake mappers and services standing in for the
+  # data face, so they need no database, Redis or port. The scope is deliberately this narrow so that
+  # a broken governance fact turns red on its own in minutes, in a job that names it, rather than
+  # behind the stack-bound `conformance` job and its 45-minute ceiling. `-Dtest` selects inside that
+  # package only; `-am` is there so the sibling modules are built from source rather than resolved
+  # from `~/.m2`; `failIfNoSpecifiedTests=false` is for those modules pulled in by `-am` — matching
+  # nothing there is not a failure.
+  #
+  # **Not covered**: the rest of the host's test classes (they still run only inside `conformance`,
+  # or locally), and the dependency modules' upstream suites (kept as found; never run here).
+  governance-tests:
+    name: The governance test package passes without a service stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # 本机 JDK 25 实测：20 个类、151 条，0 失败、0 跳过；`~/.m2` 已热时整条命令约 29 秒（冷 runner
+      # 要先编完 reactor）。10 分钟是本步的上限（沿用 `conformance` 里同一道的量），不是整道 job 的上限。
+      #
+      # Measured locally on JDK 25: 20 classes, 151 tests, 0 failures, 0 skipped; about 29 seconds
+      # for the whole command with a warm `~/.m2` (a cold runner builds the reactor first). The
+      # 10-minute ceiling is this step's, matching the same step in `conformance`, not the job's.
+      - name: Run the governance test package
+        timeout-minutes: 10
+        run: >-
+          KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
+          -pl yudao-server -am test -Dtest='cn.iocoder.yudao.server.keelbase.*Test'
+          -Dsurefire.failIfNoSpecifiedTests=false
 
   conformance:
     name: The application conforms, and the four governance rates are readable
