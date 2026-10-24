@@ -18,32 +18,39 @@ import java.util.List;
 @Mapper
 public interface Ai1HomeMapper {
 
-    @Select("SELECT (SELECT COUNT(1) FROM ai1_agent WHERE deleted = FALSE) AS agentCount, " +
-            "(SELECT COUNT(1) FROM ai1_skill WHERE deleted = FALSE) AS skillCount, " +
-            "(SELECT COUNT(1) FROM ai1_mcp WHERE deleted = FALSE) AS mcpCount, " +
-            "(SELECT COUNT(1) FROM ai1_model WHERE deleted = FALSE) AS modelCount")
+    // 别名不加反引号、`deleted` 与 0 比较而不是 FALSE：这条线部署在 PostgreSQL 上——反引号是语法错误，
+    // 而 `deleted` 是 smallint，`deleted = FALSE` 会报「operator does not exist: smallint = boolean」。
+    // 排序键改用位置序号，绕开保留字。这三种写法 MySQL 与 H2 也认。
+    // No backtick-quoted aliases and `deleted` compared to 0 rather than FALSE: this line deploys on
+    // PostgreSQL, where backticks are a syntax error and `deleted` is smallint, so `deleted = FALSE`
+    // fails with "operator does not exist: smallint = boolean". Positional ORDER BY keeps the sort
+    // keys free of reserved words. All three forms are read by MySQL and H2 too.
+    @Select("SELECT (SELECT COUNT(1) FROM ai1_agent WHERE deleted = 0) AS agentCount, " +
+            "(SELECT COUNT(1) FROM ai1_skill WHERE deleted = 0) AS skillCount, " +
+            "(SELECT COUNT(1) FROM ai1_mcp WHERE deleted = 0) AS mcpCount, " +
+            "(SELECT COUNT(1) FROM ai1_model WHERE deleted = 0) AS modelCount")
     Ai1HomeSummaryRespVO selectSummary();
 
     /**
-     * 按天统计消息数量，仅返回有消息的日期；使用 CAST AS DATE 兼容 MySQL 与 H2
+     * 按天统计消息数量，仅返回有消息的日期；使用 CAST AS DATE 兼容 MySQL、H2 与 PostgreSQL
      */
-    @Select("SELECT CAST(create_time AS DATE) AS `date`, COUNT(1) AS `count` " +
+    @Select("SELECT CAST(create_time AS DATE) AS date, COUNT(1) AS count " +
             "FROM ai1_session_message " +
-            "WHERE create_time BETWEEN #{beginTime} AND #{endTime} AND deleted = FALSE " +
+            "WHERE create_time BETWEEN #{beginTime} AND #{endTime} AND deleted = 0 " +
             "GROUP BY CAST(create_time AS DATE) " +
-            "ORDER BY `date`")
+            "ORDER BY 1")
     List<Ai1HomeMessageSummaryByDateRespVO> selectMessageSummaryListByCreateTimeBetweenGroupByDate(
             @Param("beginTime") LocalDateTime beginTime, @Param("endTime") LocalDateTime endTime);
 
     /**
      * 按 Agent 统计消息数量，按数量倒序，数量相同按 Agent 编号升序；已删除会话下的消息不计入
      */
-    @Select("SELECT c.agent_id AS agentId, COUNT(1) AS `count` " +
+    @Select("SELECT c.agent_id AS agentId, COUNT(1) AS count " +
             "FROM ai1_session_message m " +
-            "INNER JOIN ai1_session c ON m.session_id = c.id AND c.deleted = FALSE " +
-            "WHERE m.create_time BETWEEN #{beginTime} AND #{endTime} AND m.deleted = FALSE " +
+            "INNER JOIN ai1_session c ON m.session_id = c.id AND c.deleted = 0 " +
+            "WHERE m.create_time BETWEEN #{beginTime} AND #{endTime} AND m.deleted = 0 " +
             "GROUP BY c.agent_id " +
-            "ORDER BY `count` DESC, c.agent_id")
+            "ORDER BY 2 DESC, c.agent_id")
     List<Ai1HomeMessageSummaryByAgentRespVO> selectMessageSummaryListByCreateTimeBetweenGroupByAgentId(
             @Param("beginTime") LocalDateTime beginTime, @Param("endTime") LocalDateTime endTime);
 
