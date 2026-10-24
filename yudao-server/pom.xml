@@ -55,6 +55,20 @@
             <version>0.1.11</version>
         </dependency>
 
+        <!-- The trace id the host writes beside its own logs and hands to the runtime for execution
+             links. The monitor starter declares these as optional, so the host has to bring them in
+             explicitly; without an SDK provider `TracerUtils` only ever returns an empty string.
+             / 宿主写进自己的日志、并交给运行时做执行关联的 trace id。monitor starter 把它们声明为
+             optional，故宿主必须显式引入；没有 SDK provider 时 `TracerUtils` 只会返回空串。 -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+        </dependency>
+
         <!-- The model that seam talks to, when it is switched on. KeelBase's adapter activates off a
              `ChatClient.Builder` bean, and this host has none of its own: `ai1` builds its OpenAI models
              per request from rows in its own tables (`Ai1LlmModelFactory`) rather than contributing one

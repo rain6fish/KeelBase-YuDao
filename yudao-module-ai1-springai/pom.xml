@@ -37,6 +37,13 @@
             <version>${revision}</version>
         </dependency>
 
+        <!-- The runtime's trace holder, carried across the ai1 worker boundary. / 运行时的 trace holder，跨越 ai1 worker 边界传递。 -->
+        <dependency>
+            <groupId>cn.com.keelbase</groupId>
+            <artifactId>keelbase4j-core</artifactId>
+            <version>0.1.11</version>
+        </dependency>
+
         <!-- 业务组件 -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
