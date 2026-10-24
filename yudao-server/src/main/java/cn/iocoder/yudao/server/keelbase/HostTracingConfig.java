@@ -6,6 +6,7 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,7 +37,7 @@ public class HostTracingConfig {
     }
 
     @Bean
-    public OpenTelemetry openTelemetry(SdkTracerProvider provider) {
+    public OpenTelemetry openTelemetry(@Qualifier("sdkTracerProvider") SdkTracerProvider provider) {
         OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
         try {
             GlobalOpenTelemetry.set(sdk);
