@@ -37,6 +37,8 @@
 // **它造的东西，它收回去** —— 用的还是那个**本轮唯一**的标记，故收尾同样够不到别的轮次的行。**审计行不在此列**：
 // 那是一条哈希链，为了收拾门禁的凌乱去剪断它一环，是比凌乱更坏的一件事。
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -55,8 +57,50 @@ const checkNot = (name, forbidden, got) =>
   String(got).includes(forbidden) ? bad(name, `must not contain ${forbidden}`, got) : ok(name);
 const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 
-const psql = (sql) =>
-  execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+// The helper keeps `docker exec` as its default, unchanged. On a host without Docker, set
+// `PSQL_HELPER=direct` (or `local`) to run the client against a PostgreSQL you can reach; `PSQL` names
+// that client and the usual PG* variables (PGHOST / PGPORT / PGUSER / PGPASSWORD) select the endpoint.
+// `PSQL_HELPER=docker` is the same command this gate has always run.
+//
+// On a host with **no psql client at all**, set `PSQL_HELPER_SCRIPT` to a psql-shaped Node helper
+// (`scripts/psql-helper.mjs` in this repo). It takes precedence over `PSQL_HELPER`: when it is set the
+// gate runs `node <script> -h … -p … -U … -d … -tAc <sql>` and never calls docker or psql.
+//
+// psql 助手默认保持原样（`docker exec`）。没有 Docker 的机器上设 `PSQL_HELPER=direct`（或 `local`）直连
+// 一个你能连到的 PostgreSQL；`PSQL` 指定客户端路径，连接信息走常见的 PG* 变量（PGHOST / PGPORT /
+// PGUSER / PGPASSWORD）。`PSQL_HELPER=docker` 就是这道门禁一直跑的那条命令。
+//
+// **机器上根本没有 psql 客户端**时，把 `PSQL_HELPER_SCRIPT` 设成一个 psql 形状的 Node 助手（本仓
+// `scripts/psql-helper.mjs`）。它的优先级高于 `PSQL_HELPER`：设了它就只跑
+// `node <script> -h … -p … -U … -d … -tAc <sql>`，既不调 docker 也不调 psql。
+const PSQL = process.env.PSQL || 'psql';
+const PSQL_HELPER = (process.env.PSQL_HELPER || 'docker').toLowerCase();
+const PSQL_HELPER_SCRIPT = process.env.PSQL_HELPER_SCRIPT ? resolve(process.env.PSQL_HELPER_SCRIPT) : '';
+if (PSQL_HELPER_SCRIPT && !existsSync(PSQL_HELPER_SCRIPT)) {
+  throw new Error(`PSQL_HELPER_SCRIPT points to a missing file: ${process.env.PSQL_HELPER_SCRIPT} (resolved ${PSQL_HELPER_SCRIPT})`);
+}
+const psql = (sql) => {
+  if (PSQL_HELPER_SCRIPT) {
+    return execFileSync(
+      process.execPath,
+      [PSQL_HELPER_SCRIPT, '-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  if (PSQL_HELPER === 'docker') {
+    return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+  }
+  if (PSQL_HELPER === 'direct' || PSQL_HELPER === 'local') {
+    return execFileSync(
+      PSQL,
+      ['-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}"); or set PSQL_HELPER_SCRIPT to a psql-shaped helper`);
+};
 
 // 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
 // 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
@@ -257,6 +301,56 @@ async function ensureCrmWriter(adminToken) {
   return { id, username: 'gatecrmwriter', password: 'gate-pass-1234' };
 }
 
+/**
+ * A caller holding **only** the read code, and a scope of SELF so that the narrowing stands up.
+ *
+ * Scenario 2 asserts the **page's content**, and the runtime puts no tool result on the wire: the
+ * frozen `chat-response` has no `data`, and the streaming `tool_end` carries only success. So "is that
+ * row on the page" can only be read from the **module's own page endpoint** — it and the tool cross the
+ * **same** service method `CrmCustomerService.getCustomerPage`, which is where the narrowing advice
+ * sits. `common` does not hold `crm:customer:query`, and should not be widened for a gate, so this run
+ * gives the second caller a role carrying **that one code**. The data scope must be `SELF` (5) — a new
+ * role defaults to `ALL` (1), and `callerToEnforce()` answers null for a caller whose scope is every
+ * row, which stands the narrowing down; what scenario 2 needs is exactly that it stands up.
+ *
+ * 一名**只**持读权限码的调用方，数据范围 `SELF`，好让收窄站得住。
+ *
+ * 场景 2 断的是**页的内容**，而运行时不上线工具的结果：冻结的 `chat-response` 没有 `data`，流式的 `tool_end`
+ * 也只有成功与否。故「页里有没有那一行」只能从**模块自己的分页端点**读——它与工具走的是**同一个**服务方法
+ * `CrmCustomerService.getCustomerPage`，而收窄那条通知正切在它上面。`common` 没有 `crm:customer:query`，也不该
+ * 为一道门禁去放宽它，故本轮给第二个调用方一条**只带这一个码**的角色。数据范围必须是 `SELF`（5）——新角色默认
+ * `ALL`（1），而 `callerToEnforce()` 对「范围 = 全部行」的调用方返回 null，收窄就整条不发；场景 2 要的恰恰是它发。
+ */
+async function ensureCrmReader(adminToken) {
+  const menuIds = psql("select string_agg(id::text, ',') from system_menu"
+    + " where permission = 'crm:customer:query' and deleted = 0");
+  if (!menuIds) {
+    throw new Error('crm:customer:query 不在 system_menu 里 —— 这套库的菜单种子缺这一条，场景 2 的页就读不到');
+  }
+  let roleId = psql("select id from system_role where code = 'gate_crm_reader' and deleted = 0 limit 1");
+  if (!roleId) {
+    const role = await api('/system/role/create', {
+      method: 'POST', token: adminToken,
+      body: { name: 'gate-crm-reader', code: 'gate_crm_reader', sort: 99, status: 0,
+        remark: 'CRM gate: the page permission only, so the read narrowing is asserted by content' }
+    });
+    if (role.code !== 0) throw new Error(`create reader role -> ${role.code}: ${role.msg}`);
+    roleId = role.data;
+  }
+  await api('/system/permission/assign-role-menu', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), menuIds: menuIds.split(',').map(Number) }
+  });
+  await api('/system/permission/assign-role-data-scope', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), dataScope: 5, dataScopeDeptIds: [] }
+  });
+  // 与 `gatesales` 一样**按名复用、不收尾**：这条角色是夹具的一部分，不是本轮的业务行。
+  // Reused by name and **not** removed on the way out, like `gatesales`: the role is part of the
+  // fixture, not this run's business rows.
+  return Number(roleId);
+}
+
 const pendingCount = (operatorId) =>
   Number(psql(`select count(*) from confirmation_requests where operator_id = '${operatorId}' and status = 'pending'`));
 
@@ -318,7 +412,13 @@ if (!secondId) {
 }
 {
   const roles = psql(`select id from system_role where code = 'common' and deleted = 0 limit 1`);
-  await api('/system/permission/assign-user-role', { method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles)] } });
+  // 读的那个码单独一条角色（见 `ensureCrmReader`）：`common` 不该为一道门禁放宽，而场景 2 的页要它。
+  // The read code rides on a role of its own (see `ensureCrmReader`): `common` should not be widened for
+  // a gate, and scenario 2's page needs it.
+  const readerRoleId = await ensureCrmReader(admin);
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles), readerRoleId] }
+  });
 }
 const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
@@ -384,27 +484,48 @@ check('admin 那一行已种', true, adminRowId !== '');
 check('第二个调用方那一行已种', true, salesRowId !== '');
 check('有码调用方那一行已种', true, writerRowId !== '');
 
-console.log('== 场景 2 · 身份传递 + 数据范围 ==');
+console.log('== 场景 2 · 身份传递与读侧收窄：断页的内容，不只数调用次数 ==');
 {
+  // 前半：两个调用方各触发一次读工具。它断言的是这一回合**跑过了**（从审计轨读），证明的是**路由** —— 身份被
+  // 传到了本模块的工具上。它**不**证明收窄：把 `narrowToCaller` 删掉，这个计数照样是 2（2026-10-24 反向实验，
+  // 与 FMS 门禁同一次复核的同一个结论）。收窄也不在**写**那条路上显形 —— 场景 4 的拒绝来自 `requireOwned`
+  // 或写侧的 `appendPermissionCondition`，而收窄落在**读**的 `getCustomerPage` 上，两条是不同的机制。
+  //
+  // 后半：**页的内容**，这才是收窄的效果。三条都要断 —— 只断「乙的页里没有甲那一行」，一处根本没种甲那行的
+  // 夹具也会绿；只断「甲的页里有那一行」，收窄被删掉也绿。第三条（乙的页里有自己那一行）挡住第三种假绿：页
+  // 整个空着。页从**模块自己的分页端点**读、不走工具，因为运行时不上线工具的结果（见 `ensureCrmReader`
+  // 上方的注解）；而该端点与工具调用的是**同一个**被切的服务方法。
+  //
+  // The first half: each caller drives the tool once. It asserts the turn **ran** (read from the trail), which
+  // proves **routing** — the identity reached this module's tool. It does **not** prove the narrowing: delete
+  // `narrowToCaller` and the count is still 2 (2026-10-24 negative experiment, the same finding the FMS gate
+  // recorded). The narrowing does not show on the **write** path either — scenario 4's refusal comes from the
+  // write side — while this one sits on the **read**'s `getCustomerPage`: two mechanisms.
+  //
+  // The second half: the **page's content**, which is what the narrowing does. All three checks are required —
+  // "the second caller's page lacks the admin's row" alone is green on a fixture that never seeded it, and
+  // "the admin's page has it" alone is green with the narrowing deleted. A third check (the second caller's
+  // page has its own row) blocks a third false green: a page that is empty entirely. The page is read from the
+  // **module's own page endpoint** rather than the tool because the runtime puts no tool result on the wire
+  // (see the note above `ensureCrmReader`); that endpoint and the tool cross the **same** advised service
+  // method, so what it reads is the page this advice produced.
   const a = await chat(admin, '列出客户');
   check('admin 触发 CRM 工具', 'list_crm_customers', (a.toolCalls || [])[0]);
-  // **What this costs, said rather than hidden**: this scene used to assert the rows the tool *returned*
-  // — both of this run's rows for the administrator, only its own for the second caller, and the
-  // returned row's owner. As of core 0.1.5 the answer is the frozen `chat-response` and carries no
-  // `data`, and **neither** runtime puts a tool's result on the wire (the reference's `tool_end` carries
-  // a summary, not the data). So what is asserted here is that each turn **ran**, read from the trail,
-  // and the row scope is asserted where it lives: scenario 4's refusal of another caller's row, which
-  // the module itself answers.
-  //
-  // **代价说出来、不藏着**：本场原本断言的是工具**返回的行** —— 管理员看得到本轮两行、第二个调用方只看得到
-  // 自己那一行、以及回来那一行的属主。从 core 0.1.5 起，答案是冻结的 `chat-response`、不带 `data`，而**两个**
-  // 运行时都不把工具的结果放上线（参照的 `tool_end` 带的是 summary、不是数据）。所以这里断言的是**每一次都跑过了**
-  // （从审计轨读），行范围改在**它所在的地方**断言：情境 4 里那次「改别人的行」的拒绝 —— 那是**模块自己**答的。
   check('admin 的执行状态（审计轨）', 1, ranAs('list_crm_customers'));
 
   const s = await chat(second, '列出客户');
   check('第二个调用方触发同一个工具', 'list_crm_customers', (s.toolCalls || [])[0]);
   check('它的执行状态（审计轨）', 2, ranAs('list_crm_customers'));
+
+  const pageOf = (token) => api('/crm/customer/page?pageSize=100', { token });
+  const idsOn = (answer) => (((answer || {}).data || {}).list || []).map((row) => String(row.id));
+  const adminPage = await pageOf(admin);
+  const secondPage = await pageOf(second);
+  check('甲的页取到了', 0, adminPage.code);
+  check('乙的页取到了', 0, secondPage.code);
+  check('甲的页里有甲那一行（夹具确实种了它）', true, idsOn(adminPage).includes(String(adminRowId)));
+  check('乙的页里没有甲那一行（收窄真的发生了）', false, idsOn(secondPage).includes(String(adminRowId)));
+  check('乙的页里有乙自己那一行（页不是空着蒙对的）', true, idsOn(secondPage).includes(String(salesRowId)));
 }
 
 console.log('== 场景 3 · 同一权限码：REST 拒的，工具也拒；有码的照做 ==');

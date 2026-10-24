@@ -58,6 +58,8 @@
 // rows: those are a hash chain, and cutting a link to tidy up after a gate would be a worse act than the
 // untidiness.
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -77,8 +79,50 @@ const checkNot = (name, forbidden, got) =>
   String(got).includes(forbidden) ? bad(name, `must not contain ${forbidden}`, got) : ok(name);
 const note = (name, got) => console.log(`  note  ${name} → ${got}`);
 
-const psql = (sql) =>
-  execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+// The helper keeps `docker exec` as its default, unchanged. On a host without Docker, set
+// `PSQL_HELPER=direct` (or `local`) to run the client against a PostgreSQL you can reach; `PSQL` names
+// that client and the usual PG* variables (PGHOST / PGPORT / PGUSER / PGPASSWORD) select the endpoint.
+// `PSQL_HELPER=docker` is the same command this gate has always run.
+//
+// On a host with **no psql client at all**, set `PSQL_HELPER_SCRIPT` to a psql-shaped Node helper
+// (`scripts/psql-helper.mjs` in this repo). It takes precedence over `PSQL_HELPER`: when it is set the
+// gate runs `node <script> -h … -p … -U … -d … -tAc <sql>` and never calls docker or psql.
+//
+// psql 助手默认保持原样（`docker exec`）。没有 Docker 的机器上设 `PSQL_HELPER=direct`（或 `local`）直连
+// 一个你能连到的 PostgreSQL；`PSQL` 指定客户端路径，连接信息走常见的 PG* 变量（PGHOST / PGPORT /
+// PGUSER / PGPASSWORD）。`PSQL_HELPER=docker` 就是这道门禁一直跑的那条命令。
+//
+// **机器上根本没有 psql 客户端**时，把 `PSQL_HELPER_SCRIPT` 设成一个 psql 形状的 Node 助手（本仓
+// `scripts/psql-helper.mjs`）。它的优先级高于 `PSQL_HELPER`：设了它就只跑
+// `node <script> -h … -p … -U … -d … -tAc <sql>`，既不调 docker 也不调 psql。
+const PSQL = process.env.PSQL || 'psql';
+const PSQL_HELPER = (process.env.PSQL_HELPER || 'docker').toLowerCase();
+const PSQL_HELPER_SCRIPT = process.env.PSQL_HELPER_SCRIPT ? resolve(process.env.PSQL_HELPER_SCRIPT) : '';
+if (PSQL_HELPER_SCRIPT && !existsSync(PSQL_HELPER_SCRIPT)) {
+  throw new Error(`PSQL_HELPER_SCRIPT points to a missing file: ${process.env.PSQL_HELPER_SCRIPT} (resolved ${PSQL_HELPER_SCRIPT})`);
+}
+const psql = (sql) => {
+  if (PSQL_HELPER_SCRIPT) {
+    return execFileSync(
+      process.execPath,
+      [PSQL_HELPER_SCRIPT, '-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  if (PSQL_HELPER === 'docker') {
+    return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+  }
+  if (PSQL_HELPER === 'direct' || PSQL_HELPER === 'local') {
+    return execFileSync(
+      PSQL,
+      ['-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}"); or set PSQL_HELPER_SCRIPT to a psql-shaped helper`);
+};
 
 // 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
 // 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
@@ -276,8 +320,32 @@ const readStatusOf = (id) => {
   return value === 't' || value === 'true';
 };
 
-console.log('== 场景 2 · 身份传递：读被路由到本模块的工具 ==');
+console.log('== 场景 2 · 身份传递与读侧收窄：断页的内容，不只数调用次数 ==');
 {
+  // 前半断言的是这一回合**跑过了**（从审计轨读）——证明**路由**。它**不**证明收窄：这个计数与页里有什么无关。
+  //
+  // 后半断**页的内容**，从模块自己的「我的」分页端点读（`/system/notify-message/my-page`）：它与工具走的是
+  // **同一个** `getMyMyNotifyMessagePage`，而收窄（`user_id` + `user_type` 那一对）在模块的查询里。三条都要断：
+  // 只断「乙的页里没有甲那一行」，一处根本没种甲那行的夹具也会绿；只断「甲的页里有那一行」，收窄失效也绿；
+  // 第三条（乙的页里有自己那一行）挡住「页整个空着」。
+  //
+  // **这条断言守的是什么。** 工具自己把调用方传进去（`getMyMyNotifyMessagePage(query, caller, type)`），切面的那条
+  // 通知只是把任意路径带来的那一对钉回调用方。故反向实验改**工具**的身份实参：那才是「读没有按调用方收窄」在页上
+  // 的样子。
+  //
+  // The first half asserts the turn **ran** (from the trail) — which proves **routing**. It does **not** prove
+  // the narrowing: that count says nothing about what the page held.
+  //
+  // The second half asserts the **page's content**, read from the module's own "my" page endpoint
+  // (`/system/notify-message/my-page`): it and the tool cross the **same** `getMyMyNotifyMessagePage`, and the
+  // narrowing (the `user_id` + `user_type` pair) lives in the module's query. All three checks are required —
+  // the first alone is green on a fixture that never seeded the row, the second alone is green with the scoping
+  // gone, and the third blocks a page that is empty entirely.
+  //
+  // **What this assertion holds.** The tool passes the caller itself (`getMyMyNotifyMessagePage(query, caller,
+  // type)`); the advice only pins whatever arbitrary path carries back to the caller. The negative experiment
+  // therefore changes the **tool's** identity argument: that is what "the read is not scoped to the caller"
+  // looks like from the page.
   const a = await chat(admin, '我的消息');
   check('admin 触发站内信工具', 'list_my_notify_messages', (a.toolCalls || [])[0]);
   check('admin 的执行状态（审计轨）', 1, ranAs('list_my_notify_messages'));
@@ -285,6 +353,16 @@ console.log('== 场景 2 · 身份传递：读被路由到本模块的工具 =='
   const s = await chat(second, '我的消息');
   check('第二个调用方触发同一个工具', 'list_my_notify_messages', (s.toolCalls || [])[0]);
   check('它的执行状态（审计轨）', 2, ranAs('list_my_notify_messages'));
+
+  const pageOf = (token) => api('/system/notify-message/my-page?pageSize=100', { token });
+  const idsOn = (answer) => (((answer || {}).data || {}).list || []).map((row) => String(row.id));
+  const adminPage = await pageOf(admin);
+  const secondPage = await pageOf(second);
+  check('甲的页取到了', 0, adminPage.code);
+  check('乙的页取到了', 0, secondPage.code);
+  check('甲的页里有甲那一行（夹具确实种了它）', true, idsOn(adminPage).includes(String(adminRowId)));
+  check('乙的页里没有甲那一行（收窄真的发生了）', false, idsOn(secondPage).includes(String(adminRowId)));
+  check('乙的页里有乙自己那一行（页不是空着蒙对的）', true, idsOn(secondPage).includes(String(salesRowId)));
 }
 
 console.log('== 场景 3 · 高风险写入被扣下，批准后落库 ==');

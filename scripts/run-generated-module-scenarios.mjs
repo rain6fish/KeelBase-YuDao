@@ -25,8 +25,8 @@
 // another run's rows either. It does **not** remove audit rows: those are a hash chain, and cutting a link
 // to tidy up after a gate would be a worse act than the untidiness.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
@@ -64,8 +64,50 @@ const check = (name, expected, got) => (String(expected) === String(got) ? ok(na
 const checkNot = (name, forbidden, got) =>
   String(got).includes(forbidden) ? bad(name, `must not contain ${forbidden}`, got) : ok(name);
 
-const psql = (sql) =>
-  execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+// The helper keeps `docker exec` as its default, unchanged. On a host without Docker, set
+// `PSQL_HELPER=direct` (or `local`) to run the client against a PostgreSQL you can reach; `PSQL` names
+// that client and the usual PG* variables (PGHOST / PGPORT / PGUSER / PGPASSWORD) select the endpoint.
+// `PSQL_HELPER=docker` is the same command this gate has always run.
+//
+// On a host with **no psql client at all**, set `PSQL_HELPER_SCRIPT` to a psql-shaped Node helper
+// (`scripts/psql-helper.mjs` in this repo). It takes precedence over `PSQL_HELPER`: when it is set the
+// gate runs `node <script> -h … -p … -U … -d … -tAc <sql>` and never calls docker or psql.
+//
+// psql 助手默认保持原样（`docker exec`）。没有 Docker 的机器上设 `PSQL_HELPER=direct`（或 `local`）直连
+// 一个你能连到的 PostgreSQL；`PSQL` 指定客户端路径，连接信息走常见的 PG* 变量（PGHOST / PGPORT /
+// PGUSER / PGPASSWORD）。`PSQL_HELPER=docker` 就是这道门禁一直跑的那条命令。
+//
+// **机器上根本没有 psql 客户端**时，把 `PSQL_HELPER_SCRIPT` 设成一个 psql 形状的 Node 助手（本仓
+// `scripts/psql-helper.mjs`）。它的优先级高于 `PSQL_HELPER`：设了它就只跑
+// `node <script> -h … -p … -U … -d … -tAc <sql>`，既不调 docker 也不调 psql。
+const PSQL = process.env.PSQL || 'psql';
+const PSQL_HELPER = (process.env.PSQL_HELPER || 'docker').toLowerCase();
+const PSQL_HELPER_SCRIPT = process.env.PSQL_HELPER_SCRIPT ? resolve(process.env.PSQL_HELPER_SCRIPT) : '';
+if (PSQL_HELPER_SCRIPT && !existsSync(PSQL_HELPER_SCRIPT)) {
+  throw new Error(`PSQL_HELPER_SCRIPT points to a missing file: ${process.env.PSQL_HELPER_SCRIPT} (resolved ${PSQL_HELPER_SCRIPT})`);
+}
+const psql = (sql) => {
+  if (PSQL_HELPER_SCRIPT) {
+    return execFileSync(
+      process.execPath,
+      [PSQL_HELPER_SCRIPT, '-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  if (PSQL_HELPER === 'docker') {
+    return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=password', PG, 'psql', '-U', 'root', '-d', DB, '-tAc', sql], { encoding: 'utf8' }).trim();
+  }
+  if (PSQL_HELPER === 'direct' || PSQL_HELPER === 'local') {
+    return execFileSync(
+      PSQL,
+      ['-h', process.env.PGHOST || '127.0.0.1', '-p', process.env.PGPORT || '5432',
+        '-U', process.env.PGUSER || 'root', '-d', DB, '-tAc', sql],
+      { encoding: 'utf8', env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'password' } },
+    ).trim();
+  }
+  throw new Error(`PSQL_HELPER must be "docker" or "direct" (got "${process.env.PSQL_HELPER}"); or set PSQL_HELPER_SCRIPT to a psql-shaped helper`);
+};
 
 // 崩了也收尾。收尾是**一个函数**，在本轮造出第一行的那一刻挂上（见下面的 `putBack = …`），而不是等文件末尾那段
 // 才算 —— 否则「造了行、之后才崩」这条路上它是空的，而那正是实测过的那一种：本线两次门禁崩在收尾之前（一次
@@ -142,6 +184,67 @@ const pendingCount = (operatorId) =>
 const ranAs = (tool) =>
   Number(psql(`select count(*) from ai_audit_logs where tool = '${tool}' and outcome = 'executed'`));
 
+/**
+ * The second caller, able to read the module's **page** as a non-administrator.
+ *
+ * Scenario 2 asserts the **page's content**, and the runtime puts no tool result on the wire: the
+ * frozen `chat-response` has no `data`, and neither runtime's `tool_end` carries the data. So "is that
+ * row on the page" can only be read from the **module's own page endpoint** — it and the tool cross the
+ * **same** advised service method `ProductsService.getProductsPage`, which is where the narrowing
+ * (`setOwnerUserId`) sits.
+ *
+ * Two fixtures are needed for that. A **role** carrying only `products:products:query`, scoped `SELF`
+ * (5) — a new role defaults to `ALL` (1), and `callerToEnforce()` answers null for a caller whose scope
+ * is every row, which stands the narrowing down. And a **menu row** carrying that permission: the
+ * generated module ships a table, not a menu, so this deployment has none, and without one the
+ * controller refuses every non-administrator. The row is written once, matched on the permission code,
+ * with a short name that says it is a gate fixture.
+ *
+ * 第二个调用方，能以**非管理员**身份读模块的**页**。
+ *
+ * 场景 2 断的是**页的内容**，而运行时不上线工具的结果：冻结的 `chat-response` 没有 `data`，两个运行时的
+ * `tool_end` 也都不带数据。故「页里有没有那一行」只能从**模块自己的分页端点**读——它与工具走的是**同一个**
+ * 被切的服务方法 `ProductsService.getProductsPage`，而收窄（`setOwnerUserId`）正切在它上面。
+ *
+ * 这需要两样夹具。一条**只**带 `products:products:query` 的**角色**，范围 `SELF`（5）——新角色默认
+ * `ALL`（1），而 `callerToEnforce()` 对「范围 = 全部行」的调用方返回 null，收窄就整条不发。以及一行带该
+ * 权限码的**菜单**：生成模块只带表、不带菜单，故本部署没有这一条，而没有它，控制器会拒掉每一个非管理员。
+ * 这一行只写一次、按权限码匹配，名字写明它是门禁夹具。
+ */
+async function ensureProductsReader(adminToken) {
+  let menuId = psql("select id from system_menu where permission = 'products:products:query' and deleted = 0 order by id limit 1");
+  if (!menuId) {
+    psql("insert into system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name,"
+      + " status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)"
+      + " values (20990, '产品查询（门禁夹具）', 'products:products:query', 3, 99, 0, '', '', '', NULL,"
+      + " 0, false, true, true, '1', now(), '1', now(), 0)");
+    menuId = psql("select id from system_menu where permission = 'products:products:query' and deleted = 0 order by id limit 1");
+    console.log(`  note  本部署没有 products:products:query 的菜单行 —— 门禁自己写了一行（id=${menuId}）`);
+  }
+  let roleId = psql("select id from system_role where code = 'gate_products_reader' and deleted = 0 limit 1");
+  if (!roleId) {
+    const role = await api('/system/role/create', {
+      method: 'POST', token: adminToken,
+      body: { name: 'gate-products-reader', code: 'gate_products_reader', sort: 99, status: 0,
+        remark: 'Generated-module gate: the page permission only, so the read narrowing is asserted by content' }
+    });
+    if (role.code !== 0) throw new Error(`create reader role -> ${role.code}: ${role.msg}`);
+    roleId = role.data;
+  }
+  await api('/system/permission/assign-role-menu', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), menuIds: [Number(menuId)] }
+  });
+  await api('/system/permission/assign-role-data-scope', {
+    method: 'POST', token: adminToken,
+    body: { roleId: Number(roleId), dataScope: 5, dataScopeDeptIds: [] }
+  });
+  // 与 `gatesales` 一样**按名复用、不收尾**：角色与那一行菜单是夹具的一部分，不是本轮的业务行。
+  // Reused by name and **not** removed on the way out, like `gatesales`: both the role and that menu row
+  // are part of the fixture, not this run's business rows.
+  return Number(roleId);
+}
+
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 // The audit chain is signed with `keelbase.audit.hmac-key`, so rows written under a different key can
@@ -182,10 +285,16 @@ if (!secondId) {
   ok(`复用第二个用户 id=${secondId}`);
 }
 // Give it the query permission, through the API so the host invalidates its own cache — a hand-written
-// row is not seen until the cache is cleared (measured).
+// row is not seen until the cache is cleared (measured). It rides on a role of its own (see
+// `ensureProductsReader`): `common` should not be widened for a gate, and scenario 2's page needs it.
+// 给它那个查询权限，经 API 授予，好让宿主清掉自己的缓存——手写的行在缓存清掉之前看不见（实测）。它挂在
+// 一条自己的角色上（见 `ensureProductsReader`）：`common` 不该为一道门禁放宽，而场景 2 的页要它。
 {
   const roles = psql(`select id from system_role where code = 'common' and deleted = 0 limit 1`);
-  await api('/system/permission/assign-user-role', { method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles)] } });
+  const readerRoleId = await ensureProductsReader(admin);
+  await api('/system/permission/assign-user-role', {
+    method: 'POST', token: admin, body: { userId: Number(secondId), roleIds: [Number(roles), readerRoleId] }
+  });
 }
 const second = await login(SECOND_USER, SECOND_PASS);
 ok('第二个调用方登录');
@@ -222,22 +331,49 @@ putBack = () =>
 // id 来自模块的序列、而该列没有默认值——那是宿主自己的惯例（`system_users.id` 亦然），故裸插入必须点名它。
 psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_seq'), '${adminMarker}', '1')`);
 psql(`insert into ${MODULE}(id, name, owner_user_id) values (nextval('${MODULE}_seq'), '${salesMarker}', '${secondId}')`);
+const adminRowId = psql(`select id from ${MODULE} where name = '${adminMarker}'`);
+const salesRowId = psql(`select id from ${MODULE} where name = '${salesMarker}'`);
+check('甲那一行已种', true, adminRowId !== '');
+check('乙那一行已种', true, salesRowId !== '');
 {
+  // 前半：两个调用方各触发一次读工具。它断言的是这一回合**跑过了**（从审计轨读），证明的是**路由** —— 身份被
+  // 传到了本模块的工具上。它**不**证明收窄：把 `narrowToCaller` 里那句 `setOwnerUserId` 删掉，这个计数照样是 2
+  // （2026-10-24 反向实验，与 CRM、FMS 两道门禁同一次复核的同一个结论）。
+  //
+  // 后半：**页的内容**，这才是收窄的效果。三条都要断 —— 只断「乙的页里没有甲那一行」，一处根本没种甲那行的
+  // 夹具也会绿；只断「甲的页里有那一行」，收窄被删掉也绿。第三条（乙的页里有自己那一行）挡住第三种假绿：页
+  // 整个空着。页从**模块自己的分页端点**读、不走工具，因为运行时不上线工具的结果（见 `ensureProductsReader`
+  // 上方的注解）；而该端点与工具调用的是**同一个**被切的服务方法。
+  //
+  // The first half: each caller drives the tool once. It asserts the turn **ran** (read from the trail), which
+  // proves **routing** — the identity reached this module's tool. It does **not** prove the narrowing: delete
+  // `setOwnerUserId` from `narrowToCaller` and the count is still 2 (2026-10-24 negative experiment, the same
+  // finding the CRM and FMS gates recorded).
+  //
+  // The second half: the **page's content**, which is what the narrowing does. All three checks are required —
+  // "the second caller's page lacks the admin's row" alone is green on a fixture that never seeded it, and
+  // "the admin's page has it" alone is green with the narrowing deleted. A third check (the second caller's
+  // page has its own row) blocks a third false green: a page that is empty entirely. The page is read from the
+  // **module's own page endpoint** rather than the tool because the runtime puts no tool result on the wire
+  // (see the note above `ensureProductsReader`); that endpoint and the tool cross the **same** advised
+  // service method, so what it reads is the page this advice produced.
   const a = await chat(admin, '列出产品');
   check('admin 触发生成的工具', 'list_generated_products', (a.toolCalls || [])[0]);
-  // **What this costs**: this scene used to assert the rows the tool *returned* — see the same note in
-  // `run-crm-customer-scenarios.mjs`. The answer is the frozen `chat-response` and carries no `data`,
-  // and neither runtime puts a tool's result on the wire, so what is asserted is that each turn **ran**
-  // (from the trail) and the row scope is asserted where the module itself answers it.
-  //
-  // **代价**：本场原本断言的是工具**返回的行** —— 说明同 `run-crm-customer-scenarios.mjs`。答案是冻结的
-  // `chat-response`、不带 `data`，而两个运行时都不把工具的结果放上线，故这里断言的是**每一次都跑过了**（从审计轨
-  // 读），行范围在**模块自己答它的地方**断言。
   check('admin 的执行状态（审计轨）', 1, ranAs('list_generated_products'));
 
   const s = await chat(second, '列出产品');
   check('第二个调用方触发同一个工具', 'list_generated_products', (s.toolCalls || [])[0]);
   check('它的执行状态（审计轨）', 2, ranAs('list_generated_products'));
+
+  const pageOf = (token) => api(`/${MODULE}/${MODULE}/page?pageSize=100`, { token });
+  const idsOn = (answer) => (((answer || {}).data || {}).list || []).map((row) => String(row.id));
+  const adminPage = await pageOf(admin);
+  const secondPage = await pageOf(second);
+  check('甲的页取到了', 0, adminPage.code);
+  check('乙的页取到了', 0, secondPage.code);
+  check('甲的页里有甲那一行（夹具确实种了它）', true, idsOn(adminPage).includes(String(adminRowId)));
+  check('乙的页里没有甲那一行（收窄真的发生了）', false, idsOn(secondPage).includes(String(adminRowId)));
+  check('乙的页里有乙自己那一行（页不是空着蒙对的）', true, idsOn(secondPage).includes(String(salesRowId)));
 }
 
 console.log(`== 场景 3 · 写${expectHeld ? '被扣下等人，批准后才执行' : '不被扣下，直接执行'}（期望读自规格的风险级）==`);
