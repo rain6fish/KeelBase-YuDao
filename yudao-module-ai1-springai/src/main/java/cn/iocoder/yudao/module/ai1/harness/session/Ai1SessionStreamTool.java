@@ -36,12 +36,14 @@ import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1ChatModelResolver;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmChatTool;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
+import cn.iocoder.yudao.module.ai1.harness.llm.TraceScopedToolCallback;
 import cn.iocoder.yudao.module.ai1.harness.local.Ai1LocalToolProvider;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpToolFactory;
 import cn.iocoder.yudao.module.ai1.harness.rag.Ai1RagTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
@@ -567,6 +569,25 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     }
 
     /**
+     * 把捕获到的 trace id 包进每个 {@link ToolCallback}；不是 ToolCallback 的对象原样透传。
+     *
+     * <p>Wraps every ToolCallback with the captured trace id; other objects pass through unchanged.
+     */
+    private static List<Object> traceScoped(List<?> tools, String traceId) {
+        List<Object> scoped = new ArrayList<>(tools.size());
+        if (StrUtil.isBlank(traceId)) {
+            scoped.addAll(tools);
+            return scoped;
+        }
+        for (Object tool : tools) {
+            scoped.add(tool instanceof ToolCallback callback
+                    ? new TraceScopedToolCallback(callback, traceId)
+                    : tool);
+        }
+        return scoped;
+    }
+
+    /**
      * 持有执行锁后处理任务：清理异常记录、补齐已完成任务、收尾中断任务，或执行新一轮生成
      */
     private void executeTask(StreamMessageId recordId, Map<String, String> fields, Long messageId,
@@ -753,10 +774,14 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
         // governed call attributable to *this* turn rather than to the caller in general. The SKILL face is left
         // alone: nothing governs it, so there is no row to place. **This place is KeelBase's change to an
         // upstream file**: registered in `keelbase-docs/KEELBASE-UPSTREAM.md` and covered by a test.
-        List<Object> tools = new ArrayList<>(mcpToolFactory.buildTools(agent, sessionId));
-        tools.addAll(skillToolFactory.buildTools(agent));
+        // The trace id is set on this worker thread; the tool loop runs on Reactor's scheduler, so the
+        // ThreadLocal does not follow. Scope every ToolCallback with the id captured here.
+        // trace 设在 worker 线程上，而工具循环跑在 Reactor 调度线程上；这里把 id 捕获进每个 ToolCallback。
+        String traceId = ExecutionTraceHolder.current();
+        List<Object> tools = new ArrayList<>(traceScoped(mcpToolFactory.buildTools(agent, sessionId), traceId));
+        tools.addAll(traceScoped(skillToolFactory.buildTools(agent), traceId));
         if (localToolProvider != null) {
-            tools.addAll(localToolProvider.buildTools(agent, sessionId));
+            tools.addAll(traceScoped(localToolProvider.buildTools(agent, sessionId), traceId));
         }
         StringBuilder noticeText = new StringBuilder();
         List<Advisor> advisors = new ArrayList<>();
