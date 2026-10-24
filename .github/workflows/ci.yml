@@ -145,10 +145,14 @@ jobs:
 
       # The assistant's page list is curated, and a curated list is a second place to forget: each
       # route it names is looked up in the menu tree the SQL we ship defines, composed the way the
-      # console's router composes it. Pure Node.
+      # console's router composes it — and then against the branches `module-scope.sql` keeps, because
+      # a route can compose and still be switched off on this host. Pages in switched-off branches are
+      # declared one by one, so a new one, a stale declaration or a healed branch is red. Pure Node.
       # 助手的页面清单是策展的，而策展清单就是第二个可以忘的地方：它点名的每条路径，都在**我们发布的 SQL**
-      # 所定义的菜单树里查一遍，且按控制台路由的拼法拼。纯 Node。
-      - name: Every page the assistant offers must be one the menus compose
+      # 所定义的菜单树里查一遍，且按控制台路由的拼法拼；再查一遍 `module-scope.sql` 保留的支——因为一条路径
+      # 可以拼得出来、在这台机器上却已被停用。停用支里的页面**逐页声明**，于是新增一页、声明过期、或某支又被
+      # 启用，都会变红。纯 Node。
+      - name: Every page the assistant offers must be one the console this deployment runs can open
         run: node scripts/check-console-pages.mjs
 
       # The deployment's seed manifest is reconciled with what it serves: every `sql/keelbase-*.sql`

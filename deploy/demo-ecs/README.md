@@ -44,6 +44,20 @@ Maven repository, silently, which is how an audit of the first attempt found `re
 **The module set is the deployment's, so it belongs here rather than in the repository's own build.**
 A change to which modules this host runs is a change to this file.
 
+**`bpm` is inside that jar but is not part of the console.** Its presence is not an accident:
+`yudao-module-crm` depends on it at build time — CRM's contract and receivable approvals run through
+bpm's engine — so cutting bpm from the pom would take CRM with it. What this deployment does *not* do
+is show it. Three facts that read as one:
+
+| | this host |
+|---|---|
+| `bpm` classes in the jar | yes |
+| bpm menu in the console | no — `/bpm` is not on `module-scope.sql`'s keep list, so the branch is switched off |
+| `bpm_*` tables in the database | no — `seed-manifest.txt` skips `sql/keelbase-bpm.sql` |
+
+A deployer who finds bpm classes in the jar should not read that as "workflow is available on this
+host": none of its pages resolves, and the tables those pages read do not exist.
+
 > ⚠ A **running** instance holds a lock on this jar, so `mvn package`'s repackage step fails and can
 > leave the fat jar replaced by a thin one. Stop the instance first, or build in a separate worktree.
 
@@ -90,6 +104,27 @@ docker logs -f yudao-server
 curl -s -o /dev/null -w '%{http_code}\n' https://demo2.keelbase.com.cn/
 curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ <title>KeelBase</title>
 ```
+
+## What the console shows, and what the assistant offers
+
+`ConsolePages` — the list behind the `navigate_console_page` tool — names **31** routes. The console
+this deployment runs can open **19** of them: `/system` (9 pages), `/infra` (5) and `/crm` (5). The
+other **12** sit in branches `module-scope.sql` switches off — `/report`, `/bpm`, `/oa`, `/hrm`,
+`/fms`, `/ai` — so the assistant can name a page the console answers with 「模块已禁用」.
+
+`node scripts/check-console-pages.mjs` checks both trees now: a route has to compose **and** sit in a
+branch this deployment keeps. The 12 are declared page by page in that script's `SWITCHED_OFF` table,
+and the check goes red if a page is added to a switched-off branch without a declaration, if a
+declaration's branch is switched back on, or if a declaration outlives its page. Narrowing
+`ConsolePages` itself is a product decision about what the assistant should offer, so it is not
+something this deployment changes.
+
+The menu grants do not close that gap, and are worth knowing about. The seed's `system_role_menu` rows
+for `super_admin` number **253**: **229** point into branches this deployment switches off, **24** at
+menu ids no seed defines, and none at a branch it keeps (measured 2026-10-24; the check prints the
+current counts on every run). They are dead weight rather than a fallback, because a super admin is
+answered from **every** menu and not from those rows
+(`PermissionServiceImpl.getRoleMenuListByRoleId`).
 
 ## The AI model loop, and where to reach it
 

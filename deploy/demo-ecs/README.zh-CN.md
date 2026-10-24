@@ -36,6 +36,18 @@ bash scripts/jdk25.sh mvn -q -DskipTests package -pl yudao-server -am
 
 **模块集是这个部署的，所以它属于这里、不属于仓库自己的构建。** 改这个宿主跑哪几个模块，就是改这个文件。
 
+**`bpm` 在 jar 里，但不属于控制台。** 它在 jar 里不是意外：`yudao-module-crm` 在构建期依赖它——
+CRM 的合同与回款审批走 bpm 的引擎——所以从 pom 里裁掉 bpm 会把 CRM 一起裁掉。本部署**不**做的，是把它
+显示出来。三条事实合起来读：
+
+| | 本机 |
+|---|---|
+| jar 里有 `bpm` 的类 | 有 |
+| 控制台里有 bpm 菜单 | 没有 —— `/bpm` 不在 `module-scope.sql` 的保留清单里，整支被停用 |
+| 库里有 `bpm_*` 表 | 没有 —— `seed-manifest.txt` 跳过了 `sql/keelbase-bpm.sql` |
+
+看到 jar 里有 bpm 的类，**不该**读成「这台机器上有工作流」：它的页面一条都解不出来，而那些页面要读的表**不存在**。
+
 > ⚠ **正在跑**的实例会锁住这个 jar ⇒ `mvn package` 的 repackage 会失败，且**可能把胖 jar 覆盖成瘦 jar**。
 > 重建前先停掉那个实例，或在一个独立 worktree 里构建。
 
@@ -78,6 +90,23 @@ docker logs -f yudao-server
 curl -s -o /dev/null -w '%{http_code}\n' https://demo2.keelbase.com.cn/
 curl -s https://demo2.keelbase.com.cn/ | grep -o '<title>[^<]*</title>'   # ⇒ <title>KeelBase</title>
 ```
+
+## 控制台展示什么，助手提供什么
+
+`ConsolePages`——`navigate_console_page` 工具背后那份清单——点名 **31** 条路径。本部署真正跑的控制台
+打得开其中 **19** 条：`/system`（9 页）、`/infra`（5 页）、`/crm`（5 页）。另外 **12** 条落在
+`module-scope.sql` 停用的支里——`/report`、`/bpm`、`/oa`、`/hrm`、`/fms`、`/ai`——于是助手可能报出一页，
+而控制台答「模块已禁用」。
+
+`node scripts/check-console-pages.mjs` 现在**两棵树都查**：一条路径既要拼得出来，又要在本部署保留的支里。
+那 12 条在该脚本的 `SWITCHED_OFF` 表里**逐页声明**；以下三种情况检查都变红——往停用的支里加了页面却没声明、
+声明的支后来又被启用、声明的页面已经不存在。收窄 `ConsolePages` 本身是「助手该提供什么」的**产品决定**，
+不是本部署改的东西。
+
+菜单授予补不上这个缺口，而且值得知道：种子里 `super_admin` 的 `system_role_menu` 行共 **253** 条，其中
+**229** 条指向本部署停用的支、**24** 条指向种子根本没定义的菜单号，**一条都不在**本部署保留的支上
+（2026-10-24 实测；每次跑检查都会打印当前计数）。它们是**死重**而不是兜底——超级管理员由**全部**菜单作答、
+不读这些行（`PermissionServiceImpl.getRoleMenuListByRoleId`）。
 
 ## AI 模型回路，以及去哪儿用它
 
