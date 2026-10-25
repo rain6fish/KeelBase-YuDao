@@ -48,7 +48,7 @@
 
 > **运行时 pin，2026-10-24** —— 本线把运行时钉在 **0.1.11**，该版本带上了**核心侧**的 execution↔trace 关联。**宿主不消费该关联**：本仓没有任何地方引用 `ExecutionTrace*`，且在 `plan/yd-trace-link`（`441e1be4`）并入 `main` 之前，它一直不被消费。这是 **2026-10-24** 的 CTO 裁定；抬 pin 本身落在 `16e5f4b9fb`。按原样保留（合并前的快照）。
 
-> **⚠ 2026-10-24 更新** —— 上面那条裁定**已被取代**：`plan/yd-trace-link`（`441e1be4`）以 **`0e76496651`** 并入 `main`，宿主现在**消费**该关联。`YudaoExecutionTraceFilter` 为每个请求起或复用 span，并把 trace id 放进运行时的 `ExecutionTraceHolder`；ai1 的投递把该 id 随任务写进 Redis stream，于是 worker 线程上的工具循环跑在同一个 trace 下，它写下的审计行与宿主自己的操作日志得以配对。今天撑住这条说法的是：过滤器单元测试与 `Ai1SessionStreamToolTest`。曾证明 `execution_trace_links` 行带非空 `trace_id` 的隔离栈 E2E 跑在本次合并**之前**，未因本次合并重跑。
+> **⚠ 2026-10-24 更新** —— 上面那条裁定**已被取代**：`plan/yd-trace-link`（`441e1be4`）以 **`0e76496651`** 并入 `main`，宿主现在**消费**该关联。`YudaoExecutionTraceFilter` 为每个请求起或复用 span，并把 trace id 放进运行时的 `ExecutionTraceHolder`；ai1 的投递把该 id 随任务写进 Redis stream，于是 worker 线程上的工具循环跑在同一个 trace 下，它写下的审计行与宿主自己的操作日志得以配对。今天撑住这条说法的是：过滤器单元测试与 `Ai1SessionStreamToolTest`。隔离栈 E2E 曾证明 `execution_trace_links` 行可以带非空 `trace_id`，但那份读数跑在本次合并**之前**，**此前未因本次合并重跑**；**2026-10-25 已补**——同一套隔离栈上对同一条调用做三次对照：修后（`66536a1eee`）链接行的 `trace_id` 非空，把该修复回退后同一调用写 **NULL**，恢复后又非空，三次工具都跑在 `boundedElastic-2` 上，可见跨线程那一跳每次都在，变的只是 trace 有没有跟过去。这段依据的是 2026-10-25 那次同一栈三次读数（执行记录见项目执行日志 `2026-10-25 trace 异步传播修复` 条）。
 
 ## 这条线不做什么
 
