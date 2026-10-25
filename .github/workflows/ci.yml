@@ -6,7 +6,7 @@
 # them, which is the same rule that keeps every other upstream file untouched (the running count of
 # what we *have* touched is `YD-T4`). Their test-skip flags are therefore moot rather than
 # authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
-# run for real in `conformance`, below.
+# and the ai1 module's own tests run for real in `conformance`, below.
 #
 # Seven jobs, and each answers a question the others cannot (one carries a step that answers a
 # question of its own, marked where it appears):
@@ -30,7 +30,8 @@
 #                        waiting behind the full-stack `conformance` job;
 #   conformance          the application conforms end to end against a **running** stack (PostgreSQL
 #                        + Redis + the host), and the four governance rates are readable — driven, not
-#                        quoted.
+#                        quoted; it is also where the host's Java tests and the ai1 module's own tests
+#                        run.
 #
 # All but `generator`, `governance-tests` and `conformance` are pure Node and finish in seconds.
 # `generator` and `governance-tests` want a JDK 25 toolchain and a Maven build, so they cost minutes;
@@ -38,8 +39,9 @@
 #
 # `conformance` is the one job that needs a service stack, because calling the scenario scripts without
 # a host would not be running them. It brings up PostgreSQL (with pgvector) and Redis as service
-# containers, builds the host and runs its own Java tests, loads the seed, starts the server, waits
-# for `/actuator/health`, and then runs `scripts/run-app-conformance.mjs`. Two of that suite's
+# containers, builds the host, runs the host's Java tests and the ai1 module's own tests, loads the
+# seed, starts the server, waits for `/actuator/health`, and then runs
+# `scripts/run-app-conformance.mjs`. Two of that suite's
 # columns have the **model path** as their subject (MCP's two real model steps, and the assistant
 # drawer's real session), so the job sets
 # `CONFORMANCE_NO_MODEL_KEY=1`: those two columns are recorded `SKIP` with that reason, never `PASS`,
@@ -48,8 +50,8 @@
 # 上游自带两个 workflow —— `maven.yml` 与 `yudao-ui-admin.yml` —— 在本仓都是**休眠**的：它们触发于
 # `master`，而本仓分支是 `main`。它们是上游的文件、照原样留着；本仓**新增**自己的，而不是去改它们——
 # 这与「其余上游文件一律不碰」是同一条规矩（我们究竟碰过哪些，见 `YD-T4` 的记账）。故它们里的
-# 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试在下面的
-# `conformance` 里**真跑**。
+# 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试、以及 ai1
+# 模块自己的测试，都在下面的 `conformance` 里**真跑**。
 #
 # 七道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
 #
@@ -68,12 +70,13 @@
 #   governance-tests     宿主治理测试包自己就能过 —— 20 个类，不需要数据库、Redis 或端口 —— 故一条治理
 #                        事实坏了会**先**红，而不是排在整套栈的 `conformance` 后面等；
 #   conformance          应用对着**跑着的栈**（PostgreSQL + Redis + 宿主）端到端符合，且四个治理率可读
-#                        —— 驱动门禁，不誊抄门禁。
+#                        —— 驱动门禁，不誊抄门禁；宿主的 Java 测试与 ai1 模块自己的测试也在这里跑。
 #
 # 前六道是 pure Node 或离线检查、几秒到几分钟。`generator` 与 `governance-tests` 要 JDK 25 工具链与
 # Maven 构建，以分钟计。第八道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
-# service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主并跑它自己的 Java 测试 → 灌种子 →
-# 起服务 → 等 `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调那些脚本，那不叫跑过它。
+# service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主 → 跑宿主的 Java 测试与 ai1 模块自己的
+# 测试 → 灌种子 → 起服务 → 等 `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调
+# 那些脚本，那不叫跑过它。
 # 套件里有两栏的主语是**模型那条路**（MCP 的两个真模型步、抽屉的真会话），故这道 job 置
 # `CONFORMANCE_NO_MODEL_KEY=1`：那两栏记 `SKIP` 并写出原因、**绝不记 `PASS`**，其余确定性的栏照常驱动。
 # 这道 job **不接**任何真模型 key。
@@ -269,8 +272,8 @@ jobs:
   # `conformance` 后面才被发现。`-Dtest` 只在上面那一包里选；`-am` 只为让兄弟模块现编而不是从 `~/.m2` 取；
   # `failIfNoSpecifiedTests=false` 是给 `-am` 带上的那些模块用的——它们一条也匹配不上，不算失败。
   #
-  # **不覆盖**：宿主其余包里的测试（它们仍只在 `conformance` 里跑、或在本机跑），以及依赖模块自带的上游
-  # 测试套件（本仓照原样保留，从不在这里跑）。
+  # **不覆盖**：宿主其余包里的测试（它们仍只在 `conformance` 里跑、或在本机跑），ai1 模块自己的测试（在
+  # `conformance` 里跑），以及依赖模块自带的上游测试套件（本仓照原样保留，从不在这里跑）。
   #
   # This job runs **only** the governance test package `cn.iocoder.yudao.server.keelbase`: those 20
   # `*Test` classes are plain JUnit 5 + Mockito, with fake mappers and services standing in for the
@@ -282,7 +285,8 @@ jobs:
   # nothing there is not a failure.
   #
   # **Not covered**: the rest of the host's test classes (they still run only inside `conformance`,
-  # or locally), and the dependency modules' upstream suites (kept as found; never run here).
+  # or locally), the ai1 module's own tests (they run inside `conformance`), and the dependency
+  # modules' upstream suites (kept as found; never run here).
   governance-tests:
     name: The governance test package passes without a service stack
     runs-on: ubuntu-latest
@@ -371,8 +375,9 @@ jobs:
       # 从本步装进 `~/.m2` 的产物解析。这也让 surefire 的默认行为成为一道守卫——过滤范围一旦写错、一条都
       # 匹配不上，构建是**红**的（实测 exit 1），而不是「零测试也绿」。
       #
-      # 范围**刻意**只到宿主的测试类：依赖模块自带上游的测试套件（本地量到 1531 条），那是上游的文件，本仓
-      # 照原样保留，不在这道 job 的范围里。
+      # 范围**刻意**只到宿主的测试类与下面 ai1 模块自己的测试类：其余依赖模块自带上游的测试套件（今天
+      # `-pl yudao-server -am` 整道 reactor 本机量到 1005 条，其中 ai1 的 195 条在下一步跑），那是上游的
+      # 文件，本仓照原样保留，仍不在范围里。
       #
       # The host's 20 Java test classes are plain JUnit 5 + Mockito: fake mappers and services stand in
       # for the data face, so they need no database, Redis or port. Measured locally on JDK 25: 151
@@ -384,9 +389,10 @@ jobs:
       # surefire's default a guard — if the filter is ever written wrong and matches nothing, the build
       # goes **red** (measured exit 1) instead of passing with zero tests.
       #
-      # The scope is **deliberately** the host's test classes only: the dependency modules carry
-      # upstream's own suites (1531 tests measured locally), and those are upstream's files, kept as
-      # found — out of this job's scope.
+      # The scope is **deliberately** the host's test classes and, below, the ai1 module's own tests. The
+      # remaining dependency modules carry upstream's own suites: the whole `-pl yudao-server -am`
+      # reactor measures 1005 tests locally today, 195 of them ai1's (run in the next step); the other
+      # 810 are upstream's files, kept as found, and stay out of scope.
       - name: Build the host
         run: >-
           KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
@@ -397,6 +403,28 @@ jobs:
         run: >-
           KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
           -pl yudao-server test -Dtest='cn.iocoder.yudao.server.**.*Test'
+
+      # ai1 模块自己的测试类也在这里跑：24 个类、195 条，其中 `TraceScopedToolCallbackTest` 那 3 条守着
+      # 「投递线程的 trace 带到工具执行线程、用完清掉」这条回归。它们与上面一样是纯 JUnit 5 + Mockito，
+      # 不需要数据库、Redis 或端口——两条 Redis 集成测试（3 条）是 `@Disabled`，本机读数里记为 skipped。
+      # 本步沿用上一步 `install` 装进 `~/.m2` 的兄弟模块产物，故同样不带 `-am`；同样靠 surefire 的默认
+      # 行为当守卫：过滤范围一条都匹配不上，构建是**红**的（本机实测 exit 1）。用 JDK 25 在本机实测：
+      # 195 条，0 失败、0 错误、3 跳过，整步约 40 秒，故上限取 10 分钟。
+      #
+      # The ai1 module's own test classes run here too: 24 classes, 195 tests, three of them in
+      # `TraceScopedToolCallbackTest`, the regression that keeps the submitting thread's trace on the
+      # tool thread and clears it afterwards. Like the host's, they are plain JUnit 5 + Mockito and need
+      # no database, Redis or port — the two Redis integration tests (3 tests) are `@Disabled` and are
+      # recorded as skipped in the local reading. This step reuses the modules the `install` step above
+      # put in `~/.m2`, so it likewise omits `-am`, and it likewise leans on surefire's default as a
+      # guard: a filter that matches nothing turns the build **red** (measured exit 1). Measured locally
+      # on JDK 25: 195 tests, 0 failures, 0 errors, 3 skipped; about 40 seconds for the whole step, so
+      # the ceiling is 10 minutes.
+      - name: Run the ai1 module's tests
+        timeout-minutes: 10
+        run: >-
+          KEELBASE_JDK25="$JAVA_HOME" bash scripts/jdk25.sh mvn -B -ntp
+          -pl yudao-module-ai1-springai test -Dtest='cn.iocoder.yudao.module.ai1.**.*Test'
 
       - name: Load the seed into the service database
         env:
