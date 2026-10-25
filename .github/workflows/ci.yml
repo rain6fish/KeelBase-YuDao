@@ -140,6 +140,14 @@ jobs:
       - name: The boundary page must draw its not-held block, in both languages
         run: node --test scripts/boundary-page.test.mjs
 
+      # 展开审计行是 M7 的证据面：展开块里调用的每个 helper 都必须在同一文件里有定义或导入。
+      # 2026-10-25 实测：`toolRisk` 既没定义也没导入，展开任意一行时表体整块不渲染，而构建与既有门禁全绿。
+      # The audit row's expansion is M7's evidence surface: every helper the expand block calls must
+      # resolve in the same file. Measured 2026-10-25: `toolRisk` was neither defined nor imported,
+      # expanding any row rendered no table body, while the build and every existing gate stayed green.
+      - name: Every helper the audit row's expansion calls resolves
+        run: node --test scripts/audit-chain-page.test.mjs
+
   governance-registry:
     name: Every governed module declares itself
     runs-on: ubuntu-latest
