@@ -50,6 +50,8 @@
 
 > **⚠ 2026-10-24 更新** —— 上面那条裁定**已被取代**：`plan/yd-trace-link`（`441e1be4`）以 **`0e76496651`** 并入 `main`，宿主现在**消费**该关联。`YudaoExecutionTraceFilter` 为每个请求起或复用 span，并把 trace id 放进运行时的 `ExecutionTraceHolder`；ai1 的投递把该 id 随任务写进 Redis stream，于是 worker 线程上的工具循环跑在同一个 trace 下，它写下的审计行与宿主自己的操作日志得以配对。今天撑住这条说法的是：过滤器单元测试与 `Ai1SessionStreamToolTest`。曾证明 `execution_trace_links` 行带非空 `trace_id` 的隔离栈 E2E 跑在本次合并**之前**，未因本次合并重跑。
 
+> **⚠ 2026-10-25 更新** —— 上面最后那句只对**同步**路径成立。**异步**路径——ai1 的流式任务——上，工具循环跑在 Reactor 的 `boundedElastic` 上，运行时的 `ExecutionTraceHolder` ThreadLocal **没有**跟着跨线程：工具照常执行、审计行照常写，但 `execution_trace_links.trace_id` 写出来是 **NULL**。那是**真缺陷**，不是措辞没跟上。`TraceScopedToolCallback`（提交 **`66536a1eee`**）修掉了它：装配工具时捕获 `ExecutionTraceHolder.current()`，在每次 `call` 前后 set/clear（local 与 MCP 的 `ToolCallback` 都包上），于是工具及其审计写入看到的是这一轮的 trace，池线程调用后也不残留。现在撑住这条说法的是：同步路径已在真栈上读过（链接行非空，宿主日志对得上）；`TraceScopedToolCallbackTest` 读到 **3/3**；同一套隔离栈上对异步调用 `POST /admin-api/ai1/session/message/send-stream` 同时取三处读数——响应头 `trace-id=e05ff0c6…`、Redis 任务字段、`execution_trace_links.trace_id`——三者同为 `e05ff0c6…`，工具仍在 `boundedElastic-2` 上跑。
+
 ## 这条线不做什么
 
 - **不主张验证。** 没有用户、客户或试点走过它。这里写的都是**在开发宿主上跑过的**——**仅此而已**。
