@@ -613,6 +613,23 @@ mv "$tmp" "$INDEX"
 #
 # 有违反是**记录下来、不在这里致命**。这次构建的职责是把记录带出去；停下来会把「把违反展示给读者」的那一页
 # 一并带走。响亮失败的地方是 CI。
+#
+# 这份记录是一条**公开面**（2026-10-25 定）：它随产物出去、不做鉴权，未登录也取得到。判据是它写的是什么——
+# 构建事实（扫描根、文件数、`文件:行`、每条 AI 路径的治理姿态），**没有一句调用方的数据**，也**不问服务端
+# 要任何东西**；这与 `/app/capabilities`、`/app/provenance` 是同一类「应用自述」，而源码本就以 Apache-2.0
+# 公开，那几行路径不构成泄露。页面路由与菜单（`sql/keelbase-boundary-menu.sql`，授予 `common`）用的是同一条
+# 判据：不含调用方数据的面发出去不增加可达面。**不要**只给这个文件加鉴权而把 JS 产物留在公开处——那样挡不住
+# 这里任何一条事实，只会让页面在未登录时静默空白。
+#
+# This record is a **public face** (ruled 2026-10-25): it ships with the artefact, is not authenticated, and
+# even an anonymous fetch gets it. The test is what it says — build facts (scan roots, file count,
+# `file:line` coordinates, each AI path's governance posture) with not one caller's data in it, and it asks
+# the server for nothing. It is the same kind of self-description as `/app/capabilities` and
+# `/app/provenance`, and the sources are published under Apache-2.0 anyway, so those coordinates leak
+# nothing. The page's route and menu (`sql/keelbase-boundary-menu.sql`, granted to `common`) are handed out
+# by the same test: a face carrying no caller's data adds no reach. **Do not** authenticate this file alone
+# while leaving the JS artefact public — that withholds none of the facts here and only makes the page
+# render blank for a signed-out visitor.
 if [[ -f "$REPO_ROOT/scripts/check-ungoverned-tool-beans.mjs" ]]; then
   set +e
   node "$REPO_ROOT/scripts/check-ungoverned-tool-beans.mjs" --emit "$DIST/$BOUNDARY_NAME"

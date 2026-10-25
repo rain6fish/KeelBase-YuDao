@@ -37,6 +37,24 @@
 --
 -- 只插入，且幂等：每条语句按它将要加入的那一对匹配。
 
+-- **`common` 不是最小权限角色，别拿它当最小权限的对照。** 它是上游种子里的「普通角色」（`system_role` id 2，
+-- 见 `sql/postgresql/ruoyi-vue-pro.sql`），带着上游给它的整套 system / infra 菜单与权限串——本部署实测一名
+-- `common` 账号的 `get-permission-info` 返回 107 项（其中 1 项是空串，即 106 条真实权限串），
+-- `system:operate-log:query` / `system:operate-log:export` 都在里面。故「`common` 能打开这一页」只说明这一页
+-- **发给普通用户**，不说明它已经够窄：可达面看的是服务端是否按调用方限范围，不看 `common` 手里有什么。
+-- 需要一条真正的最小权限普通角色时，照 `sql/keelbase-audit-reader.sql` 的样子新种一个只带治理读菜单的角色
+-- （那个种在 `audit_reader` 上，零 system / infra 菜单）；**不要**收窄 `common`——现有用户的业务面挂在它上面。
+--
+-- **`common` is not a least-privilege role and must not serve as one.** It is upstream's seeded ordinary
+-- role (`system_role` id 2, see `sql/postgresql/ruoyi-vue-pro.sql`) and carries the whole set of system /
+-- infra menus and permission strings upstream gives it: in this deployment a `common` account's
+-- `get-permission-info` returned 107 entries, one of them an empty string, so 106 real permission strings —
+-- `system:operate-log:query` and `system:operate-log:export` among them. So "`common` can open this page"
+-- says only that the page **goes to ordinary users**, not that it is narrow. Reach is judged by whether the
+-- server scopes to the caller, never by what `common` holds. When a genuinely least-privilege ordinary role
+-- is needed, seed a new one the way `sql/keelbase-audit-reader.sql` does (it lands on `audit_reader` with
+-- zero system / infra menus). **Do not** narrow `common` — existing users' business faces hang off it.
+
 -- The directory first, so the two children have somewhere to hang.
 -- 先目录，好让两个子项有地方可挂。
 INSERT INTO system_role_menu (id, role_id, menu_id, creator, create_time, updater, update_time, deleted, tenant_id)

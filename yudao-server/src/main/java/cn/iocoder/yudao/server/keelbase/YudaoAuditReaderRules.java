@@ -19,8 +19,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>本类只回答一件事：一个调用方**是否持有**宿主自己的 `audit_reader` 角色。持有则返回六条
  * `read` 规则（审计链、操作审计、工具清单、治理策略、副作用台账、确认记录），**一条写规则都没有**；
- * 不持有则原样交回档 A（管理员拿通配、普通用户拿 Customer / FollowUp）。这份清单就是该读者的全部射程，
- * 其余一律不授予——「不能写、不能审批、不能执行」是**按构造**成立的，不是靠另一道守卫。
+ * 不持有则原样交回档 A（管理员拿通配、普通用户拿 Customer / FollowUp）。这六条是**本规则源**的全部授予，
+ * 不是该读者能读到的一切：另有一类端点**只要求已认证、并按调用方本人范围裁剪**（如 `/ai/conversations`），
+ * 它们不靠本规则源放行，对**任何**已认证调用方都回答——故读者在那里拿到的是本人基线，**不是**这条规则
+ * 扩出来的面（2026-10-25 以无角色账号对照实测：同样回答）。「不能写、不能审批、不能执行」仍**按构造**
+ * 成立，它约束的是治理面与写面，不是本人范围读面。
  *
  * <p>审计读者**不合并**普通用户的规则：它读的是治理记录，不是应用的用户。故一个同时持 `common` 与
  * `audit_reader` 的账号在本规则源下仍只有读面——这正是把两个身份分开的意义。若要一个既能办案又能审计的
@@ -38,8 +41,13 @@ import org.springframework.stereotype.Component;
  * returns six `read` rules (the audit chain, the operations audit, the tool inventory, the governance
  * policy, the side-effect ledger and the confirmation records) and **not one write rule**. If not, it
  * hands the call back to tier A unchanged (administrators get the wildcard, ordinary users get Customer /
- * FollowUp). That list is the whole reach of the reader; nothing else is granted, so "cannot write,
- * cannot approve, cannot execute" holds **by construction** rather than by a second guard.
+ * FollowUp). Those six are the **whole of what this source grants**, not everything the reader can read:
+ * another class of endpoint requires authentication only and scopes itself to the caller (for example
+ * `/ai/conversations`). It does not depend on this source to let a call through and answers **any**
+ * authenticated caller, so what an `audit_reader` gets there is its own baseline, **not** a face this rule
+ * widened (measured 2026-10-25 against an account holding no role: answered the same). "Cannot write,
+ * cannot approve, cannot execute" still holds **by construction** — it bounds the governance and write
+ * faces, not the self-scoped reads.
  *
  * <p>The audit reader does **not** merge the ordinary user's rules: it reads the governance record, it is
  * not a user of the application. An account holding both `common` and `audit_reader` therefore still has
