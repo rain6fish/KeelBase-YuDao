@@ -415,6 +415,12 @@ function toolDescription(row: AuditRow): string {
   return (row.tool && inventory.value[row.tool]?.description) || ''
 }
 
+/** 这个工具声明的风险级 —— 清单认识它时。 */
+/** The tool's declared risk level, when the inventory knows this tool. */
+function toolRisk(row: AuditRow): string {
+  return (row.tool ? inventory.value[row.tool]?.riskLevel : '') || ''
+}
+
 /** What this tool's gate does to it — the effective one, in the reader's language. */
 /** 这个工具的闸会把它怎么样 —— 生效的那道，用读者的语言。 */
 function toolGateOf(row: AuditRow): string {
