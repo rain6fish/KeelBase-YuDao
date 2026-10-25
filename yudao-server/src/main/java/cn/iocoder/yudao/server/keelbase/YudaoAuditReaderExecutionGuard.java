@@ -4,8 +4,10 @@ package cn.iocoder.yudao.server.keelbase;
 import cn.com.keelbase.runtime.identity.AuthenticatedSubject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -16,8 +18,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * {@code read} 的账户，仍能在这里让 R1 工具真实执行；R3 写则生成一条 `immediate` 确认，而该账户**自己**就能裁它
  * （`/ai/confirmations/{token}` 只拒绝别人的行）——「不能写、不能审批、不能执行」于是在运行时入口上被绕开。
  *
- * <p>本守卫只做一件事：持有启用的 `audit_reader` 角色 ⇒ 拒绝这些执行入口。读面不挡：`GET /ai/confirmations`
- * 等仍是该角色的正当射程。角色读不出来时 `YudaoAuditReaderRules` 按「不持有」处理，故守卫失败即放行给运行时
+ * <p>本守卫只做一件事：持有启用的 `audit_reader` 角色 ⇒ 拒绝这些执行入口**与写入口**。读面不挡：
+ * `GET /ai/confirmations`、`GET /ai/tool-effects` 等仍是该角色的正当射程。写入口里还有副作用台账的撤销
+ * （`DELETE /ai/tool-effects/{id}`）：运行时的 `EffectController#revoke` 只判归属、**一次都不问规则源**，故一个
+ * 先做过事、后来才被授予该角色的账号仍能撤销自己名下的旧台账行（2026-10-25 隔离栈实测：读者撤销成功、库
+ * `executed → compensating`）。角色读不出来时 `YudaoAuditReaderRules` 按「不持有」处理，故守卫失败即放行给运行时
  * 自己的身份处理；这一取舍与规则源一致——缺一次角色读只会收窄规则，不会在这里凭空放大权限。
  *
  * <p>清单里还有宿主自己的 AI 执行形状：AI 模块的 `/admin-api/ai/chat/message/send`（及其流式兄弟）
@@ -43,10 +48,15 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * cannot execute" was thus bypassable at the runtime entry.
  *
  * <p>This guard does one thing: holding an enabled `audit_reader` role ⇒ refuse those execution
- * entries. Reads stay open — `GET /ai/confirmations` and friends are the role's proper reach. An
- * unreadable role is treated as "does not hold" by `YudaoAuditReaderRules`, so the guard lets the
- * request through to the runtime's own identity handling; that matches the rule source's stance, where
- * a missing role read narrows the rules and never widens a permission here.
+ * entries **and write entries**. Reads stay open — `GET /ai/confirmations`, `GET /ai/tool-effects` and
+ * friends are the role's proper reach. The write entries include revoking a side effect
+ * (`DELETE /ai/tool-effects/{id}`): the runtime's `EffectController#revoke` judges ownership only and
+ * **never asks the rule source**, so an account that operated before it was granted the role can still
+ * revoke an old ledger row of its own (measured 2026-10-25 on an isolated stack: the reader's revoke
+ * succeeded, the row moved `executed → compensating`). An unreadable role is treated as "does not
+ * hold" by `YudaoAuditReaderRules`, so the guard lets the request through to the runtime's own identity
+ * handling; that matches the rule source's stance, where a missing role read narrows the rules and
+ * never widens a permission here.
  */
 @Component
 public class YudaoAuditReaderExecutionGuard implements HandlerInterceptor {
@@ -89,14 +99,30 @@ public class YudaoAuditReaderExecutionGuard implements HandlerInterceptor {
         }
         String path = pathOf(request);
         boolean executionEntry = YudaoAuditReaderWebConfig.EXECUTION_PATHS.contains(path);
-        // 确认的**写**入口：GET 是队列读面、仍属该角色；POST 是裁决/再执行，属执行面。
-        // The **write** side of confirmations: GET is the queue read and stays in the role; POST decides
-        // or re-executes and belongs to the execution face.
-        boolean decisionEntry = !"GET".equalsIgnoreCase(request.getMethod())
-                && YudaoAuditReaderWebConfig.DECISION_PREFIXES.stream().anyMatch(path::startsWith);
-        if (executionEntry || decisionEntry) {
+        // 确认与台账的**写**入口：GET 是读面（队列、台账列表）、仍属该角色；非 GET 是裁决 / 再执行 / 撤销。
+        // The **write** entries of confirmations and the ledger: GET is a read face (the queue, the
+        // ledger list) and stays in the role; a non-GET decides, re-executes or revokes.
+        boolean writeEntry = !"GET".equalsIgnoreCase(request.getMethod())
+                && YudaoAuditReaderWebConfig.WRITE_PREFIXES.stream().anyMatch(path::startsWith);
+        if (executionEntry) {
             throw new AccessDeniedException(
                     "the audit reader is a reader: it cannot reach the AI execution entries");
+        }
+        // 写侧的拒绝**带真 HTTP 403**，与这条删改入口本来答的拒绝同形（运行时对别人的台账行答的就是真 403）。
+        // 一个改状态的 DELETE 被拒时若答 HTTP 200，只看状态码的客户端会读成「撤销成功」——而这一条要挡的正是
+        // 一次已经发生的状态迁移。执行入口那三条保持原有的 `AccessDeniedException` 形态（拦截器的拒绝在那里
+        // 到达时是 HTTP 200 + 正文 `code:403`，2026-10-25 已记为 F2，本轮只核不改）；等 F2 收口时两处会合成一种。
+        //
+        // The write-side refusal carries a **real HTTP 403**, the shape this delete already answered
+        // with (the runtime answers a real 403 for somebody else's ledger row). A refused
+        // state-changing DELETE that answered HTTP 200 would be read as "revoked" by a status-only
+        // client — and what this entry has to stop is a state transition that actually happened. The
+        // three execution entries keep their `AccessDeniedException` shape (an interceptor refusal
+        // arrives there as HTTP 200 with `code:403` in the body — recorded as F2 on 2026-10-25 and
+        // only examined this round); the two shapes merge when F2 is closed.
+        if (writeEntry) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "the audit reader is a reader: it cannot write");
         }
         return true;
     }

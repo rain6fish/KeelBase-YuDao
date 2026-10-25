@@ -58,10 +58,34 @@ public class YudaoAuditReaderWebConfig implements WebMvcConfigurer {
             "/admin-api/ai/chat/message/send-stream",
             "/admin-api/ai1/session/message/send-stream");
 
-    /** 确认的写侧前缀：GET 之外的请求在这里裁决或再执行。 / The write-side confirmation prefixes: non-GET requests decide or re-execute here. */
-    static final List<String> DECISION_PREFIXES = List.of(
+    /**
+     * 写侧前缀：GET 之外的请求在这里写。确认的两条是裁决或再执行；台账那条是**撤销**
+     * （`DELETE /ai/tool-effects/{id}`）。GET 一律放行 —— 确认队列与台账列表都是该角色的正当读面。
+     *
+     * <p>台账为什么也得在这里挡：运行时的 `EffectController#revoke` 只判归属
+     * （`isManager() || userId == effect.userId`），**一次都不问权限规则源**。于是一个先做过事、后来才被
+     * 授予 `audit_reader` 的账号，仍能撤销自己名下那条旧台账行（2026-10-25 隔离栈实测：HTTP 200、
+     * `executed → compensating`、写了一条 `effect_revoke` 审计行）。规则源说它只有六条 `read`、
+     * 一条写规则都没有 —— 而运行时那条路径根本不会去问它，所以这道墙只能由宿主砌。
+     *
+     * <p>英文：
+     *
+     * <p>The write-side prefixes: a non-GET request under one of these writes. The two confirmation
+     * prefixes decide or re-execute; the ledger prefix **revokes** (`DELETE /ai/tool-effects/{id}`).
+     * GET is always allowed — the confirmation queue and the ledger list are the role's proper reads.
+     *
+     * <p>Why the ledger has to be refused here too: the runtime's `EffectController#revoke` judges
+     * ownership only (`isManager() || userId == effect.userId`) and **never asks the permission rule
+     * source**. An account that operated before it was granted `audit_reader` can therefore still revoke
+     * an old ledger row of its own (measured 2026-10-25 on an isolated stack: HTTP 200,
+     * `executed → compensating`, an `effect_revoke` audit line written). The rule source says it holds
+     * six `read` grants and not one write rule — and the runtime's path never asks it, so this wall can
+     * only be built on the host.
+     */
+    static final List<String> WRITE_PREFIXES = List.of(
             "/ai/confirmations",
-            "/ai/my/confirmations");
+            "/ai/my/confirmations",
+            "/ai/tool-effects");
 
     private final YudaoAuditReaderExecutionGuard guard;
     private final YudaoAiModuleSurfaceGuard aiModuleSurface;
@@ -80,7 +104,8 @@ public class YudaoAuditReaderWebConfig implements WebMvcConfigurer {
                         "/admin-api/ai/chat/message/send",
                         "/admin-api/ai/chat/message/send-stream",
                         "/admin-api/ai1/session/message/send-stream",
-                        "/ai/confirmations/**", "/ai/my/confirmations/**");
+                        "/ai/confirmations/**", "/ai/my/confirmations/**",
+                        "/ai/tool-effects", "/ai/tool-effects/**");
         // 顺序有意义：审计读者先在上述注册里拿到自己的 403，其余调用方才在这里听到「这个面不存在」。
         // Order matters: an audit reader gets its own 403 from the registration above, and only the
         // remaining callers hear here that the surface does not exist.
