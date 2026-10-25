@@ -300,18 +300,50 @@ index c22c950..029a7e9 100644
        <div
          v-if="show"
 diff --git a/src/layout/components/Message/src/Message.vue b/src/layout/components/Message/src/Message.vue
-index 8d522ef..63fedf5 100644
+index 8d522ef..5ccb56f 100644
 --- a/src/layout/components/Message/src/Message.vue
 +++ b/src/layout/components/Message/src/Message.vue
-@@ -75,7 +75,7 @@ onBeforeUnmount(() => {
+@@ -38,6 +38,16 @@ const goMyList = () => {
+   })
+ }
+ 
++// 点开一条消息：先标记已读，再打开「我的站内信」看全文
++const goMessage = async (item: any) => {
++  if (!item.readStatus) {
++    await NotifyMessageApi.updateNotifyMessageRead(item.id)
++    await getList()
++    getUnreadCount()
++  }
++  goMyList()
++}
++
+ // ========== 初始化 =========
+ onMounted(() => {
+   // 首次加载小红点
+@@ -74,8 +84,8 @@ onBeforeUnmount(() => {
+         <ElTabPane label="我的站内信" name="notice">
            <el-scrollbar class="message-list">
              <template v-for="item in list" :key="item.id">
-               <div class="message-item">
+-              <div class="message-item">
 -                <img alt="" class="message-icon" src="@/assets/imgs/avatar.gif" />
++              <div class="message-item" @click="goMessage(item)">
 +                <img alt="" class="message-icon" src="@/assets/imgs/keelbase-avatar.svg" />
                  <div class="message-content">
                    <span class="message-title">
                      {{ item.templateNickname }}：{{ item.templateContent }}
+@@ -134,6 +144,12 @@ onBeforeUnmount(() => {
+     align-items: center;
+     padding: 20px 0;
+     border-bottom: 1px solid var(--el-border-color-light);
++    cursor: pointer;
++    transition: background-color 0.2s;
++
++    &:hover {
++      background: var(--el-fill-color-light);
++    }
+ 
+     &:last-child {
+       border: none;
 diff --git a/src/layout/components/ToolHeader.vue b/src/layout/components/ToolHeader.vue
 index 23f8a3a..38a291a 100644
 --- a/src/layout/components/ToolHeader.vue
@@ -1276,3 +1308,46 @@ index f5055d7..36dad8d 100644
  
  /** 初始化 */
  onMounted(async () => {
+
+diff --git a/src/views/system/notify/my/index.vue b/src/views/system/notify/my/index.vue
+--- a/src/views/system/notify/my/index.vue
++++ b/src/views/system/notify/my/index.vue
+@@ -77,7 +77,13 @@
+         align="center"
+         prop="templateContent"
+         show-overflow-tooltip
+-      />
++      >
++        <template #default="scope">
++          <span class="message-content-link" @click="openDetail(scope.row)">
++            {{ scope.row.templateContent }}
++          </span>
++        </template>
++      </el-table-column>
+       <el-table-column label="是否已读" align="center" prop="readStatus" width="160">
+         <template #default="scope">
+           <dict-tag :type="DICT_TYPE.INFRA_BOOLEAN_STRING" :value="scope.row.readStatus" />
+@@ -97,7 +103,7 @@
+             :type="scope.row.readStatus ? 'primary' : 'warning'"
+             @click="openDetail(scope.row)"
+           >
+-            {{ scope.row.readStatus ? '详情' : '已读' }}
++            {{ scope.row.readStatus ? '详情' : '阅读' }}
+           </el-button>
+         </template>
+       </el-table-column>
+@@ -216,3 +222,14 @@
+   getList()
+ })
+ </script>
++
++<style lang="scss" scoped>
++.message-content-link {
++  cursor: pointer;
++  color: var(--el-color-primary);
++
++  &:hover {
++    text-decoration: underline;
++  }
++}
++</style>
