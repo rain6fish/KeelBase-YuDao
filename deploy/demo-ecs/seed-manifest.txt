@@ -68,6 +68,13 @@ load keelbase-policy-menu.sql
 # half is supplied by the host rule source `YudaoAuditReaderRules`.
 load keelbase-audit-reader.sql
 
+# 审计读者的**账号**：给上面那个角色一个可登录的身份 `m7audit`（口令同 `m7reader`，上游默认值）。
+# 只加账号、不写任何 `system_role_menu`；必须紧接角色文件之后——角色不存在时它插不进关系行。
+# The audit reader's **account**: a login (`m7audit`) for the role above (same password as `m7reader`,
+# upstream's default). Account only, no `system_role_menu` row; it must follow the role file, because the
+# relationship row cannot land without the role.
+load keelbase-audit-reader-user.sql
+
 # M7 走查读者（非管理员）：角色 `m7_reader`、账号 `m7reader`，以及 CRM 客户 create/update 与助手最短那一组
 # 菜单授予。必须排在以上菜单文件之后——授予引用的 `20001`/`20003`/`20004`/`20007`/`20029` 与
 # `20010`/`20019` 由它们落下。**不改 `common`**：普通角色继续做「无码读者」对照。

@@ -218,6 +218,16 @@ public final class SpecCodegen {
             // not declared when they landed, so the check has called the file UNDECLARED ever since.
             // Declaring it lets the declaration catch up with fact; no judgement is relaxed.
             "sql/keelbase-audit-reader.sql",
+            // 审计读者的**账号**（`sql/keelbase-audit-reader-user.sql`）：`audit_reader` 角色此前只有身份、没有登录，
+            // 部署齐备的库里没有人能以审计读者身份登录。本文件只插 `system_users` 一行与一行 `system_user_role`，
+            // 不写任何 `system_role_menu`（授予仍全部来自上一份）。手写、任何 Spec 都不产出 ⇒ 在此声明。
+            //
+            // The audit reader's **account** (`sql/keelbase-audit-reader-user.sql`): the `audit_reader` role had
+            // an identity but no login, so a fully seeded database had nobody who could sign in as an audit
+            // reader. The file inserts one `system_users` row and one `system_user_role` row and writes no
+            // `system_role_menu` (every grant still comes from the file above). Hand-written, produced by no
+            // Spec, so it is declared here.
+            "sql/keelbase-audit-reader-user.sql",
             // 走查读者的种子（`sql/keelbase-m7-reader.sql`，`b785afb033` 引入）：一个**非管理员**角色 `m7_reader`、
             // 它的账号 `m7reader`，以及最小的菜单授予。它同样是手写、任何 Spec 都不产出——只插、幂等，动的是
             // `system_role` / `system_users` / `system_user_role` / `system_role_menu`，且**不改** `common`；
