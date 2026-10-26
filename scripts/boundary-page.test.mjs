@@ -130,9 +130,9 @@ test('the block reads the same in both languages (snapshot)', () => {
     title: '它扣不住的',
     what: '上游自己那条路：chat 取角色的 toolIds、经 Spring AI 自己的解析器把 callback 交给模型 —— 本线治理看不见它。',
     upstreamPath: '上游模型→工具解析器',
-    why: '今天无害：本构建里唯一的 `ToolCallback` bean 是**上游自己的示例**，故解析器找不到我们的东西。',
+    why: '今天无害：本构建里唯一的 ToolCallback bean 是上游自己的示例，故解析器找不到我们的东西。',
     oneBeanAway:
-      '只差**一个**我们自己的 `{\'@\'}Bean` 交出 `ToolCallback` —— 模型就够得到它：不经引擎、不经身份、不经确认、不留审计行。',
+      '只差一个我们自己的 {\'@\'}Bean 交出 ToolCallback —— 模型就够得到它：不经引擎、不经身份、不经确认、不留审计行。',
   });
 
   assert.deepEqual(rendered(en), {
