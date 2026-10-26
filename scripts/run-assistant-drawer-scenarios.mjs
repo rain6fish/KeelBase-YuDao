@@ -35,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const API = `${HOST}/admin-api`;
@@ -153,7 +154,7 @@ const KEY = secret.SPRING_AI_DEEPSEEK_API_KEY;
 const MODEL = secret.SPRING_AI_DEEPSEEK_CHAT_MODEL || secret.SPRING_AI_DEEPSEEK_CHAT_OPTIONS_MODEL;
 check('拿到模型 key（只报长度）', true, !!KEY && KEY.length > 10);
 
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 const auditFloor = Number(psql('select coalesce(max(id), 0) from ai_audit_logs'));
 

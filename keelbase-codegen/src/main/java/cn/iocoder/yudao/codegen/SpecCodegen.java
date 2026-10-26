@@ -239,7 +239,17 @@ public final class SpecCodegen {
             // `system_user_role` / `system_role_menu` while leaving `common` alone; it was likewise not declared
             // here when it landed, so the check has called the file UNDECLARED ever since. Declaring it lets the
             // declaration catch up with fact; no judgement is relaxed.
-            "sql/keelbase-m7-reader.sql");
+            "sql/keelbase-m7-reader.sql",
+            // The demo accounts (`sql/keelbase-demo-accounts.sql`): the two the main repo's sign-in page
+            // names — `alex`'s account, and `admin`'s password rewritten while it still holds upstream's
+            // default. Hand-written, produced by no Spec, and not declared when it landed in `e672259c9f`,
+            // so the boundary check has called it UNDECLARED ever since. Declaring it lets the declaration
+            // catch up with fact; no judgement is relaxed.
+            //
+            // 演示账号（`sql/keelbase-demo-accounts.sql`）：主仓登录页上写的那两个 —— `alex` 的账号，以及
+            // `admin` 的口令（仅在它仍是上游默认值时才改写）。手写、任何 Spec 都不产出，`e672259c9f` 落地时漏了
+            // 在此声明，边界检查自那时起把它报成 UNDECLARED。补声明 = 让声明**追上事实**；判据一字未松。
+            "sql/keelbase-demo-accounts.sql");
 
     private SpecCodegen() {
     }

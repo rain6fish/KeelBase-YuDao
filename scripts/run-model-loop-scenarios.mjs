@@ -50,6 +50,7 @@
 // delete cannot reach another run's rows. No business row lands today, but the delete is written anyway so that
 // a run which somehow does land one is not silently left out. Audit rows are deliberately left alone.
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const API = `${HOST}/admin-api`;
@@ -106,7 +107,7 @@ async function api(path, { method = 'GET', token, body } = {}) {
 // ── 0) the stack ─────────────────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 check('/app/capabilities 200', 200, (await fetch(`${HOST}/app/capabilities`)).status);
-const login = await api('/system/auth/login', { method: 'POST', body: { username: 'admin', password: 'admin123' } });
+const login = await api('/system/auth/login', { method: 'POST', body: { username: ADMIN_USER, password: resolveAdminPassword(psql) } });
 check('admin 登录', 0, login.code);
 const admin = login.data.accessToken;
 

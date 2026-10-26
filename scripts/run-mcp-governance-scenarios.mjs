@@ -52,6 +52,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const API = `${HOST}/admin-api`;
@@ -162,7 +163,7 @@ for (let i = 0; i < 40 && !probeLog.includes('listening'); i += 1) {
 }
 check('探针起来了', true, probeLog.includes('listening'));
 
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // ── 2) the chain, through the host's own APIs ─────────────────────────────────────────────────────

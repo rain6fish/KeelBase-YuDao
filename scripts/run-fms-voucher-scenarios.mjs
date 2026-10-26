@@ -38,6 +38,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -216,7 +217,7 @@ console.log('== 前置 ==');
 psql('truncate table ai_audit_logs');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
 
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // 场景 2 要断**页的内容**，而运行时不上线工具的结果：冻结的 `chat-response` 没有 `data`，流式的 `tool_end`

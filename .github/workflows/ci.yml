@@ -202,6 +202,20 @@ jobs:
       - name: The deployment's seed manifest must classify every SQL file and carry every menu it serves
         run: node scripts/check-seed-list.mjs
 
+      # The administrator's password has one owner — the seed — and no gate carries a second copy of it.
+      # `keelbase-demo-accounts.sql` rewrites `admin`'s password when the row still holds upstream's
+      # default, so a database built from zero and one seeded before those accounts landed accept
+      # different passwords; a gate with the literal `admin123` in it therefore ran on one family and
+      # could not sign in on the other (measured 2026-10-26: no readings at all from a fresh seed). This
+      # holds the seed's hashes against the resolver's table and refuses any `run-*.mjs` that writes the
+      # password itself. Pure Node, no database.
+      # 管理员口令只有一个属主——种子——没有一道门禁另存一份。`keelbase-demo-accounts.sql` 在 `admin` 仍装
+      # 上游默认口令时改写它，故「从零建的库」与「那些账号落地之前灌的库」认不同口令；门禁里写死 `admin123`
+      # 就只能在其中一套上跑、在另一套上登不进去（2026-10-26 实测：新灌的库一条读数也出不来）。本检查把种子的
+      # 哈希与解析表对账，并拒掉任何自己写口令的 `run-*.mjs`。纯 Node、不连库。
+      - name: The administrator's password is the seed's, and no gate keeps a copy
+        run: node scripts/check-admin-credential.mjs
+
       # The nine-page identity matrix (issue `rain6fish/KeelBase-YuDao#2`) says which role may open
       # which governance page: the audit reader gets all but the conversation trace and the showcase,
       # the ordinary role gets the caller-scoped pages, and the showcase goes to nobody. Grants are

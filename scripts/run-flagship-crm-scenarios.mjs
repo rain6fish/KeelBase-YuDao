@@ -37,6 +37,7 @@
 // 冻结的 `chat-response`），故那份载荷的形状是**工具自己的投影**、在写它的地方核，不在这里。**把这一点说出来
 // 才是要点**：这一行绿**不能**被读成「排序是对的」。
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -135,7 +136,7 @@ const ranIn = (conversationId, tool) =>
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // The first turn is opened with a name this run chooses; from then on it continues the id the

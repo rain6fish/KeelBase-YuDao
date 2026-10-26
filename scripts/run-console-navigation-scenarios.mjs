@@ -29,6 +29,7 @@
 // 故一次绿跑说的是**在没问过模型的情况下**、确定性那条路到达了那一页。有模型只会让同一句断言取决于模型**恰好想选**
 // 哪一页。
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -86,7 +87,7 @@ const eventOf = (events, type) => events.find((e) => e.type === type);
 // ── 0) the stack answers at all ────────────────────────────────────────────────────────────────────
 console.log('== 前置 ==');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // Only rows about this gate's own tool, counted **before and after** rather than over the whole table:

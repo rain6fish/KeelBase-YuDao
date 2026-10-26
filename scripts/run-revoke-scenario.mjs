@@ -42,6 +42,7 @@
 // Everything it creates, it removes again — the row and its ledger entries go by this run's marker. Audit rows are
 // deliberately left alone: that the withdrawal is on the record is precisely what this gate exists to prove.
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -196,7 +197,7 @@ const revokeRows = () => Number(psql("select count(*) from ai_audit_logs where a
 // ── 0) the stack answers, and there is a second caller ───────────────────────────────────────────
 console.log('== 前置 ==');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // 与 CRM 门禁同一套前置，且同样幂等：两道闸本就该能对着同一个库跑，故已存在的调用方**复用**、不重建。

@@ -37,6 +37,7 @@
 // one-minute tenant cache). The business rows go by this run's three markers; the tenant's own rows go by
 // `tenant_id`, with the table list read from `information_schema`. Audit rows are deliberately left alone.
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -132,7 +133,7 @@ async function makeCustomer({ token, tenant, label, marker, operatorId }) {
 // ── 0) the stack answers, and the second tenant exists ───────────────────────────────────────────
 console.log('== 前置 ==');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
-const rootToken = await login('admin', 'admin123', ROOT_TENANT);
+const rootToken = await login(ADMIN_USER, resolveAdminPassword(psql), ROOT_TENANT);
 ok('admin@1 登录');
 
 // 闸租户的套餐要**含 CRM 那两个写权限码**：工具路径现在与 REST 同一条判据（`CrmCustomerTools`），而

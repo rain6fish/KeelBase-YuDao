@@ -48,6 +48,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48080';
 const API = `${HOST}/admin-api`;
@@ -167,7 +168,7 @@ if (!KEY || !MODEL) {
   process.exit(1);
 }
 
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 // The database's own ordering, taken before anything is asked of it — see the header.

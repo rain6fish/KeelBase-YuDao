@@ -28,6 +28,7 @@
 // **本轮的唯一标记写在行名里。** 本门禁造的每一行都带它，收尾按标记删，故够不到别的轮次。审计行刻意留着：
 // 那是一条哈希链，为收拾凌乱去剪它一环，比凌乱更坏。
 import { execFileSync } from 'node:child_process';
+import { ADMIN_USER, resolveAdminPassword } from './admin-credential.mjs';
 
 const HOST = process.env.HOST_URL || 'http://127.0.0.1:48105';
 const PG = process.env.PG_CONTAINER || 'keelbase-yudao-pg';
@@ -165,7 +166,7 @@ console.log('== 前置 ==');
 psql('truncate table ai_audit_logs');
 check('/app/capabilities 200', '200', (await fetch(`${HOST}/app/capabilities`)).status);
 
-const admin = await login('admin', 'admin123');
+const admin = await login(ADMIN_USER, resolveAdminPassword(psql));
 ok('admin 登录');
 
 console.log('== 前置 · 第二个调用方 ==');
