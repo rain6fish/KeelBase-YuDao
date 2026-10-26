@@ -101,9 +101,14 @@ public class ProductsGovernance implements GovernedModule {
     public Object requireOwnership(ProceedingJoinPoint call) throws Throwable {
         Long caller = scope.callerToEnforce();
         if (caller != null) {
+            // One advice covers the update and both deletes, so the action is read off the method the
+            // pointcut matched rather than fixed: a refusal has to name what was refused.
+            //
+            // 同一段通知同时管更新与两个删除，故 action 从通知命中的那个方法读出来，而不是写死：拒绝必须点名拒了什么。
+            String action = call.getSignature().getName().startsWith("delete") ? "delete" : "update";
             for (Long id : ids(call)) {
                 ProductsDO row = id == null ? null : mapper.selectById(id);
-                scope.requireOwned(row == null ? null : row.getOwnerUserId(), caller);
+                scope.requireOwned(row == null ? null : row.getOwnerUserId(), caller, "Product", action);
             }
         }
         return call.proceed();

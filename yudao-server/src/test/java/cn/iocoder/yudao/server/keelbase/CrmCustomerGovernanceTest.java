@@ -19,7 +19,7 @@ import cn.iocoder.yudao.module.crm.enums.common.CrmSceneTypeEnum;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.AccessDeniedException;
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 
 /**
  * CRM 客户切面的三条进门路径各收一次：分页补上「只看本人的」、按 id 读把别人的行交成空、按 id 写要求是自己的行。
@@ -131,10 +131,10 @@ class CrmCustomerGovernanceTest {
         update.setId(9L);
         when(call.getArgs()).thenReturn(new Object[]{update});
         when(mapper.selectById(9L)).thenReturn(customer(7L));
-        doThrow(new AccessDeniedException("该行不在你的数据范围内"))
-                .when(scope).requireOwned("7", CALLER);
+        doThrow(new RuleDeniedException(null, "该行不在你的数据范围内", "Customer", "update", null))
+                .when(scope).requireOwned("7", CALLER, "Customer", "update");
 
-        assertThrows(AccessDeniedException.class, () -> aspect.requireOwnership(call));
+        assertThrows(RuleDeniedException.class, () -> aspect.requireOwnership(call));
         verify(call, never()).proceed();
     }
 
@@ -147,7 +147,7 @@ class CrmCustomerGovernanceTest {
 
         aspect.requireOwnership(call);
 
-        verify(scope).requireOwned(String.valueOf(CALLER), CALLER);
+        verify(scope).requireOwned(String.valueOf(CALLER), CALLER, "Customer", "update");
         verify(call).proceed();
     }
 
@@ -160,7 +160,7 @@ class CrmCustomerGovernanceTest {
 
         aspect.requireOwnership(call);
 
-        verify(scope).requireOwned(null, CALLER);
+        verify(scope).requireOwned(null, CALLER, "Customer", "update");
         verify(call).proceed();
     }
 

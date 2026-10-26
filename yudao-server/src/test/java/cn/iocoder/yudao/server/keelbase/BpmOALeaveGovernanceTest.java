@@ -19,7 +19,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.security.access.AccessDeniedException;
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 
 /**
  * OA 请假切面的四条进门路径，其中一条**未跑过**要说清楚：创建那条在本宿主没有流程定义，故它只被单测覆盖，
@@ -93,10 +93,10 @@ class BpmOALeaveGovernanceTest {
     void aStatusChangeToAnothersLeaveIsRefusedBeforeItRuns() throws Throwable {
         when(call.getArgs()).thenReturn(new Object[]{9L});
         when(mapper.selectById(9L)).thenReturn(leave(7L));
-        doThrow(new AccessDeniedException("该行不在你的数据范围内"))
-                .when(scope).requireOwned("7", CALLER);
+        doThrow(new RuleDeniedException(null, "该行不在你的数据范围内", "OaLeave", "update", null))
+                .when(scope).requireOwned("7", CALLER, "OaLeave", "update");
 
-        assertThrows(AccessDeniedException.class, () -> aspect.requireOwnership(call));
+        assertThrows(RuleDeniedException.class, () -> aspect.requireOwnership(call));
         verify(call, never()).proceed();
     }
 
@@ -107,7 +107,7 @@ class BpmOALeaveGovernanceTest {
 
         aspect.requireOwnership(call);
 
-        verify(scope).requireOwned("42", CALLER);
+        verify(scope).requireOwned("42", CALLER, "OaLeave", "update");
         verify(call).proceed();
     }
 

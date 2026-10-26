@@ -627,6 +627,20 @@ const updateDeniedMarker = `${marker}-update-denied`;
   const hijackDone = await confirm(writerToken, pendingTokenFor(writer.id, hijackMarker), 'approve');
   note('越权写批准后的结局', hijackDone.status || JSON.stringify(hijackDone).slice(0, 120));
   check('批准了也没执行', true, hijackDone.status !== 'executed');
+  // The refusal must arrive as the **runtime's** error body, not the host's bare 403: the envelope's
+  // `errorCode` names why it was refused, and the host's message never did. `.errorCode` is read off the
+  // envelope because `data` is null on an error, so `confirm()` hands the whole body back.
+  //
+  // 拒绝必须以**运行时**的错误体到达，而不是宿主那句光秃秃的 403：信封的 `errorCode` 说得出为什么被拒，
+  // 而宿主那句从来不说。`.errorCode` 读的是信封本身 —— 出错时 `data` 为 null，故 `confirm()` 交回整个 body。
+  check('拒绝响应带运行时 errorCode', 'ROW_OUT_OF_SCOPE', hijackDone.errorCode);
+  // `explanation` 要运行时那半（core 0.1.12）才渲染出来：行拒绝不声称依据，但仍点名拒了哪个主体、哪个动作。
+  // 这两条与抬 pin **同船** —— 在 pin 还停在 0.1.11 时必红，那正是它们不能先落地的理由。
+  // `explanation` needs the runtime half (core 0.1.12): a row denial claims no basis, but it still names
+  // the subject and the action it refused. These two ride with the pin bump — they are red while the pin
+  // is still 0.1.11, which is exactly why they must not land before it moves.
+  check('拒绝点名主体', 'Customer', hijackDone.explanation?.subject);
+  check('拒绝点名动作', 'update', hijackDone.explanation?.action);
   check('别人的行一字未改', adminMarker, psql(`select name from ${CUSTOMER} where id = ${adminRowId}`));
 
   // 同一个问题的另一半：没有 `crm:customer:update`，这次写根本到不了行范围那道接缝。那一行**是**调用方
