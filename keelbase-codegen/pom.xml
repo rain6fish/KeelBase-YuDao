@@ -38,7 +38,7 @@
         <dependency>
             <groupId>cn.com.keelbase</groupId>
             <artifactId>keelbase4j-protocol</artifactId>
-            <version>0.1.11</version>
+            <version>0.1.12</version>
         </dependency>
     </dependencies>
 
