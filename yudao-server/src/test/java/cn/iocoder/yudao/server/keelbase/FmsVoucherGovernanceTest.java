@@ -19,7 +19,7 @@ import java.util.List;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.AccessDeniedException;
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 
 /**
  * FMS 切面的三条进门路径，与 CRM 那份同形但**两处不同**：收窄写在第 0 个实参上（用户 id 那一位判的是账套，
@@ -94,10 +94,10 @@ class FmsVoucherGovernanceTest {
         when(call.getArgs()).thenReturn(new Object[]{5L, List.of(1L, 2L), 1, 42L});
         when(mapper.selectById(1L)).thenReturn(voucher("42"));
         when(mapper.selectById(2L)).thenReturn(voucher("7"));
-        doThrow(new AccessDeniedException("该行不在你的数据范围内"))
-                .when(scope).requireOwned("7", CALLER);
+        doThrow(new RuleDeniedException(null, "该行不在你的数据范围内", "FmsVoucher", "update", null))
+                .when(scope).requireOwned("7", CALLER, "FmsVoucher", "update");
 
-        assertThrows(AccessDeniedException.class, () -> aspect.requireOwnership(call));
+        assertThrows(RuleDeniedException.class, () -> aspect.requireOwnership(call));
         verify(call, never()).proceed();
     }
 

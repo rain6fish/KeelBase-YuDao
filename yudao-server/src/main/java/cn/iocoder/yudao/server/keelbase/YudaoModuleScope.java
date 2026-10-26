@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -76,9 +76,33 @@ public class YudaoModuleScope {
         return owner != null && caller != null && owner.equals(String.valueOf(caller));
     }
 
-    public void requireOwned(String owner, Long caller) {
+    /**
+     * Refuse a row that is not the caller's, naming what was refused.
+     *
+     * <p>The refusal is the runtime's own row-refusal shape rather than Spring Security's
+     * {@code AccessDeniedException}: the runtime's advice recognises that type and renders
+     * {@code errorCode}, {@code reason}, {@code impact} and {@code nextStep} into the frozen error body,
+     * while the security type falls through to the host's generic handler and arrives as a bare 403
+     * with none of them. {@code subject} and {@code action} are the part a caller can act on — "this
+     * identity lacks {@code update} on {@code Customer}" rather than "forbidden" — so the call site
+     * supplies both. Today they travel on the exception and not yet in the body: the runtime renders an
+     * {@code explanation} only when it has a deny basis to claim, and a row denial has none. No basis is
+     * invented here either — the frozen {@code permission-decision} defines none for a row denial.
+     *
+     * <p>该行不是调用方的就拒绝，并点名拒了什么。
+     *
+     * <p>用的是运行时自己的行拒绝形状，而不是 Spring Security 的 {@code AccessDeniedException}：运行时的
+     * advice 认得前面那个，能把 {@code errorCode} / {@code reason} / {@code impact} / {@code nextStep}
+     * 渲染进冻结的错误体；后者会落到宿主的通用处理器，只以一个光秃秃的 403 到达，上面那些一个都没有。
+     * {@code subject} 与 {@code action} 才是调用方能据以行动的部分 ——「这个身份对 {@code Customer} 没有
+     * {@code update} 权限」而不是「forbidden」—— 故由调用点提供两者。**今天它们只在那条异常上、还不在 body
+     * 里**：运行时只在自己有一个可声称的依据时才渲染 {@code explanation}，而行拒绝没有依据。这里也**不编造
+     * 依据** —— 冻结的 {@code permission-decision} 对行拒绝没有定义任何依据。
+     */
+    public void requireOwned(String owner, Long caller, String subject, String action) {
         if (owner != null && !owner.equals(String.valueOf(caller))) {
-            throw new AccessDeniedException("该行不在你的数据范围内");
+            throw new RuleDeniedException(null, "该行不在你的数据范围内", subject, action,
+                    "该行不在你当前的数据范围内；请改用本人或被授权组织范围内的数据，或让管理员调整数据范围");
         }
     }
 

@@ -21,7 +21,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.security.access.AccessDeniedException;
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 
 /**
  * demo01 联系人的四条门，其中两条**与别的模块不同形**：分页是**模块答完之后**再过滤（而不是改查询条件），
@@ -118,10 +118,10 @@ class Demo01ContactGovernanceTest {
         request.setId(9L);
         when(call.getArgs()).thenReturn(new Object[]{request});
         when(mapper.selectById(9L)).thenReturn(contact(9L, "7"));
-        doThrow(new AccessDeniedException("该行不在你的数据范围内"))
-                .when(scope).requireOwned("7", CALLER);
+        doThrow(new RuleDeniedException(null, "该行不在你的数据范围内", "Demo01Contact", "update", null))
+                .when(scope).requireOwned("7", CALLER, "Demo01Contact", "update");
 
-        assertThrows(AccessDeniedException.class, () -> aspect.requireOwnership(call));
+        assertThrows(RuleDeniedException.class, () -> aspect.requireOwnership(call));
         verify(call, never()).proceed();
     }
 
@@ -134,7 +134,7 @@ class Demo01ContactGovernanceTest {
 
         aspect.requireOwnership(call);
 
-        verify(scope).requireOwned("42", CALLER);
+        verify(scope).requireOwned("42", CALLER, "Demo01Contact", "update");
         verify(call).proceed();
     }
 

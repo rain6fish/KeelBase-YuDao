@@ -141,7 +141,8 @@ public class Demo01ContactGovernance implements GovernedModule {
         if (caller != null && args.length >= 1
                 && args[0] instanceof Demo01ContactSaveReqVO request && request.getId() != null) {
             Demo01ContactDO existing = mapper.selectById(request.getId());
-            scope.requireOwned(existing == null ? null : existing.getCreator(), caller);
+            scope.requireOwned(existing == null ? null : existing.getCreator(),
+                    caller, "Demo01Contact", "update");
         }
         return call.proceed();
     }

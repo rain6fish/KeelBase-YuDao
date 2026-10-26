@@ -141,7 +141,8 @@ public class FmsVoucherGovernance implements GovernedModule {
             for (Object raw : ids) {
                 if (raw instanceof Long id) {
                     FmsVoucherDO existing = mapper.selectById(id);
-                    scope.requireOwned(existing == null ? null : existing.getCreator(), caller);
+                    scope.requireOwned(existing == null ? null : existing.getCreator(),
+                            caller, "FmsVoucher", "update");
                 }
             }
         }
