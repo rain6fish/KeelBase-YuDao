@@ -75,6 +75,13 @@ load keelbase-audit-reader.sql
 # relationship row cannot land without the role.
 load keelbase-audit-reader-user.sql
 
+# 演示账号（与主仓一致）：`alex`（普通用户，挂 `common`）与 `admin` 的口令。`admin` 那条**只在仍是
+# 上游默认口令时**才改写，运维换过的口令不会被种子改回去。
+# Demo accounts (the same two the main repo ships): `alex` (an ordinary user on `common`) and `admin`'s
+# password. The `admin` update applies **only while it still holds upstream's default**, so a password an
+# operator has changed is never put back by a seed.
+load keelbase-demo-accounts.sql
+
 # M7 走查读者（非管理员）：角色 `m7_reader`、账号 `m7reader`，以及 CRM 客户 create/update 与助手最短那一组
 # 菜单授予。必须排在以上菜单文件之后——授予引用的 `20001`/`20003`/`20004`/`20007`/`20029` 与
 # `20010`/`20019` 由它们落下。**不改 `common`**：普通角色继续做「无码读者」对照。
