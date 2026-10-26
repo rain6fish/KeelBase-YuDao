@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,396 @@
+@@ -1,4 +1,399 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -191,6 +191,9 @@ index 96269a8..2611a9b 100644
 +    },
 +    // 每个审计页顶部的一句覆盖声明：只说**这张面读到哪、哪些 AI 路径它到不了**。
 +    // One coverage statement per audit page: what that face reads, and which AI paths it cannot reach.
++    login: {
++      demoAccounts: 'Test accounts: alex / {alex} · admin / {admin} (test environment only)',
++    },
 +    coverage: {
 +      auditChain: 'This page does not cover: the SKILL tools and ai1 RAG retrieval (they write no audit rows), or the upstream resolver path (it does not pass through this governance).',
 +      opAudit: 'This page does not cover: the AI audit rows (a separate chain), or the SKILL shell/file execution, ai1 RAG retrieval, ai1 MCP calls and the upstream resolver path — none of them writes a business operation log.',
@@ -403,7 +406,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,391 @@
+@@ -1,4 +1,394 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -591,6 +594,9 @@ index 35f1e1a..856d201 100644
 +      loadFailed: '读不到这条边界',
 +    },
 +    // 每个审计页顶部的一句覆盖声明：只说**这张面读到哪、哪些 AI 路径它到不了**。
++    login: {
++      demoAccounts: '演示账号：alex / {alex} · admin / {admin}（仅测试环境）',
++    },
 +    coverage: {
 +      auditChain: '本页不覆盖：SKILL 工具与 ai1 RAG 检索（它们不写审计行），以及上游解析器路（它不经本治理）。',
 +      opAudit: '本页不覆盖：AI 审计行（另一条链），以及 SKILL 的 shell/文件执行、ai1 RAG 检索、ai1 MCP 调用与上游解析器路 —— 它们都不写业务操作日志。',

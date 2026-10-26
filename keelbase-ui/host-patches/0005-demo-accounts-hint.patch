@@ -1,0 +1,17 @@
+diff --git a/src/views/Login/components/LoginForm.vue b/src/views/Login/components/LoginForm.vue
+--- a/src/views/Login/components/LoginForm.vue
++++ b/src/views/Login/components/LoginForm.vue
+@@ -74,6 +74,13 @@
+           </el-button>
+         </el-form-item>
+       </el-col>
++      <!-- KeelBase: the test deployment lists its demo accounts here, the same two the main repo ships. -->
++      <!-- KeelBase：测试环境把演示账号写在登录页上，与主仓一致。 -->
++      <el-col :span="24" class="px-10px">
++        <div class="text-12px text-[var(--el-text-color-secondary)] keelbase-demo-accounts">
++          {{ t('keelbase.login.demoAccounts', { alex: 'alex / Alex@2026$Demo', admin: 'admin / Admin@2026$KeelBase' }) }}
++        </div>
++      </el-col>
+       <Verify
+         v-if="loginData.captchaEnable === 'true'"
+         ref="verify"
