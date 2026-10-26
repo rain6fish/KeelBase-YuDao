@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,372 @@
+@@ -1,4 +1,390 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -70,6 +70,14 @@ index 96269a8..2611a9b 100644
 +      colTarget: 'Target',
 +      colResultType: 'Result type',
 +      colRevokeClass: 'Revoke class',
++      colRevokeClassHint: 'How far this write can be undone: not at all, locally, by the external system, or with the transaction',
++      colResultTypeHint: 'The kind of business record this write landed on',
++      revokeClass: {
++        none: 'Not revocable',
++        'local-compensate': 'Revocable locally',
++        'governed-external': 'Reversible via the external system',
++        transactional: 'Rolled back with the transaction',
++      },
 +      colStatus: 'Status',
 +      colTime: 'Time',
 +      colActions: 'Actions',
@@ -189,10 +197,20 @@ index 96269a8..2611a9b 100644
 +      cardTitle: 'Coverage statement',
 +      verdict_complete: 'Complete',
 +      verdict_partial: 'Partial',
-+      verdict_unknown: 'Unknown (what is missing cannot be said)',
++      verdict_unknown: 'Unknown (one reading was unavailable)',
 +      sources: 'Read from',
 +      noGaps: 'No known gaps for this window',
 +      registry: 'Gap registry revision {rev}',
++      verdictUnknownNote:
++        'Unknown means the page could not obtain every reading it needs to judge: it can neither claim to be complete nor name the gaps. What is listed above is what the registry does know.',
++      gap: {
++        'chain-tail-deletion':
++          'A valid hash chain proves the recorded rows are internally consistent; it does not prove that no row was removed from the tail.',
++        'host-ai-path-not-governed':
++          'The host runs an AI path of its own that does not pass through the governance engine, so its tool calls are outside this package.',
++        'host-write-not-in-same-transaction':
++          'Where the runtime is embedded in a host that owns the business write, that write and its audit row are not written in one transaction; a crash between them leaves an executed write unaudited.',
++      },
 +      unavailable: 'Coverage statement unavailable — do not read this page as complete',
 +    },
 +    trace: {
@@ -379,7 +397,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,369 @@
+@@ -1,4 +1,385 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -447,6 +465,14 @@ index 35f1e1a..856d201 100644
 +      colTarget: '目标',
 +      colResultType: '结果类型',
 +      colRevokeClass: '可撤档位',
++      colRevokeClassHint: '这次写入能撤到什么程度：不能撤 / 本地可撤 / 由外部系统撤 / 随事务回滚',
++      colResultTypeHint: '这次写入落在哪一类业务记录上',
++      revokeClass: {
++        none: '不可撤',
++        'local-compensate': '本地可撤',
++        'governed-external': '由外部系统撤',
++        transactional: '随事务回滚',
++      },
 +      colStatus: '状态',
 +      colTime: '时间',
 +      colActions: '操作',
@@ -565,10 +591,18 @@ index 35f1e1a..856d201 100644
 +      cardTitle: '覆盖声明',
 +      verdict_complete: '完整',
 +      verdict_partial: '部分',
-+      verdict_unknown: '未知（连漏了什么都说不出）',
++      verdict_unknown: '未知（缺一项读数）',
 +      sources: '读数来自',
 +      noGaps: '本口径下没有已知缺口',
 +      registry: '缺口登记表版本 {rev}',
++      verdictUnknownNote:
++        '「未知」指本页没能取全判断所需的读数：既不能声明完整，也报不全缺口。上面列出的，是登记表确实知道的那部分。',
++      gap: {
++        'chain-tail-deletion': '哈希链校验通过只能证明已记录的行内部一致，不能证明末尾没有整行被删掉。',
++        'host-ai-path-not-governed': '宿主自己有一条不经治理引擎的 AI 路径，它的工具调用不在本证据包的覆盖范围内。',
++        'host-write-not-in-same-transaction':
++          '本运行时嵌在由宿主执行业务写入的部署里：那次写入与它的审计行不在同一事务中，两者之间崩溃会留下「已执行但未审计」的一笔。',
++      },
 +      unavailable: '覆盖声明取不到 —— 别把这一页读成完整',
 +    },
 +    trace: {

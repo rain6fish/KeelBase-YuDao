@@ -87,12 +87,16 @@
       <div v-if="coverage.gaps.length" class="coverage-gaps">
         <div v-for="gap in coverage.gaps" :key="gap.id" class="coverage-row">
           <el-tag :type="gapTagType(gap.severity)" size="small">{{ gap.severity }}</el-tag>
-          <span>{{ gap.statement }}</span>
+          <span>{{ gapText(gap) }}</span>
           <code class="coverage-gap-id">{{ gap.id }}</code>
         </div>
       </div>
       <div v-else class="coverage-line">{{ t('keelbase.coverage.noGaps') }}</div>
       <div class="coverage-line">{{ t('keelbase.coverage.registry', { rev: coverage.registryRevision }) }}</div>
+      <!-- F-7：`未知` 原来只有一个词，读者读不出它相对什么而言。这里补一句参照系。 -->
+      <div v-if="coverage.verdict === 'unknown'" class="coverage-line coverage-unknown-note">
+        {{ t('keelbase.coverage.verdictUnknownNote') }}
+      </div>
     </el-alert>
     <el-alert
       v-else-if="coverageLoaded"
@@ -290,7 +294,19 @@ import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+/**
+ * F-5：缺口陈述按 `gap.id` 取词条。登记表新增一条时词条还不存在，此时回落到运行时原文 ——
+ * 「新条目不用改前端就出现」这条性质不变，已知的才按读者语言说。
+ *
+ * Known ids render from the console's own messages; an id the console does not know yet falls back to
+ * the record's own statement, so a new registry entry still shows up without a frontend change.
+ */
+function gapText(gap: { id: string; statement: string }): string {
+  const key = `keelbase.coverage.gap.${gap.id}`
+  return te(key) ? t(key) : gap.statement
+}
 
 const LIMIT = 20
 
