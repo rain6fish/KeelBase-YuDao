@@ -45,6 +45,8 @@
     <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
     <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
     <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.effectsLedger') }}</div>
+    <!-- F-15：这行说明原来只放在表头的 `title` 悬浮提示里，读者根本看不到。挪到页面上。 -->
+    <div class="mb-8px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.effects.columnsHint') }}</div>
     <el-table v-loading="loading" :data="rows" stripe>
       <!-- Opened, this row lays out the record the write landed on. Here the row **is** the effect, so
            the two trails agree without a guess. The record's own text is masked — what a record is

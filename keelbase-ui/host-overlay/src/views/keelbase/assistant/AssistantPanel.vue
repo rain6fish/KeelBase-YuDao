@@ -365,8 +365,21 @@ async function send() {
   streamError.value = ''
   thinking.value = ''
   reply.value = ''
+  // F-13：先把这条消息插进列表。此前它要等流结束、重读会话之后才出现，读者看到的是
+  // 「先思考、后出现我的问题」。流结束后 open() 会用服务端记录整份替换，这一行随之退场。
+  // Negative id: never collides with a server id. / 负数 id，不会与服务端 id 撞。
+  messages.value.push({
+    id: -Date.now(),
+    sessionId: sessionId.value,
+    role: 'user',
+    reasoning: null,
+    content,
+    status: 0,
+    createTime: new Date().toISOString(),
+  })
   busy.value = true
   streaming.value = true
+  await scrollToEnd()
   try {
     await assistantApi.sendStream(sessionId.value, content, (event) => {
       if (event.event === 'thinking') thinking.value += event.data

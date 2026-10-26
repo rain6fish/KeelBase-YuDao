@@ -107,6 +107,9 @@
         }}
       </div>
 
+      <!-- F-17：「已知缺口」这一列读者不知道是干什么用的；「上游模型→工具解析器」也没人解释。一句图例。 -->
+      <div class="text-12px text-[var(--el-text-color-secondary)] mb-12px">{{ t('keelbase.boundary.legend') }}</div>
+
       <!-- 每条 AI 路径及其治理姿态 —— `stated.paths` 是设计事实，页面只画、不重算。 -->
       <!-- Every AI path and its posture — `stated.paths` is a design fact; the page only draws it. -->
       <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.pathsTitle') }}</div>

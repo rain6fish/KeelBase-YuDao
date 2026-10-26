@@ -36,6 +36,11 @@
       </el-button>
     </template>
 
+    <!-- F-17：读者问「哈希链校验是干什么的」。这句放在链结论与表格之间，说明它能证什么、不能证什么。 -->
+    <div v-if="verify" class="mb-10px text-12px text-[var(--el-text-color-secondary)]">
+      {{ t('keelbase.audit.chainWhat') }}
+    </div>
+
     <el-form :inline="true" :model="query" class="-mb-15px" @submit.prevent>
       <el-form-item :label="t('keelbase.audit.userId')">
         <el-input v-model="query.userId" clearable :placeholder="t('keelbase.audit.userIdPlaceholder')" class="!w-200px" @keyup.enter="reload" />

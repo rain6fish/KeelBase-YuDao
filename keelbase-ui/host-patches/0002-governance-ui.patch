@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,390 @@
+@@ -1,4 +1,396 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -19,6 +19,8 @@ index 96269a8..2611a9b 100644
 +      chainEmpty: 'Nothing on the chain yet',
 +      broken: 'broken',
 +      rowsTitle: 'Audit rows',
++      chainWhat:
++        'Chain intact means the recorded rows link one to the next and none was altered. It does not prove that no row was removed from the tail — that is the first gap in the coverage statement above.',
 +      userId: 'Caller',
 +      userIdPlaceholder: 'Filter by caller id',
 +      since: 'From',
@@ -72,6 +74,8 @@ index 96269a8..2611a9b 100644
 +      colRevokeClass: 'Revoke class',
 +      colRevokeClassHint: 'How far this write can be undone: not at all, locally, by the external system, or with the transaction',
 +      colResultTypeHint: 'The kind of business record this write landed on',
++      columnsHint:
++        'Target is the record this write changed; Result type is which kind of business record that is; Revoke class says how far it can be undone — not at all, locally, by the external system, or with the transaction.',
 +      revokeClass: {
 +        none: 'Not revocable',
 +        'local-compensate': 'Revocable locally',
@@ -164,6 +168,8 @@ index 96269a8..2611a9b 100644
 +        'retrieval-unlogged': 'Retrieval writes no audit row, including the advisor’s own search.',
 +      },
 +      summaryTitle: 'Summary',
++      legend:
++        'How to read this page: each row is one AI path. Checks it applies are the gates every call on that path meets; Known gap is what that path cannot do today, not a to-do number. Upstream model-to-tool resolver means the host (Spring AI) handing tools to the model on its own path, outside the governance of this line.',
 +      summaryHeld: 'Governed (held):',
 +      summaryNotHeld: 'Not governed (not held):',
 +      summaryNote: '{total} AI paths: {held} governed (fully or partly), {none} ungoverned.',
@@ -202,7 +208,7 @@ index 96269a8..2611a9b 100644
 +      noGaps: 'No known gaps for this window',
 +      registry: 'Gap registry revision {rev}',
 +      verdictUnknownNote:
-+        'Unknown means the page could not obtain every reading it needs to judge: it can neither claim to be complete nor name the gaps. What is listed above is what the registry does know.',
++        'Unknown means one reading did not arrive. So this page cannot say everything is covered, and cannot promise the list above is complete. What is listed is what is known for certain.',
 +      gap: {
 +        'chain-tail-deletion':
 +          'A valid hash chain proves the recorded rows are internally consistent; it does not prove that no row was removed from the tail.',
@@ -397,7 +403,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,385 @@
+@@ -1,4 +1,391 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -414,6 +420,8 @@ index 35f1e1a..856d201 100644
 +      chainEmpty: '链上还没有行',
 +      broken: '已断',
 +      rowsTitle: '审计行',
++      chainWhat:
++        '链完整指已记录的行彼此逐条连得上、且没有被改过。它不能证明末尾没有被整行删掉 —— 那是上面覆盖声明里的第一条缺口。',
 +      userId: '调用方',
 +      userIdPlaceholder: '按调用方 id 筛选',
 +      since: '起始',
@@ -467,6 +475,8 @@ index 35f1e1a..856d201 100644
 +      colRevokeClass: '可撤档位',
 +      colRevokeClassHint: '这次写入能撤到什么程度：不能撤 / 本地可撤 / 由外部系统撤 / 随事务回滚',
 +      colResultTypeHint: '这次写入落在哪一类业务记录上',
++      columnsHint:
++        '「目标」是这次写入改动的具体记录；「结果类型」是它属于哪一类业务记录；「可撤档位」是能撤到什么程度 —— 不可撤 / 本地可撤 / 由外部系统撤 / 随事务回滚。',
 +      revokeClass: {
 +        none: '不可撤',
 +        'local-compensate': '本地可撤',
@@ -559,6 +569,8 @@ index 35f1e1a..856d201 100644
 +        'retrieval-unlogged': '检索不写审计行，包括 Advisor 自己发起的那次检索。',
 +      },
 +      summaryTitle: '边界摘要',
++      legend:
++        '怎么读这一页：每一行是一条 AI 路径。「它会做的检查」是这条路每次调用都会遇到的门；「已知缺口」是这条路今天做不到的事，不是待办编号。「上游模型→工具解析器」指宿主（Spring AI）自己把工具交给模型的那条路，不经本线治理。',
 +      summaryHeld: '受治理（会被扣住的）：',
 +      summaryNotHeld: '未纳入治理（扣不住的）：',
 +      summaryNote: '共 {total} 条 AI 路径：{held} 条受治理（含部分受治理），{none} 条未纳入治理。',
@@ -596,7 +608,7 @@ index 35f1e1a..856d201 100644
 +      noGaps: '本口径下没有已知缺口',
 +      registry: '缺口登记表版本 {rev}',
 +      verdictUnknownNote:
-+        '「未知」指本页没能取全判断所需的读数：既不能声明完整，也报不全缺口。上面列出的，是登记表确实知道的那部分。',
++        '「未知」= 这一页有一项数据没取到。所以它不能说「都覆盖了」，也不能保证上面列的就是全部；上面列出的，是确定知道的那部分。',
 +      gap: {
 +        'chain-tail-deletion': '哈希链校验通过只能证明已记录的行内部一致，不能证明末尾没有整行被删掉。',
 +        'host-ai-path-not-governed': '宿主自己有一条不经治理引擎的 AI 路径，它的工具调用不在本证据包的覆盖范围内。',
