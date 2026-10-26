@@ -170,6 +170,7 @@ const REQUIRED_IN_LOAD = [
   'keelbase-policy-menu.sql',
   'keelbase-assistant-role-grants.sql',
   'keelbase-assistant-menus.sql',
+  'keelbase-ai1-permissions.sql',
 ]
 for (const f of REQUIRED_IN_LOAD) {
   if (!loadSet.has(f)) errors.push(`${MANIFEST}: ${f} must be load — this deployment's pages need it`)
@@ -179,6 +180,7 @@ for (const f of REQUIRED_IN_LOAD) {
 // Dependency order: the parent must precede its children and grants.
 const BEFORE = [
   ['keelbase-ai1.sql', 'keelbase-assistant-agent.sql'],
+  ['keelbase-assistant-menus.sql', 'keelbase-ai1-permissions.sql'],
   ['keelbase-governance-menus.sql', 'keelbase-governance-menu-grants.sql'],
   ['keelbase-governance-menus.sql', 'keelbase-boundary-menu.sql'],
   ['keelbase-governance-menus.sql', 'keelbase-trace-menu.sql'],

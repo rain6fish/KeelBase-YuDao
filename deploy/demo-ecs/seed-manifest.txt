@@ -47,6 +47,15 @@ load keelbase-assistant-agent.sql
 load keelbase-assistant-role-grants.sql
 load keelbase-assistant-menus.sql
 
+# 管理台的**按钮权限**：上一条只挂了七页、没种任何 `ai1:*` 权限串，故每页的「新增 / 修改 / 删除 / 测试」
+# 都被 `v-hasPermi` 摘掉（超管的菜单树绕过授予、权限串清单不绕过）。必须排在 `keelbase-assistant-menus.sql`
+# 之后——按钮行要挂在它落下的那几页下面；只发给 `super_admin`，只读读者一个都不发。
+# The console's **button permissions**: the line above lays the seven pages but seeds no `ai1:*` string, so
+# every page's create / update / delete / test is stripped by `v-hasPermi` (the super administrator's menu
+# tree bypasses grants; the permission list does not). It must follow `keelbase-assistant-menus.sql` — the
+# button rows hang under the pages it lays — and goes to `super_admin` only, never to the read-only readers.
+load keelbase-ai1-permissions.sql
+
 # 治理控制台：先目录 `20001`，再目录的授予，再各页。子项没有父项可挂就进不了侧栏；普通角色没有授予
 # 就只看得到 super_admin 的那一份。
 # Governance console: the directory `20001` first, then its grants, then the pages. A child with no
