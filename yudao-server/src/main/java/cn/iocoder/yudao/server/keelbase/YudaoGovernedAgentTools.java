@@ -125,7 +125,12 @@ public class YudaoGovernedAgentTools implements Ai1LocalToolProvider {
         // 这一轮所属的会话，按引擎自己那一列的叫法。会话号在这边是数字、在那边是字符串，而这就是全部翻译——它在行上的
         // 意思是「这次调用发生在会话 N 里」，也正是**逐轮的视图**得以存在的原因。
         String conversationId = sessionId == null ? null : String.valueOf(sessionId);
-        return tools.all().stream().map(tool -> callback(tool, caller, conversationId)).toList();
+        // The deployment's catalogue, not every registered tool: MCP/SKILL tools are host-assembled for
+        // one agent's binding, and handing them out here would give every agent every other agent's tools.
+        //
+        // 部署自己的目录，而不是全部注册工具：MCP/SKILL 工具是为**某一个** agent 的绑定装配的，在这里发出去等于
+        // 把每个 agent 的工具发给所有 agent。
+        return tools.catalogue().stream().map(tool -> callback(tool, caller, conversationId)).toList();
     }
 
     /**

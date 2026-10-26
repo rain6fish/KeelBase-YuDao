@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.ai1.enums.model.Ai1ModelTypeEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmChatTool;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
 import cn.iocoder.yudao.module.ai1.harness.mcp.Ai1McpToolFactory;
@@ -37,6 +38,7 @@ import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
 import org.redisson.config.NameMapper;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -247,6 +249,10 @@ public class Ai1SessionTaskRecoveryIntegrationTest extends BaseMockitoUnitTest {
         ReflectionTestUtils.setField(worker, "mcpToolFactory", mcpToolFactory);
         ReflectionTestUtils.setField(worker, "skillToolFactory", skillToolFactory);
         ReflectionTestUtils.setField(worker, "ragTool", ragTool);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<Ai1ToolGovernor> governorProvider = mock(ObjectProvider.class);
+        when(governorProvider.getIfAvailable()).thenReturn(mock(Ai1ToolGovernor.class));
+        ReflectionTestUtils.setField(worker, "toolGovernorProvider", governorProvider);
         return worker;
     }
 

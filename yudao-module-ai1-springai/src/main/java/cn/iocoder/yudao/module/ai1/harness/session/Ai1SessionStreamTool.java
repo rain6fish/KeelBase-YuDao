@@ -26,6 +26,7 @@ import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.enums.model.Ai1ModelTypeEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
 import cn.iocoder.yudao.module.ai1.harness.skill.Ai1SkillToolFactory;
 import cn.iocoder.yudao.module.ai1.service.agent.Ai1AgentService;
 import cn.iocoder.yudao.module.ai1.service.session.Ai1SessionService;
@@ -45,6 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Lazy;
@@ -211,6 +213,17 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
     private Ai1McpToolFactory mcpToolFactory;
     @Resource
     private Ai1SkillToolFactory skillToolFactory;
+
+    /**
+     * The governance seam this host fills. Optional at the Spring level only so the module can start
+     * without a host; an assembly with no governor **fails loudly** rather than quietly bypassing the
+     * engine.
+     *
+     * 宿主填的那条治理缝。它只在 Spring 层面是可选的，好让模块在没有宿主时也能起；**装配时**没有治理器会
+     * **明确失败**，而不是悄悄绕开引擎。
+     */
+    @Resource
+    private ObjectProvider<Ai1ToolGovernor> toolGovernorProvider;
 
     /**
      * Two seams a deployment may fill, and both are optional on purpose — see the interfaces. Absent
@@ -765,21 +778,26 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
                 : StrUtil.replace(ai1Properties.getSession().getDefaultSystemPrompt(),
                 YudaoAi1Properties.Session.AGENT_NAME_PLACEHOLDER, agent.getName());
 
-        // 4. 工具（MCP + SKILL + 部署方在进程内交来的）与 RAG Advisor；知识库不可用时降级跳过，并把提示写入思考流
-        // 会话随工具一起过去 —— MCP 那条路与部署方交来的那条**都算**：正是它让一次受治理的调用归得了**这一轮**、
-        // 而不是笼统地归给调用方。SKILL 那条**不动**：它上面没有治理缝，也就没有行要归位。
-        // **这一处是 KeelBase 对上游文件的改动**：登记在 `keelbase-docs/KEELBASE-UPSTREAM.md`，并由一条测试盯着。
+        // 4. 工具（MCP + SKILL + 部署方在进程内交来的）与 RAG Advisor，**四路全部经治理引擎**；
+        //    知识库不可用时降级跳过，并把提示写入思考流。
+        //    会话与调用方随工具一起过去：正是它们让一次受治理的调用归得了**这一轮**、而不是笼统地归给调用方。
+        // **这一处是 KeelBase 对上游文件的改动**：登记在 `keelbase-docs/KEELBASE-UPSTREAM.md`，并由测试盯着。
         //
-        // The session travels with the tools — the MCP face and the deployment's own alike: it is what makes a
-        // governed call attributable to *this* turn rather than to the caller in general. The SKILL face is left
-        // alone: nothing governs it, so there is no row to place. **This place is KeelBase's change to an
-        // upstream file**: registered in `keelbase-docs/KEELBASE-UPSTREAM.md` and covered by a test.
+        // All four sources — MCP, SKILL, the deployment's own tools, and RAG retrieval — go through the
+        // governance engine. The session and caller travel with every one of them, so a governed call is
+        // attributable to *this* turn. **This place is KeelBase's change to an upstream file**: registered
+        // in `keelbase-docs/KEELBASE-UPSTREAM.md` and covered by tests.
         // The trace id is set on this worker thread; the tool loop runs on Reactor's scheduler, so the
         // ThreadLocal does not follow. Scope every ToolCallback with the id captured here.
         // trace 设在 worker 线程上，而工具循环跑在 Reactor 调度线程上；这里把 id 捕获进每个 ToolCallback。
+        Ai1ToolGovernor governor = toolGovernorProvider.getIfAvailable();
+        if (governor == null) {
+            throw new IllegalStateException("no Ai1ToolGovernor — ai1 tools must run through governance");
+        }
+        Long caller = SecurityFrameworkUtils.getLoginUserId();
         String traceId = ExecutionTraceHolder.current();
-        List<Object> tools = new ArrayList<>(traceScoped(mcpToolFactory.buildTools(agent, sessionId), traceId));
-        tools.addAll(traceScoped(skillToolFactory.buildTools(agent), traceId));
+        List<Object> tools = new ArrayList<>(traceScoped(mcpToolFactory.buildTools(agent, sessionId, governor), traceId));
+        tools.addAll(traceScoped(skillToolFactory.buildTools(agent, sessionId, governor), traceId));
         if (localToolProvider != null) {
             tools.addAll(traceScoped(localToolProvider.buildTools(agent, sessionId), traceId));
         }
@@ -790,7 +808,7 @@ public class Ai1SessionStreamTool implements SmartLifecycle {
                 continue;
             }
             try {
-                advisors.add(ragTool.buildAdvisor(knowledgeBase));
+                advisors.add(ragTool.buildAdvisor(knowledgeBase, governor, caller, sessionId));
             } catch (Exception e) {
                 log.warn("[generate][Agent({}) 知识库({}) RAG 装配失败，已降级跳过]", agent.getId(), knowledgeBase.getId(), e);
                 String notice = "【知识库降级】「" + knowledgeBase.getName() + "」检索服务不可用，本次会话已跳过 RAG 上下文。\n";

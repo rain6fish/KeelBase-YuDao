@@ -5,11 +5,17 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.security.core.LoginUser;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.agent.Ai1AgentDO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.skill.Ai1SkillDO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.skill.Ai1SkillFileDO;
 import cn.iocoder.yudao.module.ai1.enums.skill.Ai1SkillFileTypeEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedTool;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolKind;
 import cn.iocoder.yudao.module.ai1.service.skill.Ai1SkillFileService;
 import cn.iocoder.yudao.module.ai1.service.skill.Ai1SkillService;
 import com.google.common.cache.Cache;
@@ -19,13 +25,20 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springaicommunity.agent.tools.*;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertMap;
@@ -85,32 +98,121 @@ public class Ai1SkillToolFactory {
     private final Map<Long, Object> syncLocks = new ConcurrentHashMap<>();
 
     /**
-     * 构建 Agent 绑定 SKILL 所需的全部工具：SkillsTool（注入 SKILL.md 内容）+ 执行类工具（限定于 Agent 物化根目录）
+     * 构建 Agent 绑定 SKILL 所需的全部工具，并让它们**经治理引擎**执行。
      *
-     * @param agent Agent
-     * @return 工具列表；未绑定有效 SKILL 时返回空列表
+     * <p>工具本身与它们的沙箱（Agent 物化根目录）不变；变的是每次调用的落点：模型看到的仍是 SKILL 自己声明的
+     * 名字、描述与入参 schema，而调用先到宿主注册的治理工具——只读的 Glob/Grep/ListDirectory 走 R1，shell、
+     * 文件与 Skill 走 R2 且**默认禁用**，管理员在策略中心放开。执行体按名字从 {@link Ai1SkillExecutionContext}
+     * 取**这一轮、这个 agent** 的 delegate，故同一个工具名在不同 agent 的沙箱里各跑各的。
+     *
+     * <p>没有治理器时**明确失败**：悄悄退回一条不经引擎的路，正是这次改动要消灭的形态。
+     *
+     * Build the tools this agent's SKILLs need, and run them **through the governance engine**.
+     *
+     * <p>The tools and their sandbox (the agent's materialised root) do not change; where a call lands
+     * does. The model still sees the name, description and input schema the SKILL declares, and the
+     * call first reaches the host's governed tool — Glob/Grep/ListDirectory at R1, shell/file/Skill at
+     * R2 and **disabled by default** until an administrator enables them in the Policy Center. The body
+     * resolves this turn's, this agent's delegate by name from {@link Ai1SkillExecutionContext}, so one
+     * tool name runs in each agent's own sandbox.
+     *
+     * <p>No governor is a **loud failure**: quietly falling back to a path that bypasses the engine is
+     * the shape this change removes.
      */
-    public List<Object> buildTools(Ai1AgentDO agent) {
+    public List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId, Ai1ToolGovernor governor) {
         // 1. 同步物化快照；未绑定有效 SKILL 时，不提供任何工具
         SkillSnapshot snapshot = sync(agent);
         if (snapshot == null) {
             return Collections.emptyList();
         }
-
-        // 2. SkillsTool：要求至少一个有效 SKILL.md，否则只物化文件，不注册技能工具
-        List<Object> tools = new ArrayList<>();
-        if (snapshot.getSkillsTool() != null) {
-            tools.add(snapshot.getSkillsTool());
+        if (governor == null) {
+            throw new IllegalStateException("no Ai1ToolGovernor — SKILL tools must run through governance");
         }
 
-        // 3. 执行类工具：ShellTools（bash）、FileSystemTools（Read/Write/Edit）、Glob、Grep、ListDirectory
+        // 2. 把 SkillsTool 与执行类工具统一成 ToolCallback，并读出它们自己的声明
+        List<ToolCallback> raw = new ArrayList<>();
+        if (snapshot.getSkillsTool() != null) {
+            raw.add(snapshot.getSkillsTool());
+        }
         Path root = snapshot.getRoot();
-        tools.add(ShellTools.builder().workingDirectory(root).build());
-        tools.add(FileSystemTools.builder().allowedDirectory(root).build());
-        tools.add(GlobTool.builder().workingDirectory(root).allowedDirectory(root).build());
-        tools.add(GrepTool.builder().workingDirectory(root).allowedDirectory(root).build());
-        tools.add(ListDirectoryTool.builder().workingDirectory(root).allowedDirectory(root).build());
-        return tools;
+        for (Object object : List.of(
+                ShellTools.builder().workingDirectory(root).build(),
+                FileSystemTools.builder().allowedDirectory(root).build(),
+                GlobTool.builder().workingDirectory(root).allowedDirectory(root).build(),
+                GrepTool.builder().workingDirectory(root).allowedDirectory(root).build(),
+                ListDirectoryTool.builder().workingDirectory(root).allowedDirectory(root).build())) {
+            Collections.addAll(raw, ToolCallbacks.from(object));
+        }
+
+        // 3. 每个工具描述一次；执行体按名字取这一轮的 delegate
+        Map<String, ToolCallback> delegates = new LinkedHashMap<>();
+        List<Ai1GovernedTool> specs = new ArrayList<>();
+        for (ToolCallback callback : raw) {
+            ToolDefinition definition = callback.getToolDefinition();
+            delegates.put(definition.name(), callback);
+            specs.add(new Ai1GovernedTool(
+                    definition.name(),
+                    definition.description(),
+                    readOnlyTool(definition.name()) ? Ai1ToolKind.SKILL_READ : Ai1ToolKind.SKILL_WRITE,
+                    definition.inputSchema(),
+                    arguments -> delegateCall(definition.name(), arguments)));
+        }
+        governor.registerAll(specs);
+
+        // 4. 模型看到的是原来的名字/描述/schema；调用先到引擎
+        Long caller = SecurityFrameworkUtils.getLoginUserId();
+        List<ToolCallback> governed = new ArrayList<>();
+        for (ToolCallback callback : raw) {
+            ToolDefinition definition = callback.getToolDefinition();
+            String name = definition.name();
+            Function<Map<String, Object>, String> call = arguments ->
+                    withCaller(caller, () -> Ai1SkillExecutionContext.run(delegates,
+                            () -> governor.execute(name, arguments, caller, sessionId).forModel()));
+            governed.add(FunctionToolCallback.builder(name, call)
+                    .description(definition.description())
+                    .inputType(Map.class)
+                    .inputSchema(definition.inputSchema())
+                    .build());
+        }
+        return governed;
+    }
+
+    /** The body of a governed SKILL tool: this turn's delegate, by name. / 受治理 SKILL 工具的执行体。 */
+    private static Object delegateCall(String name, Map<String, Object> arguments) {
+        ToolCallback delegate = Ai1SkillExecutionContext.current(name);
+        if (delegate == null) {
+            throw new IllegalStateException("no SKILL delegate named `" + name + "` in this turn");
+        }
+        return delegate.call(JsonUtils.toJsonString(arguments == null ? Map.of() : arguments));
+    }
+
+    /**
+     * Which SKILL tools change nothing: Glob, Grep and ListDirectory. Everything else — shell, the file
+     * tools (including Read), and SkillsTool — starts behind the write gate.
+     *
+     * 哪些 SKILL 工具不改动任何东西：Glob、Grep、ListDirectory。其余——shell、文件工具（含 Read）与
+     * SkillsTool——都从写闸后面起步。
+     */
+    private static boolean readOnlyTool(String name) {
+        String normalized = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        return "glob".equals(normalized) || "grep".equals(normalized)
+                || "listdirectory".equals(normalized) || "list_directory".equals(normalized);
+    }
+
+    /** Run the body with the submitting caller in the security context. / 在投递它的调用方的安全上下文里跑。 */
+    private static String withCaller(Long userId, Supplier<String> body) {
+        if (userId == null) {
+            return body.get();
+        }
+        LoginUser caller = new LoginUser();
+        caller.setId(userId);
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(caller, null, List.of()));
+        try {
+            return body.get();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     /**

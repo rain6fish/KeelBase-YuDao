@@ -29,9 +29,10 @@
 // ⇒ 那个模块里的类**实现不了**本接口，自报这条路对它们根本不通。故它们走那份手写目录
 // （`GovernedToolFaces.java`），与生成的 `ProductsTools` 同一个办法。
 //
-// **一处张力，如实记、不掩。** 目录里的 `Ai1McpGovernance` 切的是 `Ai1McpClientTool.callTool`——那是**出站**。
-// 故这条边界判的不是「入站还是出站」，而是「**归谁声明、且 AI 够不够得到本机**」：MCP 那条登记的是它的**治理端**，
-// SKILL 那条登记的是它的**装配端**，两者都不是「一条路的全部」。读成「只装入站」或「只装出站」，都有反例。
+// **一处张力，如实记、不掩。** 目录里的 `Ai1ExternalToolAdapter` 是 AI 外部工具交给引擎的外壳——MCP 与 SKILL
+// 都经它登记，而 MCP 的调用最终仍是**出站**的。故这条边界判的不是「入站还是出站」，而是「**归谁声明、且 AI 够不够
+// 得到本机**」：MCP 与 SKILL 登记的都是它们的**治理端**（同一个外壳），而 SKILL 还有自己的**装配端**；两者都不是
+// 「一条路的全部」。读成「只装入站」或「只装出站」，都有反例。
 //
 // 一条**AI 执行路径** = 本宿主上一处「AI 能到达执行」的载体，按下面五条形状判定（读的是**形状**、不是名字）：
 //
@@ -85,10 +86,11 @@
 // the interface, and declaring itself is not open to it. They go through the hand-written
 // `GovernedToolFaces.java` instead, the same way the generated `ProductsTools` does.
 //
-// **One tension, recorded rather than hidden.** The catalogue's `Ai1McpGovernance` advises
-// `Ai1McpClientTool.callTool` — an **outbound** call. So this boundary does not split on "inbound or
-// outbound" but on "**who declares it, and can the AI reach this host through it**": the MCP path is
-// here through its **governed end**, the SKILL path through its **assembling end**, and neither is "the
+// **One tension, recorded rather than hidden.** The catalogue's `Ai1ExternalToolAdapter` is the shell
+// that hands an ai1 external tool to the engine — MCP and SKILL both register through it, and an MCP
+// call is still **outbound** in the end. So this boundary does not split on "inbound or outbound" but on
+// "**who declares it, and can the AI reach this host through it**": MCP and SKILL are here through their
+// **governed end** (the same shell), and SKILL also through its **assembling end**; neither is "the
 // whole of one path". Read as "inbound only" or "outbound only", it has counter-examples either way.
 //
 // An **AI execution path** is a carrier of one of five shapes — read as shapes, not names:

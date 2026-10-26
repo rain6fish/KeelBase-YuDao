@@ -11,6 +11,9 @@ import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.agent.Ai1AgentDO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.mcp.Ai1McpDO;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedTool;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolKind;
 import cn.iocoder.yudao.module.ai1.service.mcp.Ai1McpService;
 import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.annotation.Resource;
@@ -24,8 +27,6 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 
 /**
  * AI1 MCP 工具工厂：把 Agent 绑定的 MCP 服务暴露的工具，桥接为 Spring AI ToolCallback
@@ -53,53 +54,62 @@ public class Ai1McpToolFactory {
     private Ai1McpClientTool mcpClientTool;
 
     /**
-     * 构建 Agent 绑定的 MCP 工具集合；单个服务失败时跳过，不影响会话
+     * 构建 Agent 绑定的 MCP 工具集合，并让它们**经治理引擎**执行。
      *
-     * tools/list 结果已由 {@link Ai1McpClientTool} 按配置指纹缓存，这里只做 ToolCallback 包装
+     * <p>模型看到的仍是 MCP 服务自己的工具名、描述与入参 schema；调用先经过宿主注册的治理工具：`readOnlyHint == true`
+     * 的走 R1，其余（破坏性、或没表态的）走 R2 且**默认禁用**，管理员在策略中心放开。审计行由引擎写，
+     * 带着调用方与这一轮的会话号。
      *
-     * @param agent Agent
-     * @return 工具集合
-     */
-    public List<ToolCallback> buildTools(Ai1AgentDO agent) {
-        return buildTools(agent, null);
-    }
-
-    /**
-     * 同上，另带**这一轮属于哪条会话**。
+     * <p>没有治理器时**明确失败**：悄悄退回一条不经引擎的路，正是这次改动要消灭的形态。
      *
-     * <p><b>这一处是 KeelBase 的改动，登记在 {@code keelbase-docs/KEELBASE-UPSTREAM.md}。</b>它与上面那个不带
-     * 会话的重载**并存**、不替换：上游自己的调用方与测试照旧走那个，而部署会把会话传进来。会话号**在装配处就在
-     * 作用域里**（正是知道会话的那次生成），而工具真正被调用时那条线程不知道它 —— 与「调用方」是同一条理由。
+     * Build the MCP tools this agent binds, and run them **through the governance engine**.
      *
-     * <p>它在调用处被发布（见 {@link Ai1ToolCallSession}），于是**受治理的那次调用写下的行说得清自己属于哪一轮**；
-     * 没有它，一行能被读到的最好程度只是「这个调用方最近的调用」。
+     * <p>The model still sees the MCP server's own name, description and input schema; the call first
+     * reaches the host's governed tool — `readOnlyHint == true` at R1, everything else (destructive, or
+     * unstated) at R2 and **disabled by default** until an administrator enables it in the Policy
+     * Center. The engine writes the audit row, carrying the caller and this turn's session id.
      *
-     * The same, carrying **which session this turn belongs to**.
-     *
-     * <p><b>This is KeelBase's change here, registered in {@code keelbase-docs/KEELBASE-UPSTREAM.md}.</b> It sits
-     * beside the session-less overload rather than replacing it: upstream's own callers and tests keep using that
-     * one, and a deployment passes the session in. The id is in scope where the tools are assembled — the
-     * generation that knows the session — while the thread that calls the tool does not know it, the same reason
-     * the caller travels the same way.
-     *
-     * <p>Published at the call site (see {@link Ai1ToolCallSession}), so a governed call's row can say which turn
-     * it came from; without it the most a reader can do is "this caller's recent calls".
+     * <p>No governor is a **loud failure**: quietly falling back to a path that bypasses the engine is
+     * the shape this change removes.
      *
      * @param agent     Agent
      * @param sessionId 这一轮的会话号；不属于任何会话时传 {@code null}
+     * @param governor  宿主交给 ai1 的治理缝
      * @return 工具集合
      */
-    public List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId) {
+    public List<ToolCallback> buildTools(Ai1AgentDO agent, Long sessionId, Ai1ToolGovernor governor) {
         List<ToolCallback> tools = new ArrayList<>();
         if (CollUtil.isEmpty(agent.getMcpIds())) {
             return tools;
         }
+        if (governor == null) {
+            throw new IllegalStateException("no Ai1ToolGovernor — MCP tools must run through governance");
+        }
+        Long caller = SecurityFrameworkUtils.getLoginUserId();
+        List<Ai1GovernedTool> specs = new ArrayList<>();
         for (Ai1McpDO mcp : mcpService.getMcpList(agent.getMcpIds())) {
             if (CommonStatusEnum.isDisable(mcp.getStatus())) {
                 continue;
             }
-            tools.addAll(convertList(listTools(agent, mcp), tool -> buildToolCallback(mcp, tool, sessionId)));
+            for (McpSchema.Tool tool : listTools(agent, mcp)) {
+                String name = buildToolName(mcp, tool);
+                String description = StrUtil.nullToEmpty(tool.description());
+                String schemaJson = JsonUtils.toJsonString(schemaOf(tool));
+                boolean readOnly = tool.annotations() != null
+                        && Boolean.TRUE.equals(tool.annotations().readOnlyHint());
+                specs.add(new Ai1GovernedTool(name, description,
+                        readOnly ? Ai1ToolKind.MCP_READ : Ai1ToolKind.MCP_WRITE, schemaJson,
+                        arguments -> mcpClientTool.callTool(mcp, tool.name(), arguments)));
+                tools.add(FunctionToolCallback.builder(name,
+                                (Function<Map<String, Object>, String>) arguments -> withCaller(caller,
+                                        () -> governor.execute(name, arguments, caller, sessionId).forModel()))
+                        .description(description)
+                        .inputType(Map.class)
+                        .inputSchema(schemaJson)
+                        .build());
+            }
         }
+        governor.registerAll(specs);
         return tools;
     }
 
@@ -119,36 +129,16 @@ public class Ai1McpToolFactory {
         }
     }
 
-    /**
-     * 构建单个工具回调：名称去冲突 + 入参 Schema 透传 + MCP 客户端调用落地
-     *
-     * <p>The caller is captured <b>here</b> and not where the call runs, because those are not the same
-     * thread: assembly happens inside the generation that knows who asked, while the model drives the
-     * tool loop on a renderer thread that never had a caller. Without this the governed call asks for
-     * an identity on a thread nothing ever put one on, and is refused — which used to happen or not
-     * depending on whether that pool thread happened to be created inside the caller's window.
-     *
-     * 调用方在**这里**捕获，而不是在调用真正发生的地方——两者不是同一条线程：装配发生在**知道是谁在问**的那次
-     * 生成里，而模型驱动工具循环用的是一条**从未有过调用方**的线程。没有这一段，那次受治理的调用就在一条没人
-     * 放过身份的线程上问身份，因而被拒——而它拒或不拒，过去取决于那条池线程**是否碰巧**在调用方的窗口里被创建。
-     */
-    private ToolCallback buildToolCallback(Ai1McpDO mcp, McpSchema.Tool tool, Long sessionId) {
-        Long caller = SecurityFrameworkUtils.getLoginUserId();
-        // 会话与调用方**同一处、同一理由**地随工具走：装配时它在作用域里，而调用落在的那条线程不知道它。
-        Function<Map<String, Object>, String> function = arguments ->
-                withCaller(caller, () -> Ai1ToolCallSession.as(sessionId,
-                        () -> mcpClientTool.callTool(mcp, tool.name(), arguments)));
+    /** The tool's input schema, normalised to an empty object schema when it declares none. */
+    /** 工具声明的入参 schema；没声明时归一成一个空对象 schema。 */
+    private static Map<String, Object> schemaOf(McpSchema.Tool tool) {
         Map<String, Object> inputSchema = tool.inputSchema();
         if (MapUtil.isEmpty(inputSchema)) {
             inputSchema = new HashMap<>();
             inputSchema.put("type", "object");
             inputSchema.put("properties", new HashMap<>());
         }
-        return FunctionToolCallback.builder(buildToolName(mcp, tool), function)
-                .description(StrUtil.nullToEmpty(tool.description()))
-                .inputType(Map.class)
-                .inputSchema(JsonUtils.toJsonString(inputSchema))
-                .build();
+        return inputSchema;
     }
 
     /**
