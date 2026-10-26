@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,363 @@
+@@ -1,4 +1,372 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -155,6 +155,15 @@ index 96269a8..2611a9b 100644
 +        'shell-on-host': 'No identity, audit, confirmation or refusal; its shell tool runs commands on this host.',
 +        'retrieval-unlogged': 'Retrieval writes no audit row, including the advisor’s own search.',
 +      },
++      summaryTitle: 'Summary',
++      summaryHeld: 'Governed (held):',
++      summaryNotHeld: 'Not governed (not held):',
++      summaryNote: '{total} AI paths: {held} governed (fully or partly), {none} ungoverned.',
++      sourceTitle: 'Source (for developers)',
++      notHeldWho: 'Path',
++      notHeldHow: 'How it bypasses',
++      notHeldWhyLabel: 'Why it is harmless today',
++      notHeldWhenLabel: 'Trigger that ends the exemption',
 +      notHeldTitle: 'Not held by it',
 +      notHeldWhat: "Upstream's own path: chat resolves a role's tool ids through Spring AI's own resolver and hands the callbacks to the model. This line's governance does not see it.",
 +      notHeldWhy: 'Harmless today: the only ToolCallback bean in this build is upstream’s own sample, so the resolver has nothing of ours to find.',
@@ -370,7 +379,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,360 @@
+@@ -1,4 +1,369 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -523,6 +532,15 @@ index 35f1e1a..856d201 100644
 +        'shell-on-host': '没有身份、审计、确认或拒绝；它的 shell 工具在本机执行命令。',
 +        'retrieval-unlogged': '检索不写审计行，包括 Advisor 自己发起的那次检索。',
 +      },
++      summaryTitle: '边界摘要',
++      summaryHeld: '受治理（会被扣住的）：',
++      summaryNotHeld: '未纳入治理（扣不住的）：',
++      summaryNote: '共 {total} 条 AI 路径：{held} 条受治理（含部分受治理），{none} 条未纳入治理。',
++      sourceTitle: '代码出处（供开发者核对）',
++      notHeldWho: '路径',
++      notHeldHow: '绕过方式',
++      notHeldWhyLabel: '当前无害的原因',
++      notHeldWhenLabel: '不再无害的触发条件',
 +      notHeldTitle: '它扣不住的',
 +      notHeldWhat: '上游自己那条路：chat 取角色的 toolIds、经 Spring AI 自己的解析器把 callback 交给模型 —— 本线治理看不见它。',
 +      notHeldWhy: '今天无害：本构建里唯一的 ToolCallback bean 是上游自己的示例，故解析器找不到我们的东西。',
