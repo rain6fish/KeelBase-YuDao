@@ -103,7 +103,15 @@
         </div>
       </div>
 
-      <div v-if="streamError" class="panel-error">{{ streamError }}</div>
+      <!-- 失败时只给读者一句人话。原始异常（模型的 401 报文、Java 类名、request id）进控制台日志，
+           不进这一块：它是维护者看的，而读者要的是「这次没成，我该做什么」。 -->
+      <!-- On failure the reader gets one plain sentence. The raw exception (the model's 401 body, its Java
+           class name, the request id) goes to the console log, not here: it is for whoever maintains the
+           deployment, while the reader needs to know what happened and what to do about it. -->
+      <div v-if="streamError" class="panel-error">
+        <div>{{ errorHeadline }}</div>
+        <div class="panel-error-hint">技术细节已记录在浏览器控制台。</div>
+      </div>
 
       <!-- 待我确认：一笔写悬在这里，等一个人。它出现在对话尾部，因为它就是这一轮产生的。 -->
       <div v-for="c in pending" :key="c.token" class="confirm-card">
@@ -180,6 +188,23 @@ const thinking = ref('')
 const reply = ref('')
 const streamError = ref('')
 const bodyRef = ref<HTMLElement | null>(null)
+
+/**
+ * 一行给人读的失败说明。分两句是由**读者能做什么**定的：401 那一类（密钥被拒）只有管理员能处理，
+ * 其余失败读者可以稍后重试。原始报文不参与渲染 —— 它含 Java 类名、`request_id`、密钥尾号，
+ * 是维护者的材料，已由 `console.error` 记下。
+ *
+ * One plain line saying what failed, split by **what the reader can do**: a 401-class failure (the key
+ * was refused) only an administrator can fix, while any other failure the reader may retry. The raw
+ * body never takes part in rendering — it carries a Java class name, a `request_id` and the tail of the
+ * key, which are the maintainer's material and are recorded by `console.error` below.
+ */
+const errorHeadline = computed(() => {
+  if (/401|unauthori[sz]ed|invalid[_\s-]?api[_\s-]?key|api key.*invalid/i.test(streamError.value)) {
+    return '助手暂时连不上模型服务，请联系管理员检查密钥。'
+  }
+  return '助手这次没能完成回答，请稍后重试；如果一直如此，请联系管理员检查模型服务的配置。'
+})
 
 /** The tool in the reader's language, falling back to the registered name. */
 /** 工具名，用读者的语言；不认识就保留注册名。 */
@@ -346,11 +371,16 @@ async function send() {
     await assistantApi.sendStream(sessionId.value, content, (event) => {
       if (event.event === 'thinking') thinking.value += event.data
       else if (event.event === 'message') reply.value += event.data
-      else if (event.event === 'error') streamError.value = event.data
+      else if (event.event === 'error') {
+        streamError.value = event.data
+        console.error('[assistant] the model stream reported an error:', event.data)
+      }
       scrollToEnd()
     })
   } catch (e) {
-    streamError.value = e instanceof Error ? e.message : String(e)
+    const raw = e instanceof Error ? e.message : String(e)
+    streamError.value = raw
+    console.error('[assistant] send failed:', raw)
   } finally {
     streaming.value = false
     busy.value = false
@@ -552,6 +582,11 @@ onMounted(async () => {
 .panel-error {
   color: var(--el-color-danger);
   padding: 4px 2px;
+  line-height: 1.6;
+}
+.panel-error-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 .panel-footer {
   display: flex;

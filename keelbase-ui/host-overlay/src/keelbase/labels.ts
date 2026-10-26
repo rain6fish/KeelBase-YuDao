@@ -212,6 +212,47 @@ export function outcomeMeaningKey(outcome: string | null | undefined): string | 
   return code ? `keelbase.meaning.${code}` : null
 }
 
+export type ToolEffect = 'write' | 'read' | 'unknown'
+
+/**
+ * 一个工具的调用会不会改动系统里的东西，按运行时**已经供出来**的那份声明读 —— 风险级与「是否需要确认」，
+ * 不是工具名。规则与运行时自己的 `ToolDeclaration.isGovernedWrite` 同一条：声明为 R3 及以上、或要求确认的，
+ * 是写；R0/R1 是读；其余（策略档 R2、或清单还没有答复这个工具）**不下结论**，既不称它是写、也不称它是读。
+ *
+ * Whether a tool call can change the system, read off the declaration the runtime already serves — its
+ * risk level and whether it asks for confirmation — not off its name. The rule is the runtime's own
+ * (`ToolDeclaration.isGovernedWrite`): declared R3 and above, or asking for confirmation, is a write;
+ * R0/R1 is a read; anything else (a policy-gated R2, or a tool the inventory has not answered for) is
+ * left **undecided** — neither called a write nor called a read.
+ */
+export function toolEffect(
+  tool: { requiresConfirmation?: boolean; riskLevel?: string | null } | null | undefined,
+): ToolEffect {
+  const level = tool?.riskLevel
+  if (!level) return 'unknown'
+  if (tool?.requiresConfirmation || level === 'R3' || level === 'R4' || level === 'R5') return 'write'
+  if (level === 'R0' || level === 'R1') return 'read'
+  return 'unknown'
+}
+
+/**
+ * `executed` 那句话按工具的性质分三句：写的仍说「写已经在系统里」，读的说这是一次查询、数据没被改动，
+ * 清单答不上来的只说「真的执行了」。一次查询被读成一次写，正是这三句要分开的原因。
+ *
+ * Which sentence `executed` should say, by the tool's own nature: a write still says the write is in the
+ * system, a read says it was a query and nothing changed, and a tool the inventory cannot classify says
+ * only that it really ran. Reading a query as a write is exactly what these three sentences separate.
+ */
+const EXECUTED_MEANING: Record<ToolEffect, string> = {
+  write: 'executed',
+  read: 'executedRead',
+  unknown: 'executedUnknown',
+}
+
+export function executedMeaningKey(effect: ToolEffect): string {
+  return `keelbase.meaning.${EXECUTED_MEANING[effect]}`
+}
+
 /**
  * The colour an audit row's outcome reads as. `attempted` is deliberately *not* a verdict — the
  * engine writes it before the call has a result — so it takes the neutral colour rather than a

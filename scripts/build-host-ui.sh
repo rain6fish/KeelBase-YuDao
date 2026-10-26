@@ -453,6 +453,21 @@ if [[ ! -f "$INDEX" ]]; then
   exit 2
 fi
 
+# --- 2a. no rendered line of copy may carry a literal Markdown marker ------------------------------
+# 2026-10-26 实测：`**本部署**`、`**没有会话**` 一类**成对的星号**与反引号被原样画在中文页面上。字符串级
+# 抓不住它——词条里的 `{'@'}Bean` 正是为了**渲染成** `@Bean`，星号也只是数据；记号在渲染那一刻才变成
+# 读者眼前的字面。故这里走真实的渲染路径：词条交给 vue-i18n，模板交给 Vue 自己的解析器。见
+# `scripts/check-rendered-copy.mjs`。
+#
+# Measured on 2026-10-26: **paired asterisks** like `**本部署**` and backticks were drawn literally on
+# Chinese pages. A string-level scan cannot see it — `{'@'}Bean` is written to **render as** `@Bean`,
+# and the asterisks are only data; the markers become literal text at render time. So this takes the real
+# rendering path: messages through vue-i18n, templates through Vue's own parser. See
+# `scripts/check-rendered-copy.mjs`.
+if [[ -f "$REPO_ROOT/scripts/check-rendered-copy.mjs" ]]; then
+  node "$REPO_ROOT/scripts/check-rendered-copy.mjs" "$UI_DIR"
+fi
+
 # --- 2b. the page must not carry an absolute API base pointing at a build machine -----------------
 # Upstream's `.env.prod` ships `VITE_BASE_URL=http://localhost:48080`. If that survives into the
 # artifact, the page loads fine while every call goes to the *visitor's own* machine and fails as a
