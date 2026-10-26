@@ -292,24 +292,27 @@ const boundary = {
     // `D42` 上游解析器路、`D44`-B（ai1 MCP）、SKILL、ai1 RAG（另加本部署受治理的运行时那条缝作基线）。
     // 每个条目只带**标识与枚举**：`posture`、`holds` / `doesNotHold`（与 `held.holds` 同一套词）、一个
     // `gap` 枚举，以及**代码出处** `sources`（`文件:行`）。散文由控制台 i18n 按读者语言给。
-    // 这些姿态的出处（逐条核于 2026-10-20，main `3dbe9a2894`）：
-    //   · runtime-seam —— `YudaoGovernedAgentTools.java:81` 实现 `Ai1LocalToolProvider`，调用经
-    //     `GovernedExecutionEngine`；`GovernedToolFaces.java:30-33` 写明它受确认与审计管住。
-    //   · upstream-resolver —— `GovernedToolFaces.java:30-34` 与 `:74-77` 写明治理看不见它；本文件头
-    //     (`:16-38`) 与 `:152-156` 是那条边界的门禁。
-    //   · ai1-mcp —— `Ai1McpGovernance.java:128` 是切点；`:135-139` 无身份即拒；`:142-148` 明确声明的写即拒；
-    //     `:149-160` 读/执行/失败都写审计；`:30-33` 自己写明**不经引擎、不扣人**。
-    //   · SKILL —— `Ai1SkillToolFactory.java:93` 装配、`:106-109` 造 `ShellTools` / `FileSystemTools`；
-    //     `GovernedToolFaces.java:32-37` / `:74-77` 明说它**一条治理缝都没有**，shell 在本机跑。
-    //   · ai1 RAG —— `Ai1RagTool.java:150` 的 `search` 与 `:202-205` 的 `buildAdvisor`；装配点
-    //     `Ai1SessionStreamTool.java:715-727`。ai1 模块里 0 处 `AuditService` ⇒ 检索没有审计行。
+    // 这些姿态的出处（逐条核于 2026-10-26）：
+    //   · runtime-seam —— `YudaoGovernedAgentTools.java` 实现 `Ai1LocalToolProvider`，调用经
+    //     `GovernedExecutionEngine`；`GovernedToolFaces.java` 写明它受确认与审计管住。
+    //   · upstream-resolver —— `GovernedToolFaces.java` 写明治理看不见它；本文件头与那条边界的门禁。
+    //   · ai1-mcp —— `YudaoAi1ToolGovernor.java:69` 把工具注册成宿主装配、并把写默认禁用；
+    //     `Ai1McpToolFactory.java:99` 按 `readOnlyHint` 定读/写；`Ai1ExternalToolAdapter.java:76` 交给引擎执行。
+    //     审计与授权由引擎给；外部工具没有结果 id，故**无确认、无副作用台账**。
+    //   · SKILL —— `Ai1SkillToolFactory.java:122` 装配；工具经同一个外壳进引擎。shell 仍在**本机**跑，
+    //     但每次调用先被引擎判过、并留下审计行；同样无确认、无台账。
+    //   · ai1 RAG —— `Ai1RagTool.java:227` 的 `buildAdvisor` 把检索交给引擎（R1 读），每次检索两行审计。
     //
     // Every AI path's governance posture — a **design fact** a run can only *confirm*, never derive. The
     // four paths are named by `D57`: `D42`'s upstream resolver, `D44`-B (ai1 MCP), SKILL and ai1 RAG
     // (plus this deployment's governed runtime seam as the baseline). Each entry carries identifiers and
     // enums only: `posture`, `holds` / `doesNotHold` (the same vocabulary as `held.holds`), one `gap`
     // enum, and `sources` — the code coordinates (`file:line`). The console supplies the prose through
-    // its i18n, in the reader's language. Coordinates were checked on 2026-10-20 against main `3dbe9a2894`.
+    // its i18n, in the reader's language. Coordinates were checked on 2026-10-26.
+    //   · ai1-mcp / ai1-skill now go through the engine (`YudaoAi1ToolGovernor` → `Ai1ExternalToolAdapter`);
+    //     they hold authorization, identity and audit. An external tool has no result id, so there is no
+    //     confirmation and no side-effect ledger row — the declared `external-effect-no-ledger` gap.
+    //   · ai1 RAG's retrieval is a governed R1 read: every search writes an audit row.
     paths: [
       {
         id: 'runtime-seam',
@@ -336,36 +339,36 @@ const boundary = {
       {
         id: 'ai1-mcp',
         posture: 'partially-governed',
-        holds: ['identity', 'audit', 'refusal'],
-        doesNotHold: ['authorization', 'confirmation', 'side-effect-ledger'],
-        gap: 'declaration-quality',
+        holds: ['authorization', 'identity', 'audit'],
+        doesNotHold: ['confirmation', 'side-effect-ledger'],
+        gap: 'external-effect-no-ledger',
         sources: [
-          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1McpGovernance.java:128',
-          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1McpGovernance.java:142',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/YudaoAi1ToolGovernor.java:69',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/mcp/Ai1McpToolFactory.java:99',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1ExternalToolAdapter.java:76',
         ],
       },
       {
         id: 'ai1-skill',
-        posture: 'not-governed',
-        holds: [],
-        doesNotHold: ['authorization', 'identity', 'audit', 'confirmation', 'refusal', 'side-effect-ledger'],
-        gap: 'shell-on-host',
+        posture: 'partially-governed',
+        holds: ['authorization', 'identity', 'audit'],
+        doesNotHold: ['confirmation', 'side-effect-ledger'],
+        gap: 'external-effect-no-ledger',
         sources: [
-          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/skill/Ai1SkillToolFactory.java:93',
-          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/skill/Ai1SkillToolFactory.java:106',
-          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/GovernedToolFaces.java:32',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/skill/Ai1SkillToolFactory.java:122',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/YudaoAi1ToolGovernor.java:69',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/Ai1ExternalToolAdapter.java:76',
         ],
       },
       {
         id: 'ai1-rag',
-        posture: 'not-governed',
-        holds: [],
-        doesNotHold: ['authorization', 'identity', 'audit', 'confirmation', 'refusal', 'side-effect-ledger'],
-        gap: 'retrieval-unlogged',
+        posture: 'governed',
+        holds: ['authorization', 'identity', 'audit'],
+        doesNotHold: [],
+        gap: 'none',
         sources: [
-          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/rag/Ai1RagTool.java:150',
-          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/rag/Ai1RagTool.java:202',
-          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/session/Ai1SessionStreamTool.java:727',
+          'yudao-module-ai1-springai/src/main/java/cn/iocoder/yudao/module/ai1/harness/rag/Ai1RagTool.java:227',
+          'yudao-server/src/main/java/cn/iocoder/yudao/server/keelbase/YudaoAi1ToolGovernor.java:93',
         ],
       },
     ],

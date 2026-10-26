@@ -8,6 +8,10 @@ import cn.iocoder.yudao.module.ai1.dal.dataobject.skill.Ai1SkillDO;
 import cn.iocoder.yudao.module.ai1.dal.dataobject.skill.Ai1SkillFileDO;
 import cn.iocoder.yudao.module.ai1.enums.skill.Ai1SkillFileTypeEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedOutcome;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedTool;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolKind;
 import cn.iocoder.yudao.module.ai1.service.skill.Ai1SkillFileService;
 import cn.iocoder.yudao.module.ai1.service.skill.Ai1SkillService;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +24,10 @@ import org.springframework.ai.tool.ToolCallback;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -51,10 +57,24 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
     @TempDir
     private Path tempDir;
 
+    private final List<Ai1GovernedTool> registered = new ArrayList<>();
+    private final Ai1ToolGovernor governor = new Ai1ToolGovernor() {
+        @Override
+        public void registerAll(List<Ai1GovernedTool> tools) {
+            registered.addAll(tools);
+        }
+
+        @Override
+        public Ai1GovernedOutcome execute(String name, Map<String, Object> args, Long caller, Long sessionId) {
+            throw new AssertionError("these tests only assemble; nothing should execute");
+        }
+    };
+
     @BeforeEach
     public void before() {
         // 设置 SKILL 文件目录
         ai1Properties.getSkill().setRoot(tempDir.toString());
+        registered.clear();
     }
 
     @Test
@@ -64,10 +84,12 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         mockSkillFiles("echo hi");
 
         // 调用
-        List<Object> tools = skillToolFactory.buildTools(buildAgent());
-        // 断言
-        assertEquals(6, tools.size());
-        assertInstanceOf(ToolCallback.class, tools.get(0));
+        List<ToolCallback> tools = skillToolFactory.buildTools(buildAgent(), null, governor);
+        // 断言：每个 delegate 都有一个受治理的回调，读写两种性质都在
+        assertEquals(registered.size(), tools.size());
+        assertTrue(tools.stream().allMatch(ToolCallback.class::isInstance));
+        assertTrue(registered.stream().anyMatch(tool -> tool.kind() == Ai1ToolKind.SKILL_READ));
+        assertTrue(registered.stream().anyMatch(tool -> tool.kind() == Ai1ToolKind.SKILL_WRITE));
         Path skillDirectory = agentRoot().resolve("pdf-reader");
         assertEquals(SKILL_CONTENT, FileUtil.readUtf8String(skillDirectory.resolve("SKILL.md").toFile()));
         assertEquals("echo hi", FileUtil.readUtf8String(skillDirectory.resolve("scripts/run.sh").toFile()));
@@ -82,8 +104,8 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         Ai1AgentDO agent = buildAgent();
 
         // 调用
-        skillToolFactory.buildTools(agent);
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
+        skillToolFactory.buildTools(agent, null, governor);
         // 断言
         verify(skillFileService, times(1)).getSkillFileListBySkillId(SKILL_ID);
 
@@ -94,7 +116,7 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         mockSkillFiles("echo v2");
 
         // 调用
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
         // 断言
         verify(skillFileService, times(2)).getSkillFileListBySkillId(SKILL_ID);
         assertEquals("echo v2", FileUtil.readUtf8String(agentRoot().resolve("pdf-reader/scripts/run.sh").toFile()));
@@ -107,13 +129,13 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         mockSkill(CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.of(2026, 10, 1, 10, 0));
         mockSkillFiles("echo hi");
         Ai1AgentDO agent = buildAgent();
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
 
         // mock 物化目录被删除
         FileUtil.del(agentRoot());
 
         // 调用
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
         // 断言
         verify(skillFileService, times(2)).getSkillFileListBySkillId(SKILL_ID);
         assertTrue(FileUtil.exist(agentRoot().resolve("pdf-reader/SKILL.md").toFile()));
@@ -125,10 +147,10 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         mockSkill(CommonStatusEnum.DISABLE.getStatus(), LocalDateTime.of(2026, 10, 1, 10, 0));
 
         // 调用
-        List<Object> tools = skillToolFactory.buildTools(buildAgent());
-        // 断言只保留执行工具，不物化 SKILL 文件
-        assertEquals(5, tools.size());
-        assertTrue(tools.stream().noneMatch(ToolCallback.class::isInstance));
+        List<ToolCallback> tools = skillToolFactory.buildTools(buildAgent(), null, governor);
+        // 断言只保留执行工具，不物化 SKILL 文件；SkillsTool 没有出现
+        assertEquals(registered.size(), tools.size());
+        assertTrue(registered.stream().noneMatch(tool -> "skills".equalsIgnoreCase(tool.name())));
         assertFalse(FileUtil.exist(agentRoot().resolve("pdf-reader").toFile()));
         verify(skillFileService, never()).getSkillFileListBySkillId(anyLong());
     }
@@ -136,7 +158,7 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
     @Test
     public void testBuildTools_noSkill() {
         // 调用，并断言
-        assertTrue(skillToolFactory.buildTools(new Ai1AgentDO().setId(AGENT_ID).setSkillIds(List.of())).isEmpty());
+        assertTrue(skillToolFactory.buildTools(new Ai1AgentDO().setId(AGENT_ID).setSkillIds(List.of()), null, governor).isEmpty());
         verify(skillService, never()).getSkillList(anyCollection());
     }
 
@@ -146,7 +168,7 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         mockSkill(CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.of(2026, 10, 1, 10, 0));
         mockSkillFiles("echo hi");
         Ai1AgentDO agent = buildAgent();
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
         assertTrue(FileUtil.exist(agentRoot().toFile()));
 
         // 调用
@@ -155,7 +177,7 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         assertFalse(FileUtil.exist(agentRoot().toFile()));
 
         // 调用
-        skillToolFactory.buildTools(agent);
+        skillToolFactory.buildTools(agent, null, governor);
         // 断言重新物化
         verify(skillFileService, times(2)).getSkillFileListBySkillId(SKILL_ID);
     }

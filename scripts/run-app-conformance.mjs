@@ -22,9 +22,10 @@
 //   Build · Schema · Permission · Tool Governance · Tool path (MCP) · Tenant · Audit · Confirmation
 //   · Revoke · Rates
 //
-// The previous line's record carried a **RAG permission** column; this line wires no memory/knowledge
-// gate yet, so there is no column for it here — that is a difference in the application, stated here
-// so it is not read as an omission.
+// The previous line's record carried a **RAG permission** column; this line has no separate
+// memory/knowledge column. RAG retrieval is now a governed read (audited like any other tool call), but
+// it is still not a conformance column — a difference in the application, stated here so it is not read
+// as an omission.
 //
 // Rows it cannot stand behind are `SKIP` **with the reason attached**, never `PASS`. **Every column that
 // can be driven is driven**, by the application's own gates, and driving them is the point: a record that
@@ -59,8 +60,8 @@
 //
 //   构建 · Schema · 权限 · 工具治理 · 工具路径（MCP）· 审计 · 确认 · 撤销 · 四率
 //
-// 上一条线那份记录带一栏 **RAG 权限**；本线**还没有接记忆 / 知识那条门禁**，故这里没有那一栏——这是**应用**的
-// 差别，写在这里，免得被读成遗漏。
+// 上一条线那份记录带一栏 **RAG 权限**；本线没有单独的记忆 / 知识栏。RAG 检索现在是**受治理的读**（与其它工具
+// 调用一样留审计），但仍不是一条符合性栏位——这是**应用**的差别，写在这里，免得被读成遗漏。
 //
 // 站不住的栏写 `SKIP` **并附上原因**，**绝不写 `PASS`**。**凡是驱动得动的栏都驱动**，由这个应用自己的门禁来
 // 驱动，而**驱动**正是要点：一份复述它们结果的记录只是誊抄。只有两栏直接读库 —— `Schema`（有哪些表）与

@@ -8,6 +8,9 @@ import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageStatusEnum;
 import cn.iocoder.yudao.module.ai1.enums.session.Ai1SessionMessageRoleEnum;
 import cn.iocoder.yudao.module.ai1.enums.model.Ai1ModelTypeEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedOutcome;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedTool;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
 import cn.iocoder.yudao.module.ai1.harness.skill.Ai1SkillToolFactory;
 import cn.iocoder.yudao.module.ai1.service.agent.Ai1AgentService;
 import cn.iocoder.yudao.module.ai1.service.session.Ai1SessionService;
@@ -28,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.redisson.api.RStream;
 import org.redisson.api.RLock;
@@ -98,9 +102,30 @@ public class Ai1SessionStreamToolTest extends BaseMockitoUnitTest {
     private Ai1RagTool ragTool;
     @Mock
     private Ai1TranscriptListener transcriptListener;
+    @Mock
+    private ObjectProvider<Ai1ToolGovernor> toolGovernorProvider;
+
+    /**
+     * The tests assemble tools without asserting on them; this governor only proves the seam is
+     * present, so the turn reaches the chat tool.
+     *
+     * 这些测试装配工具但不校验它们；这个治理器只证明缝在，好让这一轮走到 chat 工具。
+     */
+    private final Ai1ToolGovernor governor = new Ai1ToolGovernor() {
+        @Override
+        public void registerAll(List<Ai1GovernedTool> tools) {
+        }
+
+        @Override
+        public Ai1GovernedOutcome execute(String name, Map<String, Object> args, Long caller, Long sessionId) {
+            return new Ai1GovernedOutcome(
+                    new cn.com.keelbase.runtime.engine.ExecutionOutcome("executed", "ok", null, null, null));
+        }
+    };
 
     @BeforeEach
     public void before() {
+        lenient().when(toolGovernorProvider.getIfAvailable()).thenReturn(governor);
         // mock redissonClient 的方法（部分用例不访问 Redis）
         lenient().doReturn(taskStream).when(redissonClient).getStream(eq("ai1:session:tasks"), any(Codec.class));
         lenient().doReturn(resultStream).when(redissonClient).getStream(eq("ai1:session:result:" + MESSAGE_ID), any(Codec.class));

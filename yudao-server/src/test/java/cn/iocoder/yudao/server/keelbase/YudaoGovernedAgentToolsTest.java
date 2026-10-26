@@ -53,7 +53,12 @@ class YudaoGovernedAgentToolsTest {
         when(tool.description()).thenReturn("List the caller's customers");
         when(tool.parameters()).thenReturn(List.of(
                 ToolParameter.required("keyword", ToolParameter.STRING, "搜索词")));
-        when(tools.all()).thenReturn(List.of(tool));
+        // The deployment catalogue, not every registered tool: host-assembled MCP/SKILL tools belong
+        // to one agent's binding and must not be handed to every agent here.
+        //
+        // 部署自己的目录，而不是全部注册工具：宿主装配的 MCP/SKILL 工具属于某一个 agent 的绑定，不能在这里发给
+        // 所有 agent。
+        when(tools.catalogue()).thenReturn(List.of(tool));
     }
 
     @Test

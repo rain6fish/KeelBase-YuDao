@@ -85,6 +85,10 @@ const server = http.createServer((req, res) => {
             {
               name: TOOL,
               description: 'Echo a string back. Read-only; the probe exists to be called, not to be useful.',
+              // The deployment reads this hint: a tool that says it only reads runs at R1, everything
+              // else starts disabled (R2) until an administrator enables it in the Policy Center.
+              // 部署方读这条提示：声明只读的工具走 R1，其余以**默认禁用**（R2）起步，等管理员在策略中心放开。
+              annotations: { readOnlyHint: true },
               inputSchema: {
                 type: 'object',
                 properties: { text: { type: 'string', description: '任何字符串' } },
@@ -95,6 +99,9 @@ const server = http.createServer((req, res) => {
               name: NOTE_TOOL,
               description: 'Append a line to the probe\'s note file. This one has a side effect, so a'
                 + ' run that reaches it leaves a mark that can be checked afterwards.',
+              // Declared destructive, so it starts behind the gate: the first turn must not reach it.
+              // 声明为破坏性，故它一开始就在闸后面：第一轮**不该**碰得到它。
+              annotations: { destructiveHint: true },
               inputSchema: {
                 type: 'object',
                 properties: { text: { type: 'string', description: '要记下的一行' } },

@@ -8,6 +8,10 @@ import cn.iocoder.yudao.module.ai1.controller.admin.knowledge.vo.base.Ai1Knowled
 import cn.iocoder.yudao.module.ai1.dal.dataobject.knowledge.Ai1KnowledgeBaseDO;
 import cn.iocoder.yudao.module.ai1.enums.model.Ai1ModelTypeEnum;
 import cn.iocoder.yudao.module.ai1.framework.ai.config.YudaoAi1Properties;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedOutcome;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1GovernedTool;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolGovernor;
+import cn.iocoder.yudao.module.ai1.harness.governance.Ai1ToolKind;
 import cn.iocoder.yudao.module.ai1.harness.llm.Ai1LlmModelFactory;
 import cn.iocoder.yudao.module.ai1.service.model.Ai1ModelService;
 import cn.iocoder.yudao.module.ai1.service.model.bo.Ai1ModelRespBO;
@@ -21,6 +25,8 @@ import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvi
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -148,16 +154,26 @@ public class Ai1RagTool {
      * @return 命中分片；文档名称由调用方按文档编号补充
      */
     public List<Ai1KnowledgeSearchRespVO> search(Ai1KnowledgeBaseDO knowledgeBase, String query, Integer topK) {
-        // 1. 相似度检索：未指定检索数量时，使用知识库配置
-        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
-        List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
-                .query(query).topK(topK != null && topK > 0 ? topK : getDefaultTopK(knowledgeBase)).build());
+        // 转换为命中分片：从向量元数据中还原文档编号、分片序号
+        return convertList(searchDocuments(knowledgeBase, query, topK),
+                document -> new Ai1KnowledgeSearchRespVO().setText(document.getText())
+                        .setDocumentId(Convert.toLong(document.getMetadata().get(METADATA_DOCUMENT_ID)))
+                        .setChunkIndex(Convert.toInt(document.getMetadata().get(METADATA_CHUNK_INDEX)))
+                        .setScore(ObjUtil.defaultIfNull(document.getScore(), 0D)));
+    }
 
-        // 2. 转换为命中分片：从向量元数据中还原文档编号、分片序号
-        return convertList(documents, document -> new Ai1KnowledgeSearchRespVO().setText(document.getText())
-                .setDocumentId(Convert.toLong(document.getMetadata().get(METADATA_DOCUMENT_ID)))
-                .setChunkIndex(Convert.toInt(document.getMetadata().get(METADATA_CHUNK_INDEX)))
-                .setScore(ObjUtil.defaultIfNull(document.getScore(), 0D)));
+    /**
+     * 向量检索的**原始结果**：交给治理工具的执行体用，故它不经过任何 UI 形状的转换。
+     *
+     * <p>未指定检索数量时，使用知识库配置。
+     *
+     * The **raw** result of a vector search: what a governed tool's body returns, so it goes through
+     * no UI-shaped conversion. An unspecified top-k falls back to the knowledge base's setting.
+     */
+    public List<Document> searchDocuments(Ai1KnowledgeBaseDO knowledgeBase, String query, Integer topK) {
+        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                .query(query).topK(topK != null && topK > 0 ? topK : getDefaultTopK(knowledgeBase)).build());
     }
 
     /**
@@ -194,15 +210,96 @@ public class Ai1RagTool {
     }
 
     /**
-     * 为知识库构建 RAG Advisor：检索上下文自动注入会话
+     * 为知识库构建 RAG Advisor：检索上下文自动注入会话，**但检索本身经治理引擎**。
      *
-     * @param knowledgeBase 知识库
-     * @return RAG Advisor
+     * <p>行为不变（每次提问都自动检索），变的是检索的落点：advisor 用的 {@code VectorStore} 是一个委托，
+     * 它的 `similaritySearch` 先调 {@link Ai1ToolGovernor#execute}，由引擎写下一行审计（R1 读、带调用方与
+     * 会话号），再把原始 `Document` 交回 advisor。没有治理器时**明确失败**，不退回一条不经引擎的检索。
+     *
+     * Build the knowledge base's RAG Advisor: the retrieved context is still injected automatically,
+     * but **the retrieval itself goes through the governance engine**.
+     *
+     * <p>Behaviour is unchanged (every question still retrieves); where it lands changes. The
+     * `VectorStore` the advisor uses is a delegate whose `similaritySearch` calls the governor first —
+     * the engine writes an audit row (R1 read, carrying the caller and session id) — and then hands the
+     * raw `Document`s back. No governor is a **loud failure**, not a fallback to an ungoverned search.
      */
-    public Advisor buildAdvisor(Ai1KnowledgeBaseDO knowledgeBase) {
-        PgVectorStore vectorStore = getOrCreateVectorStore(knowledgeBase);
+    public Advisor buildAdvisor(Ai1KnowledgeBaseDO knowledgeBase, Ai1ToolGovernor governor,
+                                Long caller, Long sessionId) {
+        if (governor == null) {
+            throw new IllegalStateException("no Ai1ToolGovernor — RAG retrieval must run through governance");
+        }
+        String toolName = "ai1_rag_search__" + knowledgeBase.getId();
+        governor.registerAll(List.of(new Ai1GovernedTool(
+                toolName,
+                "Search this deployment's knowledge base `" + knowledgeBase.getName() + "`.",
+                Ai1ToolKind.RAG_READ,
+                null,
+                arguments -> searchDocuments(knowledgeBase,
+                        Convert.toStr(arguments.get("query")),
+                        Convert.toInt(arguments.get("topK"))))));
+        VectorStore governed = new Ai1GovernedVectorStore(getOrCreateVectorStore(knowledgeBase),
+                toolName, governor, caller, sessionId);
         SearchRequest searchRequest = SearchRequest.builder().topK(getDefaultTopK(knowledgeBase)).build();
-        return QuestionAnswerAdvisor.builder(vectorStore).searchRequest(searchRequest).build();
+        return QuestionAnswerAdvisor.builder(governed).searchRequest(searchRequest).build();
+    }
+
+    /**
+     * A `VectorStore` whose one retrieval goes through the engine; everything else delegates.
+     *
+     * <p>Only `similaritySearch` is intercepted: the advisor neither adds nor deletes, and a write
+     * here would be the vectorising path, which is not part of a conversation.
+     *
+     * 一个只把**检索**送进引擎的 `VectorStore`；其余原样委托。只拦 `similaritySearch`：advisor 不增不删，
+     * 这里的写属于向量化那条路，不属于一次对话。
+     */
+    private static final class Ai1GovernedVectorStore implements VectorStore {
+
+        private final VectorStore delegate;
+        private final String toolName;
+        private final Ai1ToolGovernor governor;
+        private final Long caller;
+        private final Long sessionId;
+
+        private Ai1GovernedVectorStore(VectorStore delegate, String toolName, Ai1ToolGovernor governor,
+                                       Long caller, Long sessionId) {
+            this.delegate = delegate;
+            this.toolName = toolName;
+            this.governor = governor;
+            this.caller = caller;
+            this.sessionId = sessionId;
+        }
+
+        @Override
+        public void add(List<Document> documents) {
+            delegate.add(documents);
+        }
+
+        @Override
+        public void delete(List<String> idList) {
+            delegate.delete(idList);
+        }
+
+        @Override
+        public void delete(Filter.Expression filterExpression) {
+            delegate.delete(filterExpression);
+        }
+
+        @Override
+        public List<Document> similaritySearch(SearchRequest request) {
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            arguments.put("query", request.getQuery());
+            arguments.put("topK", request.getTopK());
+            Ai1GovernedOutcome outcome = governor.execute(toolName, arguments, caller, sessionId);
+            if (outcome.executed() && outcome.outcome().data() instanceof List<?> documents) {
+                return documents.stream()
+                        .filter(Document.class::isInstance)
+                        .map(Document.class::cast)
+                        .toList();
+            }
+            log.warn("[similaritySearch][知识库检索未执行，按空上下文继续：{}]", outcome.outcome().status());
+            return List.of();
+        }
     }
 
     /**

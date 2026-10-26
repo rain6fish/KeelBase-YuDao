@@ -219,37 +219,38 @@ if (fail === 0) {
 
   const calls = probeLog.split('\n').filter((line) => line.includes('tools/call'));
   console.log(`  note  探针共收到 ${calls.length} 次调用`);
-  check('探针收到 ≥2 次', true, calls.length >= 2);
-  check('第一步是回显', true, calls.some((line) => line.includes('probe_echo')));
-  check('第二步是记笔记', true, calls.some((line) => line.includes('probe_note')));
-  const first = calls.findIndex((line) => line.includes('probe_echo'));
-  const second = calls.findIndex((line) => line.includes('probe_note'));
-  check('顺序对（回显在前）', true, first >= 0 && second > first);
+  // The read tool runs; the destructive one starts **disabled** (R2), so the engine blocks it before
+  // the MCP client is ever reached. Enabling it is a Policy Center decision; the governor and policy
+  // store unit tests cover that half.
+  //
+  // 只读工具执行；破坏性工具以 **R2、默认禁用**起步，故引擎在到达 MCP 客户端之前就把它拦住了。放开它是策略
+  // 中心的决定；治理器与策略库的单测覆盖那一半。
+  check('回显到达了探针', true, calls.some((line) => line.includes('probe_echo')));
+  check('写工具被默认拦住：探针没有收到它', true, !calls.some((line) => line.includes('probe_note')));
   check('回显的参数是给它的那段', true, calls.some((line) => line.includes(echoMarker)));
-  check('记笔记的参数是给它的那段', true, calls.some((line) => line.includes(noteMarker)));
 
-  // The side effect is the half a refusal cannot fake.
-  // 副作用是「拒绝」伪装不了的那一半。
+  // The side effect is the half a refusal cannot fake — and here it must be absent, because the
+  // call never ran.
+  // 副作用是「拒绝」伪装不了的那一半——而这里它必须**不存在**，因为那次调用根本没跑。
   const noted = existsSync(NOTE_FILE) ? readFileSync(NOTE_FILE, 'utf8') : '';
-  check('写工具的副作用落地', true, noted.includes(noteMarker));
+  check('写工具的副作用没有落地（默认拦住）', true, !noted.includes(noteMarker));
 
   console.log('== 审计 · 每一步都记在提出它的人名下 ==');
-  // The row names the MCP server, and this run's server carries this run's marker — so the query
-  // cannot be satisfied by a row some earlier run left behind. (The first version hard-coded one
-  // server's name and read an old row as a pass: a false green, caught by reading it back.)
-  // 那一行里写着 MCP 服务的名字，而本轮的服务带着**本轮的标记** ⇒ 该查询**不可能**被更早某次运行留下的行满足。
-  // （第一版写死了一个服务名、把一行旧行读成了通过：一个假绿，回读时逮住。）
-  const server = `probe-${marker}`;
-  const auditOf = (tool) => psql(`select count(*) from ai_audit_logs where user_id = '1' and tool = '${server}:${tool}' and outcome = 'executed'`);
-  check('回显那一步有审计行且属主是登录用户', true, Number(auditOf('probe_echo')) > 0);
-  check('记笔记那一步同样', true, Number(auditOf('probe_note')) > 0);
-  // YD-33：这几行**说得清自己属于哪一轮**。会话号由装配处发布、由切面写进那条列；此前它**恒为 null**，于是凡按
-  // 会话读轨迹的人都看不见 MCP 这条路上的任何调用 —— 而「没显示」与「没发生」在界面上长得一样。
+  // The row names the tool the engine executes, `<mcp-slug>__<tool>`, and this run's server carries
+  // this run's marker — so the query cannot be satisfied by a row an earlier run left behind.
+  // 那一行写着引擎执行的那个工具名 `<mcp-slug>__<tool>`，而本轮的服务带着**本轮的标记** ⇒ 该查询**不可能**被
+  // 更早某次运行留下的行满足。
+  const auditOf = (tool, outcome) => Number(psql(
+    `select count(*) from ai_audit_logs where user_id = '1' and tool like '%__${tool}' and outcome = '${outcome}'`));
+  check('回显那一步有 executed 审计行且属主是登录用户', true, auditOf('probe_echo', 'executed') > 0);
+  check('写工具有 blocked 审计行', true, auditOf('probe_note', 'blocked') > 0);
+  // YD-33：这几行**说得清自己属于哪一轮**。会话号由装配处交给引擎；此前它**恒为 null**，于是凡按会话读轨迹的人
+  // 都看不见 MCP 这条路上的任何调用 —— 而「没显示」与「没发生」在界面上长得一样。
   //
-  // YD-33: these rows can say which turn they belong to. The session is published at assembly and written onto
-  // the row by the aspect; before this it was always null, so a reader of any per-turn trace could not see a
-  // single call on the MCP face — and "not shown" looks the same as "did not happen".
-  const withSession = psql(`select count(*) from ai_audit_logs where tool like '${server}:%' and conversation_id is not null`);
+  // YD-33: these rows can say which turn they belong to. The session is handed to the engine at assembly;
+  // before this it was always null, so a reader of any per-turn trace could not see a single call on the MCP
+  // face — and "not shown" looks the same as "did not happen".
+  const withSession = psql(`select count(*) from ai_audit_logs where tool like '%__probe_%' and conversation_id is not null`);
   check('MCP 审计行带上了会话号', true, Number(withSession) > 0);
 }
 
