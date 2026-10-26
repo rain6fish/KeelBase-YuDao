@@ -67,11 +67,63 @@
         {{ t('keelbase.boundary.excluded', { paths: boundary.computed.scope.excludedPaths.join(', ') }) }}
       </div>
 
+      <!-- 一页结论：先给读者一句能复述的答案，再展开下面那张表。
+           M7 F-9：此前只有五条路径铺开，读者读完整页仍说不出「哪些扣」，只能反推「扣不住之外的」。
+           这两行把同一份记录归并成两个集合 —— 仍不重算任何东西，只按 `posture` 分组。
+           / In one line: the restatable answer first, the table second. Same record, grouped by `posture`. -->
+      <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.summaryTitle') }}</div>
+      <div class="mb-2px">
+        <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryHeld') }}</span>
+        <el-tag
+          v-for="id in heldPathIds"
+          :key="id"
+          size="small"
+          :type="postureTagType(postureOf(id))"
+          class="mr-4px mb-4px"
+        >
+          {{ t(`keelbase.boundary.path.${id}`) }}
+        </el-tag>
+      </div>
+      <div class="mb-2px">
+        <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryNotHeld') }}</span>
+        <el-tag
+          v-for="id in notHeldPathIds"
+          :key="id"
+          size="small"
+          type="danger"
+          effect="plain"
+          class="mr-4px mb-4px"
+        >
+          {{ t(`keelbase.boundary.path.${id}`) }}
+        </el-tag>
+      </div>
+      <div class="text-12px text-[var(--el-text-color-secondary)] mb-10px">
+        {{
+          t('keelbase.boundary.summaryNote', {
+            total: boundary.stated.paths.length,
+            held: heldPathIds.length,
+            none: notHeldPathIds.length
+          })
+        }}
+      </div>
+
+      <!-- F-17：「已知缺口」这一列读者不知道是干什么用的；「上游模型→工具解析器」也没人解释。一句图例。 -->
+      <div class="text-12px text-[var(--el-text-color-secondary)] mb-12px">{{ t('keelbase.boundary.legend') }}</div>
+
       <!-- 每条 AI 路径及其治理姿态 —— `stated.paths` 是设计事实，页面只画、不重算。 -->
       <!-- Every AI path and its posture — `stated.paths` is a design fact; the page only draws it. -->
       <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.pathsTitle') }}</div>
       <div class="text-12px mb-6px">{{ t('keelbase.boundary.pathsWhat') }}</div>
       <el-table :data="boundary.stated.paths" stripe>
+        <!-- 代码出处收进展开行：读者要先看结论，给开发者的坐标放在随手可得但不挡路的地方。
+             M7 F-8：此前它是一整列（260px），与「扣住/不扣」并排，把主结论稀释掉了。
+             / The code coordinates moved into an expandable row: available, but not in the reading path. -->
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="text-12px mb-4px">{{ t('keelbase.boundary.sourceTitle') }}</div>
+            <div v-for="s in row.sources" :key="s" class="text-12px text-[var(--el-text-color-secondary)]">{{ s }}</div>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('keelbase.boundary.colPath')" min-width="190">
           <template #default="{ row }">{{ t(`keelbase.boundary.path.${row.id}`) }}</template>
         </el-table-column>
@@ -93,12 +145,6 @@
         <el-table-column :label="t('keelbase.boundary.colGap')" min-width="300">
           <template #default="{ row }">{{ t(`keelbase.boundary.gap.${row.gap}`) }}</template>
         </el-table-column>
-        <!-- 代码出处（`文件:行`）与产物同源，读者可自己核对。 / the code coordinates, from the same record. -->
-        <el-table-column :label="t('keelbase.boundary.colSource')" min-width="260">
-          <template #default="{ row }">
-            <div v-for="s in row.sources" :key="s" class="text-12px text-[var(--el-text-color-secondary)]">{{ s }}</div>
-          </template>
-        </el-table-column>
       </el-table>
 
       <!-- 它扣不住的：独立成块，读者从上到下走一遍就能读到上游那条路与「只差一个 bean」的告诫。
@@ -106,22 +152,25 @@
       <!-- Not held by it: its own block, so a reader walking the page top to bottom meets upstream's
            path and the "one bean away" warning. The content comes from `stated.notHeld`, the path name
            from `path.<id>` — the same record as the table above; the page derives nothing new. -->
-      <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.notHeldTitle') }}</div>
-      <div class="text-12px mb-4px">{{ t('keelbase.boundary.notHeldWhat') }}</div>
-      <div class="mb-4px">
-        <el-tag size="small" effect="plain">
-          {{ t(`keelbase.boundary.path.${boundary.stated.notHeld.id}`) }}
-        </el-tag>
-      </div>
-      <div class="text-12px text-[var(--el-text-color-secondary)] mb-6px">
-        {{ t('keelbase.boundary.notHeldWhy') }}
-      </div>
-      <el-alert
-        v-if="boundary.stated.notHeld.oneBeanAway"
-        type="warning"
-        :closable="false"
-        :title="t('keelbase.boundary.notHeldOneBean')"
-      />
+      <!-- M7 F-10：这一段原来是一整段可以逐字照抄的散文；读者抄下来就算答对。改成四条带标签的事实，
+           每一行各自回答一个问题，抄一整段不再能替代理解。 / Was one copyable paragraph; now four labelled facts. -->
+      <div class="font-medium mt-16px mb-6px">{{ t('keelbase.boundary.notHeldTitle') }}</div>
+      <el-descriptions :column="1" border size="small">
+        <el-descriptions-item :label="t('keelbase.boundary.notHeldWho')">
+          <el-tag size="small" effect="plain">
+            {{ t(`keelbase.boundary.path.${boundary.stated.notHeld.id}`) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('keelbase.boundary.notHeldHow')">
+          {{ t('keelbase.boundary.notHeldWhat') }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('keelbase.boundary.notHeldWhyLabel')">
+          {{ t('keelbase.boundary.notHeldWhy') }}
+        </el-descriptions-item>
+        <el-descriptions-item v-if="boundary.stated.notHeld.oneBeanAway" :label="t('keelbase.boundary.notHeldWhenLabel')">
+          {{ t('keelbase.boundary.notHeldOneBean') }}
+        </el-descriptions-item>
+      </el-descriptions>
 
       <!-- 会绕过它的 bean：有才画，且是这一页唯一「坏了」的样子 / only when there are any -->
       <template v-if="boundary.computed.offenders.length">
@@ -136,7 +185,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 
@@ -182,6 +231,20 @@ function postureTagType(posture: PathRow['posture']): 'success' | 'warning' | 'd
 const boundary = ref<Boundary | null>(null)
 const error = ref('')
 const missing = ref(false)
+
+/** 按 `posture` 把五条路径归成两个集合：受治理的（含部分）与完全不设防的。
+ *  只是分组，不重算 —— 与表格同一份记录。 / Grouped by `posture`; nothing is recomputed. */
+const heldPathIds = computed(() =>
+  (boundary.value?.stated.paths ?? [])
+    .filter((p) => p.posture === 'governed' || p.posture === 'partially-governed')
+    .map((p) => p.id)
+)
+const notHeldPathIds = computed(() =>
+  (boundary.value?.stated.paths ?? []).filter((p) => p.posture === 'not-governed').map((p) => p.id)
+)
+function postureOf(id: string): PathRow['posture'] {
+  return (boundary.value?.stated.paths ?? []).find((p) => p.id === id)?.posture ?? 'not-governed'
+}
 
 // The UI build lays this file in from the gate's own `--emit`; nothing here recomputes it. `no-store`
 // because a console that showed a remembered boundary would be showing a build that is no longer the one

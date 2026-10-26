@@ -29,7 +29,11 @@ public class AuthLoginReqVO extends CaptchaVerificationReqVO {
 
     @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED, example = "buzhidao")
     @NotEmpty(message = "密码不能为空")
-    @Length(min = 4, max = 16, message = "密码长度为 4-16 位")
+    // KeelBase 的演示口令 `Admin@2026$KeelBase` 是 18 位；4-16 的上限让它连提交都过不去（实测 400）。
+    // 登录放宽到 30；注册与改密各自的 DTO 不动。
+    // KeelBase's demo password is 18 characters; the previous 4-16 ceiling rejected it before any
+    // comparison (measured: HTTP 400). Login is widened to 30; register and change-password are untouched.
+    @Length(min = 4, max = 30, message = "密码长度为 4-30 位")
     private String password;
 
     // ========== 绑定社交登录时，需要传递如下参数 ==========

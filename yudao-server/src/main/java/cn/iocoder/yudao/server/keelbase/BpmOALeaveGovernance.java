@@ -130,7 +130,8 @@ public class BpmOALeaveGovernance implements GovernedModule {
         Object[] args = call.getArgs();
         if (caller != null && args.length >= 1 && args[0] instanceof Long id) {
             BpmOALeaveDO existing = mapper.selectById(id);
-            scope.requireOwned(existing == null ? null : String.valueOf(existing.getUserId()), caller);
+            scope.requireOwned(existing == null ? null : String.valueOf(existing.getUserId()),
+                    caller, "OaLeave", "update");
         }
         return call.proceed();
     }

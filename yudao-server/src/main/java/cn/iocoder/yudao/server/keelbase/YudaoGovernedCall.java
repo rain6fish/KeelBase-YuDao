@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package cn.iocoder.yudao.server.keelbase;
 
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 import cn.com.keelbase.runtime.identity.ActingCaller;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import java.util.concurrent.Callable;
@@ -11,8 +12,8 @@ import org.springframework.security.access.AccessDeniedException;
  *
  * <p><b>它补的是什么。</b>宿主把一次受治理的写包在 {@link TenantUtils#execute(Long, Callable)} 里，而那个重载
  * 的收尾是 `catch (Exception e) { throw new RuntimeException(e); }`。切面（如
- * {@code CrmCustomerGovernance.requireOwnership}）在 {@code call.proceed()} **之前**抛的
- * {@link AccessDeniedException} 因此被**压平**成一层裸 `RuntimeException`；而运行时那句
+ * {@code CrmCustomerGovernance.requireOwnership}）在 {@code call.proceed()} **之前**抛的**拒绝**因此被
+ * **压平**成一层裸 `RuntimeException`；而运行时那句
  * 「一次失败**证明**没落库就释放认领」（`provesNothingLanded`）只认**裸类型**，认不出被压平的 ⇒ 一次被拒的写，
  * 在 `write_claims` 里留下一条 `effect_id is null` 的 `claimed` 行。
  *
@@ -28,7 +29,7 @@ import org.springframework.security.access.AccessDeniedException;
  *
  * <p><b>What it repairs.</b> The host runs a governed write inside
  * {@link TenantUtils#execute(Long, Callable)}, whose tail is
- * `catch (Exception e) { throw new RuntimeException(e); }`. An {@link AccessDeniedException} the aspect
+ * `catch (Exception e) { throw new RuntimeException(e); }`. A refusal the aspect
  * (e.g. {@code CrmCustomerGovernance.requireOwnership}) raises <em>before</em> {@code call.proceed()} is
  * therefore flattened into a bare `RuntimeException`, and the runtime's "the failure proves nothing
  * landed, release the claim" (`provesNothingLanded`) names the bare type only — so a refused write
@@ -61,10 +62,33 @@ public final class YudaoGovernedCall {
         try {
             return ActingCaller.as(userId, () -> TenantUtils.execute(YudaoCallerTenant.current(), body));
         } catch (RuntimeException failed) {
-            if (failed.getCause() instanceof AccessDeniedException refusal) {
-                throw refusal;
-            }
-            throw failed;
+            throw refusalInsideOneLayer(failed);
         }
+    }
+
+    /**
+     * The failure as it should reach the runtime: the refusal itself when the tenant wrapper is all that
+     * stands in front of it, otherwise the failure unchanged.
+     *
+     * <p><b>Two refusal types, not one.</b> {@link AccessDeniedException} is Spring Security's, and
+     * {@link RuleDeniedException} is the runtime's own — the row gate raises the second, and the tenant
+     * wrapper flattens it exactly as it flattens the first. Recognising only the first was measured as a
+     * regression: the runtime could no longer see the refusal, so it never released the write claim and
+     * the refused call left a `claimed` row behind. Both are handed back as themselves, for the same
+     * reason and with the same one-layer rule.
+     *
+     * <p>被租户包装挡住时交回**拒绝本身**，否则原样交回失败。
+     *
+     * <p><b>是两种拒绝，不是一种。</b>{@link AccessDeniedException} 是 Spring Security 的，
+     * {@link RuleDeniedException} 是运行时自己的 —— 行闸抛的是后者，而租户那层对它的压平与对前者的**一模一样**。
+     * 只认前者是**被量出来的**回归：运行时再也看不见这次拒绝，于是从不释放写声明，被拒的调用在 `write_claims`
+     * 里留下一条 `claimed` 行。两者都原样交回，理由相同、只拆一层的规则也相同。
+     */
+    static RuntimeException refusalInsideOneLayer(RuntimeException failed) {
+        Throwable cause = failed.getCause();
+        if (cause instanceof AccessDeniedException || cause instanceof RuleDeniedException) {
+            return (RuntimeException) cause;
+        }
+        return failed;
     }
 }

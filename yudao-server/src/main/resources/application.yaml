@@ -213,7 +213,7 @@ yudao:
     siliconflow: # 硅基流动
       enable: true
       api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
-      model: deepseek-ai/DeepSeek-V4-Pro
+      model: deepseek-ai/DeepSeek-V4-Flash
     xinghuo: # 讯飞星火
       enable: true
       api-key: ${XINGHUO_API_KEY:sk-xxxx}

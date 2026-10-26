@@ -14,7 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.AccessDeniedException;
+import cn.com.keelbase.runtime.authz.RuleDeniedException;
 
 /**
  * 「要不要收束这个人」的四种答案、以及收束时的三个原语。所有模块切面共用这一份，故它错一次会同时放宽好几个模块。
@@ -102,15 +102,23 @@ class YudaoModuleScopeTest {
 
     @Test
     void anothersRowIsRefused() {
-        assertThrows(AccessDeniedException.class, () -> scope.requireOwned("43", CALLER));
+        RuleDeniedException refused = assertThrows(RuleDeniedException.class,
+                () -> scope.requireOwned("43", CALLER, "Customer", "update"));
+        // What the caller can act on: which action on which subject was refused, and that no basis is
+        // claimed — the frozen permission-decision defines none for a row denial.
+        // 调用方能据以行动的部分：对哪个主体、哪个动作被拒；以及**不声称依据**——冻结的
+        // permission-decision 对行拒绝没有定义依据。
+        assertEquals("Customer", refused.subject());
+        assertEquals("update", refused.action());
+        assertNull(refused.deniedBy(), "a row denial claims no basis");
     }
 
     @Test
     void theCallersOwnRowAndAMissingRowBothPass() {
-        assertDoesNotThrow(() -> scope.requireOwned("42", CALLER));
+        assertDoesNotThrow(() -> scope.requireOwned("42", CALLER, "Customer", "update"));
         // 一行不存在时交给模块自己答 —— 切面分不出「没有」与「不是你的」，也不该去分。
         // A row that is not there is left to the module; the aspect cannot tell it from "not yours".
-        assertDoesNotThrow(() -> scope.requireOwned(null, CALLER));
+        assertDoesNotThrow(() -> scope.requireOwned(null, CALLER, "Customer", "update"));
     }
 
     @Test

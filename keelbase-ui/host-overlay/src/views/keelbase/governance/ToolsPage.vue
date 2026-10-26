@@ -45,6 +45,8 @@
     <!-- 覆盖声明（`D57`）：这一页读到哪、到不了哪些路径 —— 只写事实。 -->
     <!-- Coverage statement (`D57`): what this page reads, and which paths it cannot reach. -->
     <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.effectsLedger') }}</div>
+    <!-- F-15：这行说明原来只放在表头的 `title` 悬浮提示里，读者根本看不到。挪到页面上。 -->
+    <div class="mb-8px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.effects.columnsHint') }}</div>
     <el-table v-loading="loading" :data="rows" stripe>
       <!-- Opened, this row lays out the record the write landed on. Here the row **is** the effect, so
            the two trails agree without a guess. The record's own text is masked — what a record is
@@ -91,8 +93,19 @@
           {{ maskTitle(row.targetTitle) }} <span class="muted">#{{ row.resultId ?? '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('keelbase.effects.colResultType')" prop="resultType" width="150" />
-      <el-table-column :label="t('keelbase.effects.colRevokeClass')" prop="revokeClass" width="150" />
+      <!-- F-4：两列原来直接把枚举值打在表上（`crm_customer` / `local_compensate`），读者不知道是什么。
+           表头给一句取值说明，可撤档位按词条译成人话；未知取值仍原样显示，不隐藏。 -->
+      <el-table-column :label="t('keelbase.effects.colResultType')" prop="resultType" width="180">
+        <template #header>
+          <span :title="t('keelbase.effects.colResultTypeHint')">{{ t('keelbase.effects.colResultType') }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column :label="t('keelbase.effects.colRevokeClass')" width="180">
+        <template #header>
+          <span :title="t('keelbase.effects.colRevokeClassHint')">{{ t('keelbase.effects.colRevokeClass') }}</span>
+        </template>
+        <template #default="{ row }">{{ revokeClassText(row.revokeClass) }}</template>
+      </el-table-column>
       <el-table-column :label="t('keelbase.effects.colStatus')" width="120" align="center">
         <template #default="{ row }">
           <el-tag :type="row.status === 'revoked' ? 'info' : 'success'" size="small">
@@ -135,7 +148,14 @@ import { useConsoleWriteAllowed } from '@/keelbase/consoleRole'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+/** F-4：可撤档位按词条译成人话；四个取值之外的（运行时将来新增的）原样显示，不吞掉。 */
+function revokeClassText(value: string | null | undefined): string {
+  if (!value) return '—'
+  const key = `keelbase.effects.revokeClass.${value}`
+  return te(key) ? t(key) : value
+}
 /** The audit reader sees no write control (revoke); the server's verdict is unchanged. */
 /** 审计读者不出现写控件（撤销）；服务端裁决不变。 */
 const { canWrite } = useConsoleWriteAllowed()

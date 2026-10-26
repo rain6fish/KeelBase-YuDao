@@ -20,6 +20,9 @@
 #   console-pages        *a step inside `governance-registry`* — every page the assistant offers is a
 #                        route the menus we ship compose, so a curated list cannot quietly point at a
 #                        page that moved;
+#   identity-matrix      *a step inside `governance-registry`* — the nine-page identity matrix (which
+#                        role may open which governance page) is read off the seed SQL cell by cell, so
+#                        a grant line cannot reverse that table silently;
 #   generator            the committed generated files are still a Spec's output (`--check-boundary`)
 #                        and still what that Spec says (`--check`);
 #   family-block         the generated "KeelBase family" section at the top of this repository's
@@ -63,6 +66,8 @@
 #                        —— `YD-13` 让它**数得出来**的那个集合；
 #   console-pages        *`governance-registry` 里的一个 step* —— 助手提供的每一页，都是**我们发布的菜单**
 #                        解得出来的一条路径，策展清单因而不会悄悄指向一个已经挪走的页面；
+#   identity-matrix      *`governance-registry` 里的一个 step* —— 九页身份矩阵（哪个角色能开哪一页治理页）
+#                        从种子 SQL 逐格读出来，一条授予改不成「悄悄反转这张表」；
 #   generator            已提交的生成物仍是 Spec 的输出（`--check-boundary`）、且仍是那份 Spec 说的
 #                        东西（`--check`）；
 #   family-block         本仓 README 开头生成的「KeelBase 家族」段仍与生成时的戳相符 —— 副本自带哈希，
@@ -140,6 +145,17 @@ jobs:
       - name: The boundary page must draw its not-held block, in both languages
         run: node --test scripts/boundary-page.test.mjs
 
+      # 「面向读者」还有更宽的一半：消息只是数据，标记不会被解释、只会被打印。2026-10-25 走查在决策轨迹的
+      # 覆盖声明与边界页的警示里都读到了字面的 `**` 和反引号。这道测试读中英两套词条、逐条走完每个叶子，
+      # 谁把标记写回消息里，它就红 —— 并报出是哪一套、哪个键。
+      #
+      # The reader-facing half has a wider form: a message is data, so a marker is printed rather than
+      # interpreted. The 2026-10-25 walk read literal `**` and backticks in the trace coverage line and
+      # in the boundary warning. This reads both bundles, every leaf, and turns red on whoever types a
+      # marker back into a message — naming the bundle and the key.
+      - name: No message prints Markdown at the reader
+        run: node --test scripts/i18n-no-markdown.test.mjs
+
       # 展开审计行是 M7 的证据面：展开块里调用的每个 helper 都必须在同一文件里有定义或导入。
       # 2026-10-25 实测：`toolRisk` 既没定义也没导入，展开任意一行时表体整块不渲染，而构建与既有门禁全绿。
       # The audit row's expansion is M7's evidence surface: every helper the expand block calls must
@@ -185,6 +201,19 @@ jobs:
       # 清单里，就是「页面变得到不了」的那种安静方式（YD-41 那几页就是这样丢的）。纯 Node。
       - name: The deployment's seed manifest must classify every SQL file and carry every menu it serves
         run: node scripts/check-seed-list.mjs
+
+      # The nine-page identity matrix (issue `rain6fish/KeelBase-YuDao#2`) says which role may open
+      # which governance page: the audit reader gets all but the conversation trace and the showcase,
+      # the ordinary role gets the caller-scoped pages, and the showcase goes to nobody. Grants are
+      # spread over several seed files in three matching shapes (role by code, role by id, menu by
+      # path), so one line can flip a cell while nothing else notices. This reads the seed text and
+      # compares the matrix cell by cell; it starts no stack and opens no database. Pure Node.
+      # 九页身份矩阵（issue `rain6fish/KeelBase-YuDao#2`）说哪个角色能开哪一页治理页：审计读者拿到除决策
+      # 轨迹与对抗证明外的全部；普通角色拿到按调用方限范围的那几页；对抗证明谁也不给。授予散在几份种子文件里、
+      # 有三种匹配写法（角色按 code、角色按 id、菜单按路径），故一行就能翻转一格而别处毫无反应。这道检查读
+      # 种子文本、逐格比对矩阵；不起栈、不连库。纯 Node。
+      - name: The nine-page identity matrix must not be reversed by a grant change
+        run: node scripts/check-identity-matrix.mjs
 
       # `/app/capabilities` 的 `businessModules` 是**声明**而非运行时探测，前端据此显隐导航。本测试把它
       # 与部署的两处事实对账：种子清单里的 `load` / `skip`，以及 `module-scope.sql` 的保留清单。纯 Node、

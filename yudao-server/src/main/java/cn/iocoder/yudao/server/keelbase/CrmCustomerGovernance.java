@@ -161,7 +161,8 @@ public class CrmCustomerGovernance implements GovernedModule {
         Long caller = scope.callerToEnforce();
         if (caller != null && call.getArgs()[0] instanceof CrmCustomerSaveReqVO row && row.getId() != null) {
             CrmCustomerDO existing = mapper.selectById(row.getId());
-            scope.requireOwned(existing == null ? null : String.valueOf(existing.getOwnerUserId()), caller);
+            scope.requireOwned(existing == null ? null : String.valueOf(existing.getOwnerUserId()),
+                    caller, "Customer", "update");
         }
         return call.proceed();
     }
