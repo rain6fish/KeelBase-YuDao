@@ -639,7 +639,7 @@ const updateDeniedMarker = `${marker}-update-denied`;
   // `explanation` needs the runtime half (core 0.1.12): a row denial claims no basis, but it still names
   // the subject and the action it refused. These two ride with the pin bump — they are red while the pin
   // is still 0.1.11, which is exactly why they must not land before it moves.
-  check('拒绝点名主体', 'CrmCustomer', hijackDone.explanation?.subject);
+  check('拒绝点名主体', 'Customer', hijackDone.explanation?.subject);
   check('拒绝点名动作', 'update', hijackDone.explanation?.action);
   check('别人的行一字未改', adminMarker, psql(`select name from ${CUSTOMER} where id = ${adminRowId}`));
 
