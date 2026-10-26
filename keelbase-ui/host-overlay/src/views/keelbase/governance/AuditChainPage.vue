@@ -275,10 +275,12 @@ import {
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import {
   actionLabelKey,
+  executedMeaningKey,
   gateLabelKey,
   outcomeLabelKey,
   outcomeMeaningKey,
   outcomeTagType,
+  toolEffect,
   toolLabelKey,
 } from '@/keelbase/labels'
 import { resolveCallerNames } from '@/keelbase/callerNames'
@@ -476,10 +478,20 @@ function recordText(row: AuditRow): string {
   return `${parts.join(' · ')} ${t('keelbase.audit.matchNote')}`
 }
 
-/** What the outcome means, in one line — the part a single word cannot carry. */
-/** 这个结局**意味着什么**，一句话 —— 一个词载不动的那部分。 */
+/**
+ * 这个结局**意味着什么**，一句话 —— 一个词载不动的那部分。`executed` 按工具**自己声明的性质**分句
+ * （见 `toolEffect`）：一次查询并没有把一次写放进系统，而说它放了，正是这一页最不该给审计人员的读法。
+ *
+ * What the outcome means, in one line — the part a single word cannot carry. `executed` is split by what
+ * the tool itself declares (§ `toolEffect`): a query did not put a write into the system, and saying it
+ * did is the one reading this page must not give an auditor.
+ */
 function meaningText(row: AuditRow): string {
-  const key = outcomeMeaningKey(effectiveOutcome(row))
+  const outcome = effectiveOutcome(row)
+  if (outcome === 'executed') {
+    return t(executedMeaningKey(toolEffect(row.tool ? inventory.value[row.tool] : null)))
+  }
+  const key = outcomeMeaningKey(outcome)
   return key ? t(key) : ''
 }
 
