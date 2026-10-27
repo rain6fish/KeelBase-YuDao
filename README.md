@@ -2,6 +2,13 @@
 
 > Chinese: [README.zh-CN.md](README.zh-CN.md)
 
+<p align="center">
+  <a href="https://github.com/rain6fish/KeelBase-YuDao/actions/workflows/ci.yml"><img src="https://github.com/rain6fish/KeelBase-YuDao/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="NOTICE"><img src="https://img.shields.io/badge/License-MIT_%2B_Apache--2.0-blue.svg" alt="License: MIT (upstream host) + Apache-2.0 (KeelBase additions)"></a>
+  <img src="https://img.shields.io/badge/Java-25-informational" alt="Java 25">
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.0-informational" alt="Spring Boot 4.1.0">
+</p>
+
 **An enterprise application development platform built for AI** — hosted on
 [yudao / `ruoyi-vue-pro`](https://github.com/YunaiV/ruoyi-vue-pro), adding the KeelBase runtime:
 identity bridge, tool governance, confirmation, decision trace, audit and revoke.

@@ -2,6 +2,13 @@
 
 > 英文：[README.md](README.md)
 
+<p align="center">
+  <a href="https://github.com/rain6fish/KeelBase-YuDao/actions/workflows/ci.yml"><img src="https://github.com/rain6fish/KeelBase-YuDao/actions/workflows/ci.yml/badge.svg" alt="CI 状态"></a>
+  <a href="NOTICE"><img src="https://img.shields.io/badge/License-MIT_%2B_Apache--2.0-blue.svg" alt="许可：MIT（上游宿主）+ Apache-2.0（KeelBase 新增部分）"></a>
+  <img src="https://img.shields.io/badge/Java-25-informational" alt="Java 25">
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.0-informational" alt="Spring Boot 4.1.0">
+</p>
+
 **一个为 AI 而建的企业应用开发平台**——地基是 [芋道 / `ruoyi-vue-pro`](https://github.com/YunaiV/ruoyi-vue-pro)，
 在其上补 KeelBase 运行时：身份桥、工具治理、确认、决策轨迹、审计与撤销。
 
