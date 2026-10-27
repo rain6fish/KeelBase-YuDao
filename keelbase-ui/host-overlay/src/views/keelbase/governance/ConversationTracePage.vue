@@ -76,7 +76,14 @@
              disclosure and not as one more thing that happened. -->
         <!-- 一条 `notice` 步，是运行时在**披露**它放不进这里的东西，故按披露画、不按「又发生了一件事」画。 -->
         <el-tag v-else size="small" type="warning">{{ t('keelbase.trace.noticeTag') }}</el-tag>
-        <span class="step-content" :class="{ 'text-[var(--el-color-warning)]': s.type === 'notice' }">{{ stepTextOf(s) }}</span>
+        <div class="step-body">
+          <span class="step-content" :class="{ 'text-[var(--el-color-warning)]': s.type === 'notice' }">{{ stepTextOf(s) }}</span>
+          <!-- F-18：被拦下 / 失败的那一步，运行时自己的记录行在这里——它点名了成因。 -->
+          <!-- F-18: for a blocked or failed step, the runtime's own record line names the cause. -->
+          <span v-if="s.detail && s.success === false" class="step-detail">
+            {{ t('keelbase.trace.detailLine', { detail: s.detail }) }}
+          </span>
+        </div>
       </div>
     </div>
   </ContentWrap>
@@ -181,9 +188,20 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   min-width: 150px;
 }
-.step-content {
+.step-body {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.step-content {
   font-size: 13px;
+  word-break: break-word;
+}
+.step-detail {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
   word-break: break-word;
 }
 </style>

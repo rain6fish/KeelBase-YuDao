@@ -174,6 +174,21 @@
               <span class="d-key">{{ t('keelbase.audit.colDetail') }}</span>
               <span>{{ row.detail || '—' }}</span>
             </div>
+            <!-- F-18：运行时一直把「凭什么放行 / 凭什么拒绝」记在这一行上；页面此前没有画。 -->
+            <!-- F-18: the runtime has always recorded why this row was allowed or refused; the page never drew it. -->
+            <div v-if="checksOf(row).length" class="d-row">
+              <span class="d-key">{{ t('keelbase.audit.colChecks') }}</span>
+              <span>
+                <div class="muted">{{ t('keelbase.audit.checksNote') }}</div>
+                <div v-for="c in checksOf(row)" :key="c.name" class="check-row">
+                  <el-tag :type="c.ok ? 'success' : 'danger'" size="small">
+                    {{ c.ok ? t('keelbase.audit.checkPassed') : t('keelbase.audit.checkFailed') }}
+                  </el-tag>
+                  <span>{{ checkText(c.name) }}</span>
+                  <span v-if="c.note" class="muted">{{ c.note }}</span>
+                </div>
+              </span>
+            </div>
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colId') }}</span>
               <span>#{{ row.id }}</span>
@@ -276,6 +291,7 @@ import {
   effectApi,
   toolApi,
   type AuditRow,
+  type AuthorizationBasis,
   type ChainVerification,
   type CoverageStatement,
   type EffectRow,
@@ -396,6 +412,43 @@ const query = reactive<{ userId: string; isError: string }>({ userId: '', isErro
 function callerName(id: string | null | undefined): string {
   if (!id) return '—'
   return names.value[String(id)] ?? String(id)
+}
+
+/**
+ * The row's authorization basis, in whichever shape it arrives: this host sends the stored canonical
+ * JSON as a string, and the type also allows an already-parsed object. A string that does not parse
+ * is treated as no basis rather than as an empty one — the row still renders, and nothing is invented
+ * for it.
+ *
+ * 这一行的授权依据，到的是哪种形状都接住：本宿主把存下的规范 JSON 当字符串发，类型也允许已解析的对象。
+ * 解析不了的字符串当作**没有依据**、而不是空依据 —— 行照常渲染，也不替它编一个。
+ */
+function basisOf(row: AuditRow): AuthorizationBasis | null {
+  const raw = row.authorization
+  if (!raw) return null
+  if (typeof raw !== 'string') return raw
+  try {
+    return JSON.parse(raw) as AuthorizationBasis
+  } catch {
+    return null
+  }
+}
+
+/** The checks this row's gate recorded — empty when it recorded no basis. */
+/** 这一行的闸门记下的检查 —— 没有记下依据时为空。 */
+function checksOf(row: AuditRow) {
+  return basisOf(row)?.checks ?? []
+}
+
+/**
+ * A check's name in the reader's language. An unknown name falls back to the runtime's own word, so a
+ * vocabulary that widens does not need a frontend change to stay readable.
+ *
+ * 一道检查的名字，用读者的语言。不认识的名称回落到运行时自己的词，故词表放宽时前端不必跟着改。
+ */
+function checkText(name: string): string {
+  const key = `keelbase.audit.check.${name}`
+  return te(key) ? t(key) : name
 }
 
 function actionText(action: string | null | undefined): string {
@@ -679,6 +732,12 @@ onMounted(() => {
 .d-key {
   min-width: 72px;
   color: var(--el-text-color-secondary);
+}
+.check-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
 }
 .chain {
   display: flex;

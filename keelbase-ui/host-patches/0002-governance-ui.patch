@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,400 @@
+@@ -1,4 +1,442 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -39,6 +39,18 @@ index 96269a8..2611a9b 100644
 +      colResult: 'Result',
 +      colStatus: 'Status',
 +      colDetail: 'Detail',
++      colChecks: 'Checks',
++      checkPassed: 'passed',
++      checkFailed: 'failed',
++      checksNote: 'The checks this call passed or failed, as the runtime recorded them.',
++      check: {
++        risk_policy: 'Risk level (R5 is always blocked)',
++        tool_enabled: 'Enabled by governance policy',
++        role_allowed: 'Role allowlist',
++        feature_flag: 'Feature flag',
++        admin_only: 'Administrators only',
++        agent_read_only: 'Agent read-only',
++      },
 +      attemptedHint: 'records the attempt only — its outcome is on the adjacent row',
 +      toolDeclared: 'The tool says',
 +      meaning: 'What that means',
@@ -64,6 +76,35 @@ index 96269a8..2611a9b 100644
 +      argsLabel: 'This call would carry:',
 +      writesTitle: 'What the AI wrote for me',
 +      writesTotal: '{n} rows',
++      reasonImmediate: 'This write would change business data. The rules require your confirmation before it runs.',
++      reasonApproval: 'This is a high-impact action. The rules require a second person to approve it before it runs.',
++      reasonRun: 'This is a batch of actions. The rules require one approval for the whole batch before any of them run.',
++      stepConfirm: 'Step 2 · Confirmation gate',
++      stepExecute: 'Step 3 · Execution',
++      stepLedger: 'Step 4 · Side-effect ledger',
++      stepHere: 'stopped here',
++      stepWaitingYou: 'waiting on you',
++      stepWaitingOther: 'waiting on another approver',
++      stepRunning: 'running',
++      stepFailed: 'did not succeed',
++      historyTitle: 'Recent decisions',
++      historyCount: '{n} records',
++      historyEmpty: 'Nothing has been decided recently',
++      historyHint: 'Only confirmations you raised in the last 24 hours are listed; older ones are not on this page.',
++      stepReached: 'Step reached: {step}',
++      reasonLabel: 'Why: {reason}',
++      decidedLabel: 'Decided at: {at}',
++      outcomeApproved: 'Approved',
++      outcomeDeclined: 'Declined',
++      outcomeTimeout: 'Expired (nobody decided)',
++      outcomeExecuted: 'Executed',
++      outcomeFailed: 'Did not run',
++      approvedNotRun: 'Approved, but the write did not run: {reason}',
++      approvedNotRunUnknown: 'Approved, but the write did not run. The system recorded no reason.',
++      unknownReason: 'the system recorded no reason',
++      executedOk: 'Approved and executed.',
++      readOnlyNote: 'Your role is read-only, so there is no approve or decline here. Ask a colleague with write permission to decide it.',
++      notHereNote: 'An action the governance blocked outright does not appear here — it has no confirmation record; its reason is on the Audit chain page.',
 +    },
 +    effects: {
 +      colId: 'ID',
@@ -236,6 +277,7 @@ index 96269a8..2611a9b 100644
 +      close: 'Close',
 +      stepsTitle: 'Trace',
 +      noticeTag: 'disclosure',
++      detailLine: 'Record: {detail}',
 +    },
 +    opAudit: {
 +      title: 'Operations audit',
@@ -407,7 +449,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,395 @@
+@@ -1,4 +1,437 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -444,6 +486,18 @@ index 35f1e1a..856d201 100644
 +      colResult: '结果',
 +      colStatus: '状态',
 +      colDetail: '详情',
++      colChecks: '判定依据',
++      checkPassed: '通过',
++      checkFailed: '未通过',
++      checksNote: '这次调用通过或被拒的那几道检查，由运行时记下。',
++      check: {
++        risk_policy: '风险级（R5 恒阻断）',
++        tool_enabled: '治理策略是否启用',
++        role_allowed: '角色白名单',
++        feature_flag: '特性开关',
++        admin_only: '仅限管理员',
++        agent_read_only: 'agent 是否只读',
++      },
 +      attemptedHint: '只记「试过」——它的结局在相邻那一行',
 +      toolDeclared: '工具自述',
 +      meaning: '这意味着',
@@ -469,6 +523,35 @@ index 35f1e1a..856d201 100644
 +      argsLabel: '这次调用会带：',
 +      writesTitle: 'AI 替我写了什么',
 +      writesTotal: '{n} 行',
++      reasonImmediate: '这是一次会改动业务数据的写。规则要求你先确认，它才会执行。',
++      reasonApproval: '这是一次高影响动作。规则要求第二个人批准，它才会执行。',
++      reasonRun: '这是一批动作。规则要求一次性批准整批，它们才会执行。',
++      stepConfirm: '第 2 步 · 确认门控',
++      stepExecute: '第 3 步 · 执行',
++      stepLedger: '第 4 步 · 副作用登记',
++      stepHere: '停在这里',
++      stepWaitingYou: '等的是你',
++      stepWaitingOther: '等的是另一位审批人',
++      stepRunning: '正在执行',
++      stepFailed: '执行没有成功',
++      historyTitle: '最近裁决',
++      historyCount: '{n} 条记录',
++      historyEmpty: '最近没有裁决过的记录',
++      historyHint: '只列最近 24 小时内、由你本人发起的确认；更早的记录不在这一页。',
++      stepReached: '走到哪一步：{step}',
++      reasonLabel: '为什么：{reason}',
++      decidedLabel: '裁决时刻：{at}',
++      outcomeApproved: '已批准',
++      outcomeDeclined: '已拒绝',
++      outcomeTimeout: '已过期（没有人裁决）',
++      outcomeExecuted: '已执行',
++      outcomeFailed: '没执行成功',
++      approvedNotRun: '已批准，但没有执行成功：{reason}',
++      approvedNotRunUnknown: '已批准，但没有执行成功。系统没有记下原因。',
++      unknownReason: '系统没有记下原因',
++      executedOk: '已批准并执行成功。',
++      readOnlyNote: '你的角色只有读权限，所以这里没有批准或拒绝按钮。需要裁决时，请交给有写权限的同事。',
++      notHereNote: '被治理直接拦下的动作不会出现在这里 —— 它们没有确认记录，原因在「审计链」页上。',
 +    },
 +    effects: {
 +      colId: '编号',
@@ -638,6 +721,7 @@ index 35f1e1a..856d201 100644
 +      close: '关闭',
 +      stepsTitle: '轨迹',
 +      noticeTag: '披露',
++      detailLine: '记录：{detail}',
 +    },
 +    opAudit: {
 +      title: '操作审计',
