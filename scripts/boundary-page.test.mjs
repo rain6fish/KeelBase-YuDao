@@ -168,3 +168,23 @@ test('the gate record feeds the block: upstream-resolver, one bean away', () => 
   assert.match(gate, /id:\s*'upstream-resolver',\s*posture:\s*'not-governed'/, 'the paths row is not-governed');
   assert.match(gate, /id:\s*'upstream-resolver',[\s\S]*?gap:\s*'one-bean-away'/, 'the paths row carries the one-bean gap');
 });
+
+test('the gate record pins the SKILL path as partially governed, and names where', () => {
+  const gate = read(GATE);
+  const at = gate.indexOf("id: 'ai1-skill'");
+  assert.ok(at >= 0, 'stated.paths carries an ai1-skill entry');
+  const row = objectAt(gate, gate.lastIndexOf('{', at));
+
+  // 这一行是**手写数据**，不是扫描结果：删掉它、或把它改回「不受治理」，门禁本身都不会红 —— 故由这里红。
+  // The row is hand-written data rather than a scan result: deleting it, or declaring the path ungoverned
+  // again, would leave the gate itself green — so this is what goes red instead.
+  assert.match(row, /posture:\s*'partially-governed'/, 'the SKILL path is declared partially governed');
+  for (const held of ['authorization', 'identity', 'audit']) {
+    assert.match(row, new RegExp(`holds:\\s*\\[[^\\]]*'${held}'`), `the SKILL path holds ${held}`);
+  }
+  for (const missing of ['confirmation', 'side-effect-ledger']) {
+    assert.match(row, new RegExp(`doesNotHold:\\s*\\[[^\\]]*'${missing}'`), `the SKILL path does not hold ${missing}`);
+  }
+  assert.match(row, /gap:\s*'external-effect-no-ledger'/, 'the declared gap is an external effect with no ledger row');
+  assert.match(row, /Ai1SkillToolFactory\.java:\d+/, 'the row cites the assembly point it describes');
+});
