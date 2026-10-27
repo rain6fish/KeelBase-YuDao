@@ -416,23 +416,31 @@ function statusTag(status: string): 'success' | 'info' {
 
 async function loadPending() {
   pendingLoading.value = true
-  try {
-    // One call asks only for what is waiting; the other leaves `status` out, which is how the same
-    // endpoint answers the caller's decided rows. Splitting the two keeps the pending card honest if
-    // the history half ever fails: it is a separate face, not a wider filter on this one.
-    //
-    // 一次只问在等的那些；另一次不带 `status`，同一端点就会把调用方**已裁决**的行答回来。分成两次调用，
-    // 是为了让「历史」那一半万一失败时不影响「待决策」这一半：它是另一块面，不是这一块放宽的筛选。
-    const [waiting, all] = await Promise.all([confirmationApi.mine('pending'), confirmationApi.mine()])
-    pending.value = waiting
-    decided.value = all.filter((r) => r.status !== 'pending')
-  } catch (e) {
+  // One call asks only for what is waiting; the other leaves `status` out, which is how the same
+  // endpoint answers the caller's decided rows. The two are **settled independently**: a history read
+  // that fails (403, a broken envelope) must not empty the card that is waiting on the person — that
+  // card is the one they came to act on.
+  //
+  // 一次只问在等的那些；另一次不带 `status`，同一端点就会把调用方**已裁决**的行答回来。两次**各自结算**：
+  // 「历史」那一半失败（403、坏信封）不得把「等这个人处理」的那张卡清空 —— 那张卡正是他来这里要做的事。
+  const [waiting, all] = await Promise.allSettled([confirmationApi.mine('pending'), confirmationApi.mine()])
+  if (waiting.status === 'fulfilled') {
+    pending.value = waiting.value
+  } else {
     pending.value = []
-    decided.value = []
-    ElMessage.error(runtimeErrorMessage(e, t('keelbase.common.loadFailed')))
-  } finally {
-    pendingLoading.value = false
+    ElMessage.error(runtimeErrorMessage(waiting.reason, t('keelbase.common.loadFailed')))
   }
+  if (all.status === 'fulfilled') {
+    decided.value = all.value.filter((r) => r.status !== 'pending')
+  } else {
+    decided.value = []
+    // Say it once: if the pending half already reported, a second toast would describe the same outage.
+    // 只说一次：待决那一半已经报过时，再来一条只是在描述同一次故障。
+    if (waiting.status === 'fulfilled') {
+      ElMessage.warning(runtimeErrorMessage(all.reason, t('keelbase.common.loadFailed')))
+    }
+  }
+  pendingLoading.value = false
 }
 
 async function loadEffects() {

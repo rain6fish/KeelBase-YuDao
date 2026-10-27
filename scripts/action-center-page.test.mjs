@@ -37,8 +37,13 @@ const patch = read('keelbase-ui/host-patches/0002-governance-ui.patch')
 test('the recent-decisions list asks for decided rows and drops the pending ones', () => {
   assert.match(
     actionCenter,
-    /confirmationApi\.mine\('pending'\),\s*confirmationApi\.mine\(\)/,
-    'the page no longer asks for the caller\'s decided rows',
+    /Promise\.allSettled\(\[confirmationApi\.mine\('pending'\),\s*confirmationApi\.mine\(\)\]\)/,
+    'the two reads no longer settle independently — a history failure would empty the pending card',
+  )
+  assert.match(
+    actionCenter,
+    /if \(waiting\.status === 'fulfilled'\)/,
+    'the pending half is no longer filled only from its own result',
   )
   assert.match(
     actionCenter,
