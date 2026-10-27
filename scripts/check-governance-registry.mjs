@@ -44,8 +44,11 @@
 //      的治理（本宿主上就是 MCP 那条）；⑤ 声明 `public List<…> buildTools(…)` 的类——`ai1` 的 `harness` 里**把工具装配给
 //      一次会话**的地方（本宿主上两条：MCP 那条的装配端，与 SKILL 那条）。它必须**登记**：或者自己 `implements GovernedPath`
 //      （`kind()` 为 `TOOL`），或者在 `GovernedToolFaces.java` 这份手写目录里被按类名列出（生成面与 `ai1` 那两处走这条）。
-//      **⚠ ⑤ 只读「装配端」。** 那两处装出来的工具交给模型调，而**调用发生在库内部、宿主侧没有可切的 public 方法**
-//      ⇒ 「这条路受不受治理」**不在**这个形状里：SKILL 那条（`ShellTools` 在服务器上跑 shell）**今天一条治理缝都没有**。
+//      **⚠ ⑤ 只读「装配端」。** 那两处装出来的工具交给模型调，而「这条路受不受治理」**不在**这个形状里 —— 它是
+//      `stated.paths` 里的一条**声明**（`check-ungoverned-tool-beans.mjs`），由 `boundary-page.test.mjs` 钉住。
+//      **更正（2026-10-27；原文「今天一条治理缝都没有」保留、已过期）**：SKILL 那条自 `63bbba70a1` 起经
+//      `Ai1ToolGovernor` 进引擎（`Ai1SkillToolFactory.buildTools` 收治理器、缺则抛），姿态记为
+//      `partially-governed`：**有**授权 / 身份 / 审计，**无**确认、**无**副作用台账。
 //   * `workflow` / `scheduled-task` —— 今天本宿主上**一条都没有**；形状写在下面，空缺**明说**而不是省略。一条流程若出现，
 //      它应 `implements GovernedPath` 并报 `WORKFLOW`；一个定时任务同理报 `SCHEDULED_TASK`。
 //
@@ -105,10 +108,13 @@
 //       assembling end, and the SKILL path). It must declare itself (`implements GovernedPath`,
 //       `kind()` = `TOOL`) or be listed by class name in the hand-written `GovernedToolFaces.java`
 //       catalogue (the generated face, and those two, go this way).
-//       **⚠ ⑤ reads the assembling end only.** What it assembles is handed to a model, and **the call
-//       happens inside a library, with no host-side public method to advise** — so "is this path
-//       governed?" is *not* in this shape: the SKILL path (`ShellTools` runs shell on the server) has
-//       **no governance seam at all** today.
+//       **⚠ ⑤ reads the assembling end only.** What it assembles is handed to a model, but "is this path
+//       governed?" is *not* in this shape — it is a **declaration** in `stated.paths`
+//       (`check-ungoverned-tool-beans.mjs`), pinned by `boundary-page.test.mjs`.
+//       **Corrected 2026-10-27 (the former "no governance seam at all today" is stale):** since
+//       `63bbba70a1` the SKILL path goes through `Ai1ToolGovernor` — `Ai1SkillToolFactory.buildTools`
+//       takes a governor and throws without one — and is declared `partially-governed`: authorization,
+//       identity and audit held; confirmation and the side-effect ledger not.
 //   * `workflow` / `scheduled-task` — there are none on this host today; the shapes are stated and the
 //       emptiness is said rather than omitted.
 //

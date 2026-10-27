@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.ai1.harness.skill;
 
+import cn.com.keelbase.runtime.engine.ExecutionOutcome;
 import cn.hutool.core.io.FileUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
@@ -43,6 +44,13 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
     private static final Long AGENT_ID = 1L;
     private static final Long SKILL_ID = 10L;
     private static final String SKILL_CONTENT = "---\nname: pdf-reader\ndescription: 读取 PDF\n---\n\n# pdf-reader\n";
+
+    /**
+     * The governor's answer, so the test can tell it from anything a SKILL delegate would return.
+     *
+     * 治理器的回答，用来与任何 SKILL delegate 的返回区分。
+     */
+    private static final String GOVERNED_MARKER = "GOVERNED-BY-THE-ENGINE";
 
     @InjectMocks
     private Ai1SkillToolFactory skillToolFactory;
@@ -160,6 +168,56 @@ public class Ai1SkillToolFactoryTest extends BaseMockitoUnitTest {
         // 调用，并断言
         assertTrue(skillToolFactory.buildTools(new Ai1AgentDO().setId(AGENT_ID).setSkillIds(List.of()), null, governor).isEmpty());
         verify(skillService, never()).getSkillList(anyCollection());
+    }
+
+    /**
+     * A factory with no governor must fail rather than quietly assemble a path that bypasses the engine.
+     *
+     * 没有治理器的工厂必须失败，而不是悄悄装出一条绕过引擎的路。
+     */
+    @Test
+    public void testBuildTools_noGovernor_fails() {
+        mockSkill(CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.of(2026, 10, 1, 10, 0));
+        mockSkillFiles("echo hi");
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> skillToolFactory.buildTools(buildAgent(), null, null));
+        assertTrue(error.getMessage().contains("must run through governance"));
+    }
+
+    /**
+     * The callbacks the model receives keep the tool's own name, and every call reaches the governor: the body is
+     * the governed execute, not the SKILL's own delegate.
+     *
+     * 模型收到的回调保留工具自己的名字，而每次调用都先到治理器：执行体是受治理的 execute，不是 SKILL 自己的 delegate。
+     */
+    @Test
+    public void testBuildTools_everyCallReachesTheGovernor() {
+        mockSkill(CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.of(2026, 10, 1, 10, 0));
+        mockSkillFiles("echo hi");
+        List<String> executed = new ArrayList<>();
+        Ai1ToolGovernor recording = new Ai1ToolGovernor() {
+            @Override
+            public void registerAll(List<Ai1GovernedTool> tools) {
+                registered.addAll(tools);
+            }
+
+            @Override
+            public Ai1GovernedOutcome execute(String name, Map<String, Object> args, Long caller, Long sessionId) {
+                executed.add(name);
+                return new Ai1GovernedOutcome(ExecutionOutcome.executed(GOVERNED_MARKER, null));
+            }
+        };
+
+        List<ToolCallback> tools = skillToolFactory.buildTools(buildAgent(), null, recording);
+        assertFalse(tools.isEmpty());
+        for (ToolCallback tool : tools) {
+            // Spring AI serialises the body's String as JSON, so the marker arrives quoted.
+            // Spring AI 会把执行体返回的 String 序列化成 JSON，故标记串到达时带引号。
+            assertTrue(tool.call("{}").contains(GOVERNED_MARKER),
+                    "the model sees the governor's answer, not a delegate's");
+        }
+        assertEquals(registered.stream().map(Ai1GovernedTool::name).toList(), executed);
     }
 
     @Test
