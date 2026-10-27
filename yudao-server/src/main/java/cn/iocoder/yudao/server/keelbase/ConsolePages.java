@@ -153,7 +153,7 @@ public class ConsolePages {
         public String description() {
             StringBuilder sb = new StringBuilder();
             sb.append("Open a page of the administration console and let the console navigate to it. ")
-                    .append("Pass one `page` key from the list below, then say which page you opened ")
+                    .append("Pass one page key from the list below, then say which page you opened ")
                     .append("instead of only claiming that you did. Pages: ");
             for (int i = 0; i < PAGES.size(); i++) {
                 Page page = PAGES.get(i);

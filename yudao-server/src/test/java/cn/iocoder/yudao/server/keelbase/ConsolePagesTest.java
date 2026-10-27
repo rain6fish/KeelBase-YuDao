@@ -64,6 +64,14 @@ class ConsolePagesTest {
         assertFalse(tool.execute(Map.of(), principal()).success());
     }
 
+    @Test
+    void theToolsOwnWordsCarryNoMarkdownMarkers() {
+        String description = tool.description();
+
+        assertFalse(description.contains("`"), "the tool's description prints a backtick at the reader");
+        assertFalse(description.contains("**"), "the tool's description prints Markdown emphasis at the reader");
+    }
+
     private static Principal principal() {
         return new Principal("42", Principal.ROLE_USER);
     }
