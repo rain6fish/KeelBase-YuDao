@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,442 @@
+@@ -1,4 +1,443 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -103,6 +103,7 @@ index 96269a8..2611a9b 100644
 +      approvedNotRunUnknown: 'Approved, but the write did not run. The system recorded no reason.',
 +      unknownReason: 'the system recorded no reason',
 +      executedOk: 'Approved and executed.',
++      approvedNoResult: 'Approved, but no execution result came back.',
 +      readOnlyNote: 'Your role is read-only, so there is no approve or decline here. Ask a colleague with write permission to decide it.',
 +      notHereNote: 'An action the governance blocked outright does not appear here — it has no confirmation record; its reason is on the Audit chain page.',
 +    },
@@ -449,7 +450,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,437 @@
+@@ -1,4 +1,438 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -550,6 +551,7 @@ index 35f1e1a..856d201 100644
 +      approvedNotRunUnknown: '已批准，但没有执行成功。系统没有记下原因。',
 +      unknownReason: '系统没有记下原因',
 +      executedOk: '已批准并执行成功。',
++      approvedNoResult: '已批准，但没有拿到执行结果。',
 +      readOnlyNote: '你的角色只有读权限，所以这里没有批准或拒绝按钮。需要裁决时，请交给有写权限的同事。',
 +      notHereNote: '被治理直接拦下的动作不会出现在这里 —— 它们没有确认记录，原因在「审计链」页上。',
 +    },

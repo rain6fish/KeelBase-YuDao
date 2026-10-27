@@ -423,9 +423,9 @@ async function decide(token: string, decision: 'approve' | 'decline') {
           : '已批准，但没有执行成功。系统没有记下原因。',
       )
     } else {
-      // An older runtime answers nothing about execution; do not claim the write ran.
-      // 旧运行时对执行结果什么都不答；不要声称那次写已经跑过。
-      ElMessage.success('已批准')
+      // No answer about execution; say exactly that rather than announcing "approved".
+      // 对执行结果没有答复；就照实这么说，而不是宣布「已批准」。
+      ElMessage.warning('已批准，但没有拿到执行结果。')
     }
     await loadCards()
   } catch (e) {

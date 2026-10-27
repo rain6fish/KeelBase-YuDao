@@ -505,9 +505,11 @@ async function decide(item: ConfirmationItem, decision: 'approve' | 'decline') {
           : t('keelbase.actionCenter.approvedNotRunUnknown'),
       )
     } else {
-      // An older runtime answers nothing about execution; do not claim the write ran.
-      // 旧运行时对执行结果什么都不答；不要声称那次写已经跑过。
-      ElMessage.success(t('keelbase.actionCenter.approved'))
+      // No answer about execution (an older runtime, or an empty body). Say exactly that rather
+      // than announcing "approved" — the write below is the part we do not know.
+      // 对执行结果没有答复（旧运行时，或空正文）。就照实这么说，而不是宣布「已批准」—— 下面那件事
+      // 正是我们不知道的。
+      ElMessage.warning(t('keelbase.actionCenter.approvedNoResult'))
     }
     // An approval runs the write, so the ledger is refreshed alongside the pending list.
     // 批准会**真的执行**那笔写，故台账与待决列表一起刷新。

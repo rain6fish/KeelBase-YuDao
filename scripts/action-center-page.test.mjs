@@ -27,9 +27,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(join(ROOT, p), 'utf8')
 
 const actionCenter = read('keelbase-ui/host-overlay/src/views/keelbase/governance/ActionCenterPage.vue')
+const assistantPanel = read('keelbase-ui/host-overlay/src/views/keelbase/assistant/AssistantPanel.vue')
 const auditChain = read('keelbase-ui/host-overlay/src/views/keelbase/governance/AuditChainPage.vue')
 const trace = read('keelbase-ui/host-overlay/src/views/keelbase/governance/ConversationTracePage.vue')
 const api = read('keelbase-ui/host-overlay/src/keelbase/governanceApi.ts')
+const runtime = read('keelbase-ui/host-overlay/src/keelbase/runtime.ts')
 const patch = read('keelbase-ui/host-patches/0002-governance-ui.patch')
 
 test('the recent-decisions list asks for decided rows and drops the pending ones', () => {
@@ -91,7 +93,7 @@ test('both locale dictionaries carry every F-18 key', () => {
     'historyTitle', 'historyCount', 'historyEmpty', 'historyHint',
     'stepReached', 'reasonLabel', 'decidedLabel',
     'outcomeApproved', 'outcomeDeclined', 'outcomeTimeout', 'outcomeExecuted', 'outcomeFailed',
-    'approvedNotRun', 'approvedNotRunUnknown', 'unknownReason', 'executedOk',
+    'approvedNotRun', 'approvedNotRunUnknown', 'unknownReason', 'executedOk', 'approvedNoResult',
     'readOnlyNote', 'notHereNote',
     'colChecks', 'checkPassed', 'checkFailed', 'checksNote',
     'risk_policy', 'tool_enabled', 'role_allowed', 'feature_flag', 'admin_only', 'agent_read_only',
@@ -101,6 +103,27 @@ test('both locale dictionaries carry every F-18 key', () => {
     assert.ok(enKeys.has(key), `en.ts is missing ${key}`)
     assert.ok(zhKeys.has(key), `zh-CN.ts is missing ${key}`)
   }
+})
+
+test('a failed runtime envelope is an error, not data', () => {
+  // Measured on the real stack: the host answers a failed decision as HTTP 200 with
+  // `{code:500,data:null,msg:'系统异常'}`. Unwrapping that without checking the code handed the page
+  // `null`, and it announced "approved" for a write the server had refused.
+  //
+  // 真栈实测：宿主把一次失败的裁决答成 HTTP 200 + `{code:500,data:null,msg:'系统异常'}`。不看码就拆信封
+  // 会把 `null` 交给页面，于是它对一次服务端已拒绝的写宣布了「已批准」。
+  assert.match(runtime, /ENVELOPE_OK_CODES/, 'the accepted success codes are no longer declared')
+  assert.match(
+    runtime,
+    /if \(!ENVELOPE_OK_CODES\.has\(p\.code\)\)/,
+    'a non-success envelope code is no longer rejected',
+  )
+  assert.match(actionCenter, /keelbase\.actionCenter\.approvedNoResult/, 'an empty answer is no longer reported honestly')
+  assert.match(
+    assistantPanel,
+    /ElMessage\.warning\('已批准，但没有拿到执行结果。'\)/,
+    'the assistant panel no longer stops short of claiming success',
+  )
 })
 
 test('the page no longer reports "approved" before the server answered', () => {
