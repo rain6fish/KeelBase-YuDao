@@ -8,13 +8,17 @@
 # authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
 # and the ai1 module's own tests run for real in `conformance`, below.
 #
-# Seven jobs, and each answers a question the others cannot (one carries a step that answers a
+# Eight jobs, and each answers a question the others cannot (one carries a step that answers a
 # question of its own, marked where it appears):
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
 #   governance-boundary  no bean of ours hands a tool to Spring AI, which is the fact `D42`'s
 #                        boundary rests on and is one `@Bean` away from no longer being true;
+#   rendered-copy        every line of copy this layer's UI **renders** — locale messages through
+#                        vue-i18n, templates through Vue's parser — carries no literal `**` or
+#                        backtick, so issue rain6fish/KeelBase-YuDao#3's class of defect reddens CI
+#                        rather than only a local build;
 #   governance-registry  every module this host governs declares itself, and the name it declares is
 #                        the one its own pointcuts point at — the set `YD-13` made countable;
 #   console-pages        *a step inside `governance-registry`* — every page the assistant offers is a
@@ -36,7 +40,9 @@
 #                        quoted; it is also where the host's Java tests and the ai1 module's own tests
 #                        run.
 #
-# All but `generator`, `governance-tests` and `conformance` are pure Node and finish in seconds.
+# All but `generator`, `governance-tests` and `conformance` are pure Node and finish in seconds, except
+# `rendered-copy`: it is pure Node too, but it fetches the UI checkout and installs the gate's four
+# packages, so it costs about a minute.
 # `generator` and `governance-tests` want a JDK 25 toolchain and a Maven build, so they cost minutes;
 # `generator` is kept to its two **offline** checks, and `governance-tests` to the governance package.
 #
@@ -56,12 +62,15 @@
 # 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试、以及 ai1
 # 模块自己的测试，都在下面的 `conformance` 里**真跑**。
 #
-# 七道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
+# 八道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
 #   governance-boundary  我们自己没有任何 bean 把工具交给 Spring AI —— `D42` 那条边界所倚的**事实**，
 #                        而它离「不再成立」只差一个 `@Bean`；
+#   rendered-copy        这一层界面**渲染出来**的每一行字——词条经 vue-i18n、模板经 Vue 自己的解析器——
+#                        都不带字面的 `**` 或反引号，故 issue rain6fish/KeelBase-YuDao#3 那一类缺陷在 CI
+#                        上就红，而不是只在本地构建里；
 #   governance-registry  本宿主治理的每个模块都**自报**，而它报的名字**就是**它自己 pointcut 所指的那一个
 #                        —— `YD-13` 让它**数得出来**的那个集合；
 #   console-pages        *`governance-registry` 里的一个 step* —— 助手提供的每一页，都是**我们发布的菜单**
@@ -77,8 +86,9 @@
 #   conformance          应用对着**跑着的栈**（PostgreSQL + Redis + 宿主）端到端符合，且四个治理率可读
 #                        —— 驱动门禁，不誊抄门禁；宿主的 Java 测试与 ai1 模块自己的测试也在这里跑。
 #
-# 前六道是 pure Node 或离线检查、几秒到几分钟。`generator` 与 `governance-tests` 要 JDK 25 工具链与
-# Maven 构建，以分钟计。第八道 `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
+# 其余各道是纯 Node 或离线检查、几秒到一分钟（`rendered-copy` 要拉一次界面检出、装门禁那四个包，故约
+# 一分钟）。`generator` 与 `governance-tests` 要 JDK 25 工具链与 Maven 构建，以分钟计。最后一道
+# `conformance` 是本文件里**唯一**需要一套**跑着的栈**的：
 # service containers 起 PostgreSQL（带 pgvector）与 Redis → 构建宿主 → 跑宿主的 Java 测试与 ai1 模块自己的
 # 测试 → 灌种子 → 起服务 → 等 `/actuator/health` → 跑 `scripts/run-app-conformance.mjs`。不起宿主直接调
 # 那些脚本，那不叫跑过它。
@@ -163,6 +173,208 @@ jobs:
       # expanding any row rendered no table body, while the build and every existing gate stayed green.
       - name: Every helper the audit row's expansion calls resolves
         run: node --test scripts/audit-chain-page.test.mjs
+
+  # 渲染级的文案门禁一直都在，只是**只跑在本地构建里**：`scripts/check-rendered-copy.mjs` 由
+  # `scripts/build-host-ui.sh` 的 2a 段调用，而 CI 上只有字符串级的 `scripts/i18n-no-markdown.test.mjs`
+  # ——它读词条文本，看不见模板，也看不见 vue-i18n 渲染之后的样子（issue `rain6fish/KeelBase-YuDao#3`
+  # 记的正是被原样画出来的 `**`）。这道 job 把同一条闸接进 CI：按 1b 段的顺序铺增量（删除清单 →
+  # 覆盖目录 → 补丁，依序），然后跑闸门。
+  #
+  # 它不装整套应用依赖：闸只要 vue、vue-i18n、`@vue/compiler-sfc` 与 `@vue/compiler-dom` 这几个包，而
+  # `check-rendered-copy.mjs` 是 `createRequire` 从 `<UI>/node_modules` 解析的。版本钉在检出自己的
+  # `package.json` + `pnpm-lock.yaml` 上（vue 3.5.34 / vue-i18n 11.4.0）：渲染行为取决于这两个包，版本
+  # 一漂，`t()` 与模板解析就不再是应用用的那一套。克隆之后那一步断言「检出声明的就是这里要装的」，故
+  # 抬界面钉却忘了抬版本会**响亮地**失败，而不是拿另一套渲染器验出一道假绿。
+  #
+  # 缺检出时闸门**退出 2**，而本 job 没有 `continue-on-error`、也不把闸包进 `|| true`：跳过在这条线上
+  # 就是假绿。末尾那条 self-check 把「缺检出必须是 2」也钉住，免得后来有人把它改成一个安静的 0。
+  #
+  # The rendered-copy gate has always existed, but it ran only in the local build:
+  # `scripts/check-rendered-copy.mjs` is called from `scripts/build-host-ui.sh` §2a, while CI had only the
+  # string-level `scripts/i18n-no-markdown.test.mjs` — which reads message text and can see neither the
+  # templates nor what vue-i18n renders (issue `rain6fish/KeelBase-YuDao#3` is exactly a `**` drawn
+  # literally). This job wires the same gate into CI: it lays the delta down in §1b's order (removals →
+  # overlay → patches), then runs the gate.
+  #
+  # It does not install the whole app: the gate needs vue, vue-i18n, `@vue/compiler-sfc` and
+  # `@vue/compiler-dom`, because `check-rendered-copy.mjs` resolves them through `createRequire` from
+  # `<UI>/node_modules`. The versions are pinned to the checkout's own `package.json` + `pnpm-lock.yaml`
+  # (vue 3.5.34 / vue-i18n 11.4.0): rendering behaviour is theirs, and a drift makes `t()` and the
+  # template parser something other than what the app runs. The step after the clone asserts that the
+  # checkout declares what this job installs, so raising the UI pin without raising these fails loudly
+  # instead of validating a green on a second renderer.
+  #
+  # With no checkout the gate **exits 2**, and this job carries no `continue-on-error` and never wraps
+  # the gate in `|| true`: a skip here is a false green. The self-check at the end pins the exit code too,
+  # so nobody can later turn it into a quiet 0.
+  rendered-copy:
+    name: No rendered line of copy carries a literal Markdown marker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UI_DIR: target/yudao-ui-admin-vue3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # 与 `build-host-ui.sh` §1 同形：钉住的是**提交**，不是分支——五份补丁是针对 `9bd6a91` 写的，
+      # 上游 master 一往前动，补丁就地失效。抬这个值必须**与补丁一起**做。
+      #
+      # Same shape as `build-host-ui.sh` §1: the pin is a **commit**, not a branch — the five patches
+      # were written against `9bd6a91`, and upstream moving on invalidates them. Raising this value is a
+      # deliberate edit made **together with** the patches.
+      - name: Fetch the pinned UI checkout
+        env:
+          UI_REPO: https://gitee.com/yudaocode/yudao-ui-admin-vue3.git
+          UI_MIRROR: https://github.com/yudaocode/yudao-ui-admin-vue3.git
+          UI_REF: 9bd6a91286573af70874ebd9c23d73177dd8001d
+        run: |
+          set -euo pipefail
+          # 主远端是 Gitee（与 `build-host-ui.sh` 的默认一致）；runner 上够不着它时退到 GitHub 镜像。
+          # 镜像也持有 `9bd6a91`（2026-10-27 在本机取过），故兜底是一件验过的事实，不是猜的——
+          # 一条拉不到检出就会永久变红的 job，与把闸留在本地没有区别。
+          #
+          # The primary remote is Gitee (the build script's own default); when a runner cannot reach it,
+          # fall back to the GitHub mirror. The mirror holds `9bd6a91` too (fetched locally on 2026-10-27),
+          # so the fallback is a measured fact rather than a guess — a job that can never fetch its
+          # checkout would be permanently red, which is no better than leaving the gate in the local build.
+          clone_from() {
+            rm -rf "$UI_DIR"
+            git clone --depth 1 "$1" "$UI_DIR"
+          }
+          if ! clone_from "$UI_REPO"; then
+            echo "could not clone $UI_REPO — trying the GitHub mirror" >&2
+            clone_from "$UI_MIRROR"
+          fi
+          git -C "$UI_DIR" fetch --depth 1 origin "$UI_REF"
+          git -C "$UI_DIR" checkout --quiet --detach FETCH_HEAD
+          # 铺补丁之前先把「钉」验证掉：对错了树，后面每一步都会以别种名目失败。
+          # Prove the pin before laying anything on it: against the wrong tree, every later step fails
+          # under some other name.
+          test "$(git -C "$UI_DIR" rev-parse HEAD)" = "$UI_REF"
+
+      # 检出的 `package.json` 声明 vue 3.5.34 / vue-i18n 11.4.0，与下面装的一致；不一致就红。
+      # The checkout's `package.json` declares vue 3.5.34 / vue-i18n 11.4.0, the same versions the step
+      # below installs; a disagreement is red.
+      #
+      # 装到一个**另起的空目录**再链进来，而不是在检出里 `npm install <pkg>`：后者会按检出自己的
+      # `package.json` 把整套应用依赖解一遍（以分钟计，且 npm 不认那份 pnpm lockfile），而闸只要这四个包。
+      # 链进来是因为闸从 `<UI>/node_modules` 解析；`realpathSync` 会跟过去，行为不受影响。
+      #
+      # Install into a separate empty directory and link it in, rather than `npm install <pkg>` inside the
+      # checkout: the latter resolves the app's **entire** dependency tree from that package.json (minutes,
+      # and npm does not honour the pnpm lockfile), while the gate needs four packages. It is linked in
+      # because the gate resolves from `<UI>/node_modules`; `realpathSync` follows the link, so behaviour
+      # is unchanged.
+      - name: Install the gate's rendering toolchain at the checkout's own versions
+        run: |
+          set -euo pipefail
+          node -e '
+            const pkg = require("./" + process.env.UI_DIR + "/package.json")
+            const want = { vue: "3.5.34", "vue-i18n": "11.4.0" }
+            let bad = false
+            for (const [name, version] of Object.entries(want)) {
+              const declared = (pkg.dependencies ?? {})[name] ?? (pkg.devDependencies ?? {})[name]
+              if (declared !== version) {
+                console.error(`${name}: the checkout declares ${declared}, this job installs ${version}`)
+                bad = true
+              }
+            }
+            if (bad) {
+              console.error("raise the UI pin and the patch set together, or move both versions together")
+              process.exit(1)
+            }
+            console.log("the checkout and the gate install the same vue and vue-i18n")
+          '
+          DEPS="$RUNNER_TEMP/rendered-copy-deps"
+          mkdir -p "$DEPS"
+          ( cd "$DEPS" && npm init --yes >/dev/null && \
+            npm install --no-audit --no-fund --ignore-scripts \
+              vue@3.5.34 vue-i18n@11.4.0 @vue/compiler-sfc@3.5.34 @vue/compiler-dom@3.5.34 )
+          ln -s "$DEPS/node_modules" "$UI_DIR/node_modules"
+
+      # 1b 段的三步，顺序就是那里的顺序：删除 → 覆盖 → 补丁。每一步都**响亮地失败**：路径不在了、
+      # 覆盖放不进去、补丁贴不上，说的都是上游动了、这份增量要重做——而不是跳过它、让检查对着半我们的树。
+      #
+      # §1b's three steps, in its order: removals → overlay → patches. Each fails **loudly**: a path that
+      # is gone, an overlay that cannot be placed, a patch that no longer applies — all of them mean
+      # upstream moved and this delta has to be revisited, never that it should be skipped and the gate
+      # run against a half-ours tree.
+      - name: Lay the delta down — removals, overlay, patches
+        run: |
+          set -euo pipefail
+          # 每个路径都用**绝对**路径，与 `build-host-ui.sh` 里 `REPO_ROOT` 打头的那份一致。原因很实在：
+          # `git -C <检出>` 会先把进程切到检出里再解析参数，故相对的补丁路径会在**检出内部**去找
+          # （本机第一次跑就是这么红的：`can't open patch 'keelbase-ui/…'`，被当成「补丁贴不上」）。
+          #
+          # Every path here is **absolute**, the way the `REPO_ROOT`-prefixed ones are in
+          # `build-host-ui.sh`. The reason is concrete: `git -C <checkout>` moves the process into the
+          # checkout before resolving arguments, so a relative patch path is looked for **inside the
+          # checkout** (the first local run went red exactly this way: `can't open patch 'keelbase-ui/…'`,
+          # reported as "the patch does not apply").
+          UI="$PWD/$UI_DIR"
+          OVERLAY="$PWD/keelbase-ui/host-overlay"
+          PATCHES="$PWD/keelbase-ui/host-patches"
+          REMOVALS="$PWD/keelbase-ui/host-removals.txt"
+
+          while IFS= read -r rel || [[ -n "$rel" ]]; do
+            rel="${rel#"${rel%%[![:space:]]*}"}"   # trim leading whitespace
+            rel="${rel%"${rel##*[![:space:]]}"}"   # trim trailing whitespace
+            [[ -z "$rel" || "$rel" == \#* ]] && continue
+            case "$rel" in
+              /* | *..*)
+                echo "removal list entry is not a plain repo-relative path: $rel" >&2
+                exit 1
+                ;;
+            esac
+            if [[ ! -e "$UI/$rel" ]]; then
+              echo "removal list names a path upstream no longer has: $rel" >&2
+              echo "upstream moved it — the removal list has to be revisited, not skipped" >&2
+              exit 1
+            fi
+            rm -rf "${UI:?}/$rel"
+            echo "removed $rel"
+          done < "$REMOVALS"
+
+          while IFS= read -r -d '' f; do
+            rel="${f#"$OVERLAY"/}"
+            mkdir -p "$(dirname "$UI/$rel")"
+            cp "$f" "$UI/$rel"
+            echo "added $rel"
+          done < <(find "$OVERLAY" -type f -print0)
+
+          for p in "$PATCHES"/*.patch; do
+            [[ -e "$p" ]] || continue
+            if ! git -C "$UI" apply --check "$p" 2>/dev/null; then
+              echo "patch does not apply cleanly: $(basename "$p")" >&2
+              echo "upstream changed the code it edits — the patch has to be rebased, not skipped" >&2
+              exit 1
+            fi
+            git -C "$UI" apply "$p"
+            echo "applied $(basename "$p")"
+          done
+
+      # 这一步就是 2a 段在 CI 上的那一份。缺检出时它退出 2，step 因而变红——不跳过、也不 `|| true`。
+      # This is §2a on CI. With no checkout it exits 2, which reddens the step — no skip, no `|| true`.
+      - name: No rendered line of copy may carry a literal `**` or a backtick
+        run: node scripts/check-rendered-copy.mjs "$UI_DIR"
+
+      # 「缺检出必须是红」这件事本身也得有人守：拿一个不存在的目录跑同一个闸，断言它退出 **2**。它防的是
+      # 后来有人把上面那条调用包进 `|| true`、或把闸改成一个安静的 0。
+      #
+      # The "a missing checkout must be red" fact needs a keeper of its own: run the same gate against a
+      # directory that is not there and require exit **2**. It is what stops a later edit from wrapping
+      # the call above in `|| true` or turning the gate into a quiet 0.
+      - name: A missing checkout exits 2, never reads as a skip
+        run: |
+          set +e
+          node scripts/check-rendered-copy.mjs "$RUNNER_TEMP/no-such-ui" >/dev/null 2>&1
+          rc=$?
+          set -e
+          echo "the gate exited $rc for a missing checkout"
+          test "$rc" = 2
 
   governance-registry:
     name: Every governed module declares itself
