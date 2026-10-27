@@ -669,10 +669,9 @@ index 5736a49..f4e5ea2 100644
  }
  
 diff --git a/src/views/Home/Index.vue b/src/views/Home/Index.vue
-index 5326389..4f5ad89 100644
 --- a/src/views/Home/Index.vue
 +++ b/src/views/Home/Index.vue
-@@ -6,15 +6,12 @@
+@@ -6,14 +6,11 @@
            <el-col :xl="12" :lg="12" :md="12" :sm="24" :xs="24">
              <div class="flex items-center">
                <el-avatar :src="avatar" :size="70" class="mr-16px">
@@ -682,14 +681,13 @@ index 5326389..4f5ad89 100644
                <div>
                  <div class="text-20px">
                    {{ t('workplace.welcome') }} {{ username }} {{ t('workplace.happyDay') }}
-                 </div>
+-                </div>
 -                <div class="mt-10px text-14px text-gray-500">
 -                  {{ t('workplace.toady') }}，20℃ - 32℃！
--                </div>
+                 </div>
                </div>
              </div>
-           </el-col>
-@@ -25,27 +22,27 @@
+@@ -25,30 +22,32 @@
                  <CountTo
                    class="text-20px"
                    :start-val="0"
@@ -698,31 +696,52 @@ index 5326389..4f5ad89 100644
                    :duration="2600"
                  />
                </div>
-               <el-divider direction="vertical" />
-               <div class="px-8px text-right">
+-              <el-divider direction="vertical" />
+-              <div class="px-8px text-right">
 -                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.toDo') }}</div>
-+                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiAccess') }}</div>
-                 <CountTo
-                   class="text-20px"
-                   :start-val="0"
+-                <CountTo
+-                  class="text-20px"
+-                  :start-val="0"
 -                  :end-val="totalSate.todo"
-+                  :end-val="totalSate.access"
-                   :duration="2600"
-                 />
-               </div>
-               <el-divider direction="vertical" border-style="dashed" />
-               <div class="px-8px text-right">
+-                  :duration="2600"
+-                />
+-              </div>
+-              <el-divider direction="vertical" border-style="dashed" />
+-              <div class="px-8px text-right">
 -                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.access') }}</div>
-+                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiError') }}</div>
-                 <CountTo
-                   class="text-20px"
-                   :start-val="0"
+-                <CountTo
+-                  class="text-20px"
+-                  :start-val="0"
 -                  :end-val="totalSate.access"
-+                  :end-val="totalSate.errors"
-                   :duration="2600"
-                 />
-               </div>
-@@ -57,19 +54,11 @@
+-                  :duration="2600"
+-                />
+-              </div>
++              <template v-if="canSeeApiLogs">
++                <el-divider direction="vertical" />
++                <div class="px-8px text-right">
++                  <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiAccess') }}</div>
++                  <CountTo
++                    class="text-20px"
++                    :start-val="0"
++                    :end-val="totalSate.access"
++                    :duration="2600"
++                  />
++                </div>
++                <el-divider direction="vertical" border-style="dashed" />
++                <div class="px-8px text-right">
++                  <div class="mb-16px text-14px text-gray-400">{{ t('workplace.apiError') }}</div>
++                  <CountTo
++                    class="text-20px"
++                    :start-val="0"
++                    :end-val="totalSate.errors"
++                    :duration="2600"
++                  />
++                </div>
++              </template>
+             </div>
+           </el-col>
+         </el-row>
+@@ -57,19 +56,11 @@
    </div>
  
    <el-row class="mt-8px" :gutter="8" justify="space-between">
@@ -743,7 +762,7 @@ index 5326389..4f5ad89 100644
            </div>
          </template>
          <el-skeleton :loading="loading" animated>
-@@ -103,17 +92,9 @@
+@@ -103,17 +94,9 @@
                  </div>
                  <div
                    class="mt-12px break-all line-clamp-2 text-12px text-gray-400"
@@ -763,7 +782,7 @@ index 5326389..4f5ad89 100644
                  </div>
                </el-card>
              </el-col>
-@@ -142,65 +123,17 @@
+@@ -142,73 +125,27 @@
          </el-skeleton>
        </el-card>
      </el-col>
@@ -832,8 +851,10 @@ index 5326389..4f5ad89 100644
 +import type { WorkplaceTotal, Project } from './types'
  import { pieOptions, barOptions } from './echarts-data'
  import { useRouter } from 'vue-router'
++import { checkPermi } from '@/utils/permission'
  
-@@ -209,6 +142,7 @@ defineOptions({ name: 'Index' })
+ defineOptions({ name: 'Index' })
+ 
  const { t } = useI18n()
  const router = useRouter()
  const userStore = useUserStore()
@@ -841,7 +862,7 @@ index 5326389..4f5ad89 100644
  // const { setWatermark } = useWatermark()
  const loading = ref(true)
  const avatar = userStore.getUser.avatar
-@@ -216,151 +150,48 @@ const username = userStore.getUser.nickname
+@@ -216,151 +153,57 @@
  const pieOptionsData = reactive<EChartsOption>(pieOptions) as EChartsOption
  // 获取统计数
  let totalSate = reactive<WorkplaceTotal>({
@@ -852,6 +873,14 @@ index 5326389..4f5ad89 100644
 +  errors: 0
  })
  
++// 首页这两格读的是基础设施日志，读者角色没有那两个权限。权限先问一次：没有就不发这两条请求，两格计数
++// 也一并收起（见模板）—— 今天它们是 403 之后回落出来的 0，那是个安静的错误读数。
++// The two figures read the infrastructure logs, which the reader roles may not read. The permission is
++// asked once up front: without it neither request is sent and both figures are hidden with it (see the
++// template) — today they are a zero that fell out of a 403, which is a quiet wrong reading.
++const canSeeApiLogs =
++  checkPermi(['infra:api-access-log:query']) && checkPermi(['infra:api-error-log:query'])
++
  const getCount = async () => {
 -  const data = {
 -    project: 40,
@@ -859,25 +888,28 @@ index 5326389..4f5ad89 100644
 -    todo: 10
 -  }
 -  totalSate = Object.assign(totalSate, data)
-+  // The two figures beside the module count are the interface's own: how many calls it has answered
-+  // and how many of them failed, read from the logs the infrastructure module keeps. Each falls back
-+  // to zero on its own — a rejected call would otherwise take the whole `Promise.all` down and leave
-+  // the dashboard on its skeletons forever.
-+  // 模块数旁边那两个数是接口自己的：它答过多少次调用、其中多少次失败——取自基础设施模块所记的日志。
-+  // 两者各自回落到 0——否则一个调用被拒会把整个 `Promise.all` 带下去，面板就永远停在骨架屏上。
-+  const [access, errors] = await Promise.all([
-+    getApiAccessLogPage({ pageNo: 1, pageSize: 1 })
-+      .then((res) => res?.total ?? 0)
-+      .catch(() => 0),
-+    getApiErrorLogPage({ pageNo: 1, pageSize: 1 })
-+      .then((res) => res?.total ?? 0)
-+      .catch(() => 0)
-+  ])
+-}
+-
+-// 获取项目数
++  // 没有权限就**不问**：那两条读会以 403 回来，拦截器随即把「没有该操作权限」弹成一条通知，读者一进
++  // 首页就被吓一跳。有权限时两者仍各自回落——一个被拒不会把整块面板拖成骨架屏。
++  // Without the permission nothing is asked: those two reads answer 403 and the interceptor turns that
++  // into a "no permission" toast the reader meets on landing. With it, each still falls back on its
++  // own, so one rejected call cannot leave the dashboard on its skeletons.
++  const [access, errors] = canSeeApiLogs
++    ? await Promise.all([
++        getApiAccessLogPage({ pageNo: 1, pageSize: 1 })
++          .then((res) => res?.total ?? 0)
++          .catch(() => 0),
++        getApiErrorLogPage({ pageNo: 1, pageSize: 1 })
++          .then((res) => res?.total ?? 0)
++          .catch(() => 0)
++      ])
++    : [0, 0]
 +  totalSate.access = access
 +  totalSate.errors = errors
- }
- 
--// 获取项目数
++}
++
 +// The system's own modules. Read from the routes the backend handed this user rather than listed by
 +// hand: a hand-written list drifts the moment a module is added or switched off, and the count above
 +// would go on reporting the old one. 系统自身的模块。取自后端发给该用户的路由，而不是手写一份：手写的
@@ -1026,7 +1058,7 @@ index 5326389..4f5ad89 100644
  }
  
  // 用户来源
-@@ -415,8 +246,6 @@ const getAllApi = async () => {
+@@ -415,8 +258,6 @@
    await Promise.all([
      getCount(),
      getProject(),
@@ -1035,7 +1067,7 @@ index 5326389..4f5ad89 100644
      getUserAccessSource(),
      getWeeklyUserActivity()
    ])
-@@ -424,11 +253,11 @@ const getAllApi = async () => {
+@@ -424,11 +265,11 @@
  }
  
  const handleProjectClick = (message: string) => {
