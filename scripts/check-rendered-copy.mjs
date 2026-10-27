@@ -194,29 +194,34 @@ function deltaVueFiles() {
 function checkTemplates() {
   const files = deltaVueFiles()
 
-  const visit = (node) => {
-    if (!node) return
-    if (node.type === 2 /* TEXT */) checkRendered('template', node.content, 'template text carries a literal marker')
-    if (node.type === 1 /* ELEMENT */) {
-      for (const prop of node.props ?? []) {
-        if (prop.type === 6 /* static attribute */ && prop.value?.type === 2) {
-          checkRendered('template attribute', prop.value.content, 'a static attribute value carries a literal marker')
-        }
-      }
-    }
-    for (const child of node.children ?? []) visit(child)
-  }
-
   for (const file of files) {
+    const rel = relative(UI, file).replace(/\\/g, '/')
     const { descriptor } = sfc.parse(readFileSync(file, 'utf8'))
     if (!descriptor.template) continue
+    // 节点行号相对模板内容，而内容的第一行就是 `<template>` 所在行。
+    // Node lines are relative to the template content, whose first line is the `<template>` line.
+    const base = descriptor.template.loc.start.line
     let ast
     try {
       ast = parseTemplate(descriptor.template.content)
     } catch (e) {
-      console.error(`${relative(UI, file)}: template does not parse (${e.message})`)
-      violations.push({ where: relative(UI, file), text: e.message, why: 'template does not parse' })
+      console.error(`${rel}: template does not parse (${e.message})`)
+      violations.push({ where: rel, text: e.message, why: 'template does not parse' })
       continue
+    }
+    const at = (node) => `${rel}:${base + (node.loc?.start.line ?? 1) - 1}`
+
+    const visit = (node) => {
+      if (!node) return
+      if (node.type === 2 /* TEXT */) checkRendered(at(node), node.content, 'template text carries a literal marker')
+      if (node.type === 1 /* ELEMENT */) {
+        for (const prop of node.props ?? []) {
+          if (prop.type === 6 /* static attribute */ && prop.value?.type === 2) {
+            checkRendered(at(prop.value), prop.value.content, 'a static attribute value carries a literal marker')
+          }
+        }
+      }
+      for (const child of node.children ?? []) visit(child)
     }
     visit(ast)
   }
