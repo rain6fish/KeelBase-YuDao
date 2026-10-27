@@ -249,7 +249,19 @@ public final class SpecCodegen {
             // 演示账号（`sql/keelbase-demo-accounts.sql`）：主仓登录页上写的那两个 —— `alex` 的账号，以及
             // `admin` 的口令（仅在它仍是上游默认值时才改写）。手写、任何 Spec 都不产出，`e672259c9f` 落地时漏了
             // 在此声明，边界检查自那时起把它报成 UNDECLARED。补声明 = 让声明**追上事实**；判据一字未松。
-            "sql/keelbase-demo-accounts.sql");
+            "sql/keelbase-demo-accounts.sql",
+            // ai1 管理台的**按钮权限行**（`sql/keelbase-ai1-permissions.sql`，`9fcb3c5877` 引入、`ef02521786` 收窄成
+            // 「只种行、不授予」）：那七页的菜单行由 `sql/keelbase-assistant-menus.sql` 挂出，但权限串一行都没种，故
+            // 每个 `v-hasPermi` 按钮都拿不到码。手写、任何 Spec 都不产出；引入时漏了在此声明，边界检查自那时起把它
+            // 报成 UNDECLARED。补声明 = 让声明**追上事实**；判据一字未松。
+            //
+            // The ai1 console's **button-permission rows** (`sql/keelbase-ai1-permissions.sql`, landed in
+            // `9fcb3c5877` and narrowed to rows-without-grants in `ef02521786`): the seven pages' menu rows are
+            // raised by `sql/keelbase-assistant-menus.sql`, but no permission string was seeded, so every
+            // `v-hasPermi` button on them had no code to check. Hand-written, produced by no Spec; it was not
+            // declared here when it landed, so the boundary check has called it UNDECLARED ever since.
+            // Declaring it lets the declaration catch up with fact; no judgement is relaxed.
+            "sql/keelbase-ai1-permissions.sql");
 
     private SpecCodegen() {
     }
