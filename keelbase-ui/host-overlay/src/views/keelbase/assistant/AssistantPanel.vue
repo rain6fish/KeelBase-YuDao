@@ -11,7 +11,8 @@
   **①** 会话来自 `ai1`（`/admin-api/ai1/...`），不是主仓那条；**②** 工具卡只列**写** —— 运行时按调用方
   只供写那一面（`/ai/tool-effects`），读不在这一面，卡片如实写着；**③** 确认卡**在这一页内决定**
   （`/ai/my/confirmations/{token}/decide`，按调用方）—— 治理控制台那几页是**管理员专属**，普通调用方跳过去
-  是死路；**④** 入参一律不打印：控制台不打印记录自己的文字（`mask.ts` 那条红线），而本运行时没有给人读的摘要。
+  是死路；**④** 确认卡写出**这次写入要用的业务事实**（运行时已在 `arguments` 里供出），读者才核得对要写的是谁；
+  记录**自己的文字**仍不打印 —— `mask.ts` 那条红线针对的是**已有记录**，不是这份提议的入参。
 
   The assistant panel: **one conversation**. The shell (a drawer) is `AssistantDrawer.vue`; this draws only the
   content, so the same panel can be mounted elsewhere later.
@@ -27,8 +28,9 @@
   rather than a drawing choice: **①** sessions come from `ai1`, not from the main repo's path; **②** the tool
   face lists **writes only** — the runtime serves the caller's own writes and nothing else; **③** the
   confirmation card **decides in place** (`/ai/my/confirmations/{token}/decide`, caller-scoped) because the
-  governance console's pages are administrator-only; **④** arguments are never printed — the console does not
-  print a record's own text (`mask.ts`).
+  governance console's pages are administrator-only; **④** the confirmation card draws **the business facts the
+  write will use** (served in `arguments`), so the reader can check who or what is written; a record's **own
+  text** is still never printed — `mask.ts`'s red line is about existing records, not a proposal's arguments.
 -->
 <template>
   <div class="assistant-panel">
@@ -113,18 +115,35 @@
         <div class="panel-error-hint">技术细节已记录在浏览器控制台。</div>
       </div>
 
-      <!-- 待我确认：一笔写悬在这里，等一个人。它出现在对话尾部，因为它就是这一轮产生的。 -->
+      <!-- 待我确认：一笔写悬在这里，等一个人。它出现在对话尾部，因为它就是这一轮产生的。
+           卡上写出**这次写入要用的业务事实**（运行时已在 `arguments` 里供出），读者才核得对「要建的到底是谁」；
+           记录**自己的文字**仍不打印 —— 那是 `mask.ts` 的红线，针对的是**已有记录**，与这**一份提议**的入参不是一回事。 -->
+      <!-- A write waiting on a person, at the tail of the conversation that produced it. The card shows
+           **the business facts this write will use** — the runtime already serves them in `arguments` — so
+           the reader can check who or what is about to be written. A record's **own text** is still not
+           printed: that `mask.ts` red line is about existing records, not about this proposal's arguments. -->
       <div v-for="c in pending" :key="c.token" class="confirm-card">
         <div class="confirm-head">
-          <el-tag size="small" effect="plain" type="warning">待确认</el-tag>
+          <el-tag size="small" effect="plain" type="warning">{{ t('keelbase.assistantCard.pending') }}</el-tag>
           <el-tag v-if="c.riskLevel" size="small" effect="plain">{{ c.riskLevel }}</el-tag>
           <span class="confirm-title">{{ toolText(c.toolName) }}</span>
         </div>
-        <div v-if="c.impact?.actions" class="note">涉及 {{ c.impact.actions }} 个动作。</div>
-        <div class="note">入参不在这里显示：控制台不打印记录自己的文字。</div>
+        <div v-if="c.impact?.actions" class="note">
+          {{ t('keelbase.assistantCard.impact', { n: c.impact.actions }) }}
+        </div>
+        <div class="confirm-args">
+          <div class="confirm-args-title">{{ t('keelbase.assistantCard.argsTitle') }}</div>
+          <div v-if="argEntries(c).length" class="confirm-args-list">
+            <div v-for="a in argEntries(c)" :key="a.key" class="confirm-arg">
+              <span class="confirm-arg-key">{{ argLabel(a.key) }}</span>
+              <span class="confirm-arg-value">{{ a.value }}</span>
+            </div>
+          </div>
+          <div v-else class="note">{{ t('keelbase.assistantCard.noArgs') }}</div>
+        </div>
         <div class="confirm-actions">
-          <el-button size="small" @click="decide(c.token, 'decline')">拒绝</el-button>
-          <el-button size="small" type="primary" @click="decide(c.token, 'approve')">批准</el-button>
+          <el-button size="small" @click="decide(c.token, 'decline')">{{ t('keelbase.assistantCard.decline') }}</el-button>
+          <el-button size="small" type="primary" @click="decide(c.token, 'approve')">{{ t('keelbase.assistantCard.approve') }}</el-button>
         </div>
       </div>
 
@@ -173,7 +192,7 @@ import { maskTitle } from '@/keelbase/mask'
 import { outcomeLabelKey, outcomeTagType, toolLabelKey } from '@/keelbase/labels'
 import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const agent = ref<AssistantAgent>({ configured: false, agentId: null })
 const sessions = ref<AssistantSession[]>([])
@@ -212,6 +231,37 @@ function toolText(name: string | null | undefined): string {
   if (!name) return '—'
   const key = toolLabelKey(name)
   return key ? t(key) : name
+}
+
+/**
+ * 入参的**键**用读者的语言说；控制台不认识的键原样显示 —— 不猜。
+ *
+ * An argument's **name** in the reader's language; a key this console does not know is shown as itself,
+ * never guessed.
+ */
+function argLabel(key: string): string {
+  const i18nKey = `keelbase.assistantCard.arg.${key}`
+  return te(i18nKey) ? t(i18nKey) : key
+}
+
+/**
+ * 入参的**值**：对象压成紧凑 JSON，其余原样 —— 画出来的就是**将要写入**的那个值。记录自己的文字不在
+ * 这条路径上，故那段掩码规矩不受影响。
+ *
+ * An argument's **value**: an object is flattened to compact JSON and anything else is shown as it is —
+ * what is drawn is the value that will be written. The record's own text is not on this path, so the
+ * masking rule is untouched.
+ */
+function argEntries(c: ConfirmationItem): { key: string; value: string }[] {
+  return Object.entries(c.arguments ?? {}).map(([key, value]) => ({
+    key,
+    value:
+      value === null || value === undefined
+        ? '—'
+        : typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value),
+  }))
 }
 
 /** An outcome in the reader's language, falling back to the raw word the runtime used. */
@@ -547,6 +597,34 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
+}
+.confirm-args {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+.confirm-args-title {
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.confirm-args-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.confirm-arg {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+}
+.confirm-arg-key {
+  flex: 0 0 auto;
+  min-width: 72px;
+  color: var(--el-text-color-secondary);
+}
+.confirm-arg-value {
+  word-break: break-all;
 }
 .confirm-title {
   font-weight: 600;

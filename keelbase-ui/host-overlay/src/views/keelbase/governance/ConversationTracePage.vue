@@ -42,12 +42,29 @@
     <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.coverage.trace') }}</div>
     <el-empty v-if="!loading && !conversations.length" :description="t('keelbase.trace.empty')" />
     <el-table v-else v-loading="loading" :data="conversations" stripe @row-click="open">
-      <el-table-column :label="t('keelbase.trace.colId')" prop="id" min-width="280" show-overflow-tooltip />
+      <!-- F-2：先给**可辨认**的那一列 —— 名字由用户起；没有名字就如实写「未命名」，不拿消息正文凑一个
+           （那是内容摘要，AU-4 刻意不带）。 -->
+      <!-- F-2: the identifying column comes first — a name the user gave. With no name the row says
+           so; it never improvises one from message text, which is the content digest AU-4 withholds. -->
+      <el-table-column :label="t('keelbase.trace.colTitle')" min-width="240">
+        <template #default="{ row }">
+          <div class="flex items-center gap-6px">
+            <span :class="row.title ? '' : 'text-[var(--el-text-color-secondary)]'">
+              {{ row.title || t('keelbase.trace.untitled') }}
+            </span>
+            <el-button link size="small" @click.stop="rename(row)">{{ t('keelbase.trace.rename') }}</el-button>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column :label="t('keelbase.trace.colId')" prop="id" min-width="240" show-overflow-tooltip />
       <el-table-column :label="t('keelbase.trace.colModel')" width="220">
         <template #default="{ row }">{{ row.provider }} / {{ row.model }}</template>
       </el-table-column>
+      <!-- 条数取整段对话记录（`messageCount`）；列表只带最新两条回合，故不能拿 `messages.length` 当总数。 -->
+      <!-- The count is the whole transcript's (`messageCount`); the list carries only the newest two
+           turns, so `messages.length` is not the total. -->
       <el-table-column :label="t('keelbase.trace.colMessages')" width="120" align="center">
-        <template #default="{ row }">{{ row.messages.length }}</template>
+        <template #default="{ row }">{{ row.messageCount ?? row.messages.length }}</template>
       </el-table-column>
       <el-table-column :label="t('keelbase.trace.colLast')" width="200">
         <template #default="{ row }">{{ timeText(row.lastActivityAt) }}</template>
@@ -85,6 +102,7 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import {
   conversationApi,
@@ -151,6 +169,37 @@ async function open(row: ConversationData) {
     traceError.value = runtimeErrorMessage(e, t('keelbase.common.loadFailed'))
   } finally {
     opening.value = null
+  }
+}
+
+/** 名字的上限与服务端同一条（`ConversationTitle.MAX_LENGTH`），故输入框先挡住过长的那一种。 */
+/** The title ceiling is the server's own (`ConversationTitle.MAX_LENGTH`), so the prompt refuses it first. */
+const TITLE_MAX_LENGTH = 200
+
+/**
+ * 给一条会话起名；留空等于清除。属主由服务端按 id 判，页面不复查。
+ *
+ * Name a conversation; blank clears it. The server decides ownership by the id, and the page does not
+ * re-check what the server already enforces.
+ */
+async function rename(row: ConversationData) {
+  let title: string
+  try {
+    const { value } = await ElMessageBox.prompt(t('keelbase.trace.renamePrompt'), t('keelbase.trace.rename'), {
+      inputValue: row.title ?? '',
+      inputValidator: (v: string) =>
+        (v ?? '').trim().length <= TITLE_MAX_LENGTH || t('keelbase.trace.renameTooLong', { n: TITLE_MAX_LENGTH }),
+    })
+    title = String(value ?? '')
+  } catch {
+    return
+  }
+  try {
+    const saved = await conversationApi.rename(row.id, title)
+    row.title = saved.title ?? null
+    ElMessage.success(t('keelbase.trace.renamed'))
+  } catch (e) {
+    ElMessage.error(runtimeErrorMessage(e, t('keelbase.trace.renameFailed')))
   }
 }
 
