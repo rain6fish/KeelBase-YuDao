@@ -100,8 +100,9 @@ const OPERATIONS = [
       outcome: 'executed',
       tool: 'update_crm_customer',
       executionId: 'fda3e3d0-2954-4c48-be60-f1e1ece29c61',
+      authorization:
+        '{"tool":"update_crm_customer","riskLevel":"R3","riskStrategy":"confirmation","requiresConfirmation":false,"checks":[{"name":"risk_policy","ok":true},{"name":"tool_enabled","ok":true},{"name":"role_allowed","ok":true},{"name":"admin_only","ok":true}],"policy":{"revision":"c1afaee3fde0"}}',
     },
-    gate: 'auto',
     effect: {
       resultType: 'crm_customer',
       resultId: 9005,
@@ -127,8 +128,9 @@ const OPERATIONS = [
       outcome: 'executed',
       tool: 'update_crm_customer',
       executionId: 'f8f1bda5-246c-45b0-9fbe-88dc4131be92',
+      authorization:
+        '{"tool":"update_crm_customer","riskLevel":"R3","riskStrategy":"confirmation","requiresConfirmation":true,"checks":[{"name":"risk_policy","ok":true},{"name":"tool_enabled","ok":true},{"name":"role_allowed","ok":true},{"name":"admin_only","ok":true}],"policy":{"revision":"8499adb0271c"}}',
     },
-    gate: 'confirm',
     effect: {
       resultType: 'crm_customer',
       resultId: 9006,
@@ -154,8 +156,8 @@ const OPERATIONS = [
       outcome: 'declined',
       tool: 'update_crm_customer',
       executionId: null,
+      authorization: null,
     },
-    gate: 'confirm',
     effect: null,
     hostNowName: '',
     recordState: '',
@@ -168,7 +170,6 @@ const answersFor = (op) =>
   six.composeSix({
     row: op.row,
     callerName: 'KeelBase',
-    gate: op.gate,
     effect: op.effect,
     hostNowName: op.hostNowName,
     recordState: op.recordState,
@@ -198,6 +199,47 @@ test('the auto-allowed write says 「无需确认」 out loud', () => {
   const confirmation = answers.find((a) => a.key === 'confirmation')
   assert.equal(confirmation.answered, true, 'the auto-allowed row leaves the fifth question blank')
   assert.match(confirmation.text, /No confirmation needed/, 'the auto-allowed row does not say so')
+})
+
+test('the gate is read off the authorization the row recorded', () => {
+  // 词汇来自协议自己的 `RiskLevel`：`riskStrategy` 是风险级的策略，`requiresConfirmation` 是这一次的裁决位。
+  // 没有 `authorization` 的行回空串 —— 那一格说「这一行没写」，而不是拿今天去补。
+  //
+  // The vocabulary is the protocol's own `RiskLevel`: `riskStrategy` is the level's strategy and
+  // `requiresConfirmation` is the decision taken. A row with no `authorization` answers empty — the cell
+  // says the row does not say, rather than filling it in from today.
+  const g = (auth) => six.gateFromRow({ authorization: auth })
+  assert.equal(g('{"riskStrategy":"confirmation","requiresConfirmation":false}'), 'auto')
+  assert.equal(g('{"riskStrategy":"confirmation","requiresConfirmation":true}'), 'confirm')
+  assert.equal(g('{"riskStrategy":"human_approval","requiresConfirmation":true}'), 'approval')
+  assert.equal(g('{"riskStrategy":"block","requiresConfirmation":false}'), 'blocked')
+  assert.equal(g(null), '', 'a row that recorded no authorization must not answer a gate')
+  assert.equal(six.gateFromRow({}), '')
+})
+
+test('a gate handed in from outside cannot answer the fifth question', () => {
+  // 工具清单今天说 `confirm`（策略已还原），而这一行记下的裁决是**自动放行**。把「今天的闸」当作参数塞进来，
+  // 第五问仍须答「无需确认」—— 否则同一条审计行会随策略改口，而那正是这条修复要断掉的。
+  //
+  // The inventory says `confirm` today (the policy was restored), while this row recorded an **auto**
+  // decision. Hand "today's gate" in as a parameter and the fifth question must still answer "no
+  // confirmation needed" — otherwise one audit row answers differently after a policy change, which is
+  // exactly what this fix cuts.
+  const answers = six.composeSix({
+    row: OPERATIONS[0].row,
+    callerName: 'KeelBase',
+    gate: 'confirm',
+    effect: OPERATIONS[0].effect,
+    hostNowName: OPERATIONS[0].hostNowName,
+    recordState: OPERATIONS[0].recordState,
+    mask,
+    resultWord: 'Executed',
+    resultMeaning: 'It really happened; the write is in the system',
+    t,
+    te,
+  })
+  const confirmation = answers.find((a) => a.key === 'confirmation')
+  assert.match(confirmation.text, /No confirmation needed/, `got "${confirmation.text}"`)
 })
 
 test('the confirmed write names who confirmed, and the refused one says a person said no', () => {

@@ -43,9 +43,13 @@ export interface AuditRow {
   executionId?: string | null
   /**
    * What allowed or refused this row — the structured verdict of the gate that let the write run. It is
-   * not drawn on this page: the six-question block says what happened in business words instead.
+   * **not printed** on this page, and it is the only basis of the fifth question (who confirmed): this
+   * row's own decision, not the tool inventory's setting today. Printing the raw JSON is what the
+   * reader's face gave up; using it to answer in business words is what it kept.
    *
-   * 凭什么允许或拒绝这一行 —— 那道让写跑起来的闸的结构化裁决。本页不画它：六问那一块用业务词说结果。
+   * 凭什么允许或拒绝这一行 —— 那道让写跑起来的闸的结构化裁决。本页**不印**它，而它正是第五问（谁确认）
+   * 唯一的依据：这一行**当时**的裁决，不是工具清单**此刻**的设定。读者这一面放弃的是把那串 JSON 原样印出来；
+   * 留下的是用它答一句业务话。
    */
   authorization?: string | null
 }

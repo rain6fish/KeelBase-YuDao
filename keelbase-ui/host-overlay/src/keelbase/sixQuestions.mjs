@@ -149,13 +149,53 @@ export function changeLine({ effect, hostNowName, mask, t, te }) {
 }
 
 /**
- * ⑤ 谁确认 —— 按这个工具的**生效闸门**回答，不按这一行猜。
+ * 这一行**当时**过的是哪道闸，只从这一行自己记下来的 `authorization` 读。
  *
- * 自动放行写「无需确认」；要求本人确认的工具，写「本人确认（对话内）」—— 因为那道闸的定义就是「等操作者
+ * **不能问工具清单。** 清单答的是**此刻**的闸（`GET /ai/tools` 的 `gateMode` 由当下的策略算出来），
+ * 而这一行是一次**过去**的调用：同一条审计行，在策略改过之后会被答成另一个样子 —— 一次自动放行的写
+ * 说成「本人确认了」、一次本人确认过的写说成「无需确认」。判据要的是「这次操作怎么了」，所以依据取这一行
+ * 记下的那一次裁决。
+ *
+ * 词汇来自协议自己的 `RiskLevel`：`riskStrategy` 是风险级对应的策略（`auto` / `policy` /
+ * `confirmation` / `human_approval` / `block`），`requiresConfirmation` 是这一次**实际**的裁决位。
+ * 两个合起来才分得出「无需确认」「本人确认」「第二人批准」「被扣住」。这一行没记 `authorization` 时
+ * （比如待决行、被拒行，或者更早的运行时），回空串 —— 那一格就说这一行没写，**不**拿今天的清单去补。
+ *
+ * Which gate this row actually passed, read only from the `authorization` the row itself recorded.
+ *
+ * **The inventory must not be asked.** It answers the gate **now** (`gateMode` in `GET /ai/tools` is
+ * derived from the policy as it stands), while the row is a **past** call: the same audit row reads
+ * differently after a policy change — an auto-allowed write becomes "confirmed it themselves", and a
+ * write a person confirmed becomes "no confirmation needed". The criterion asks what *this operation*
+ * came to, so the basis is the decision recorded on the row.
+ *
+ * The vocabulary is the protocol's own `RiskLevel`: `riskStrategy` is the risk level's strategy
+ * (`auto` / `policy` / `confirmation` / `human_approval` / `block`), and `requiresConfirmation` is the
+ * decision that was actually taken. Together they separate "no confirmation needed", "confirmed it
+ * themselves", "a second person approved" and "held". A row that recorded no `authorization` (pending,
+ * declined, or an older runtime) answers with an empty gate — the cell then says the row does not say,
+ * rather than filling it in from today's inventory.
+ */
+export function gateFromRow(row) {
+  const auth = parseSnapshot(row?.authorization)
+  if (!auth) return ''
+  if (auth.riskStrategy === 'block') return 'blocked'
+  if (auth.requiresConfirmation === false) return 'auto'
+  if (auth.requiresConfirmation === true) {
+    return auth.riskStrategy === 'human_approval' ? 'approval' : 'confirm'
+  }
+  return ''
+}
+
+/**
+ * ⑤ 谁确认 —— 按**这一行记下的那道闸**（见 `gateFromRow`）回答，不按工具当下的设定猜。
+ *
+ * 自动放行写「无需确认」；要求本人确认的写「本人确认（对话内）」—— 因为那道闸的定义就是「等操作者
  * 本人」；要求第二人批准的工具，本运行时的审计行上**没有**批准人是谁，故这一格如实说没有，而不是拿隔壁那一行
  * 的时间去凑一个人。
  *
- * ⑤ who confirmed — answered from the tool's **effective gate**, not guessed from the row.
+ * ⑤ who confirmed — answered from **the gate this row recorded** (see `gateFromRow`), not guessed from
+ * the tool's setting today.
  *
  * An auto-allowed call says 「无需确认」. A tool that asks the operator says 「本人确认（对话内）」, because
  * that is what the gate means. A tool that needs a second person carries no approver on this runtime's
@@ -207,13 +247,19 @@ export function objectLine({ effect, hostNowName, state, mask, t, te }) {
  * 六行，一次答全。`answered` 只标「这一格有答案」，不标「答案是好消息」—— 第六问「结果」永远有答案，
  * 哪怕那个答案是「被拒了」。
  *
+ * ⑤ 的依据**只有**这一行（`gateFromRow`），调用方**不能**从别处塞一个闸进来：那正是「同一条审计行
+ * 会随策略改口」的来源。
+ *
  * Six lines, all at once. `answered` marks whether the cell **has** an answer, not whether the answer is
  * good news — the sixth question always has one, even when the answer is "it was refused".
+ *
+ * The fifth question's basis is **the row alone** (`gateFromRow`); a caller cannot hand a gate in from
+ * elsewhere — that is exactly what used to make one audit row answer differently after a policy change.
  */
-export function composeSix({ row, callerName, gate, effect, hostNowName, recordState, mask, resultWord, resultMeaning, t, te }) {
+export function composeSix({ row, callerName, effect, hostNowName, recordState, mask, resultWord, resultMeaning, t, te }) {
   const object = objectLine({ effect, hostNowName, state: recordState, mask, t, te })
   const change = changeLine({ effect, hostNowName, mask, t, te })
-  const confirmation = confirmationLine({ gate, outcome: row?.outcome, callerName, t })
+  const confirmation = confirmationLine({ gate: gateFromRow(row), outcome: row?.outcome, callerName, t })
   return [
     { key: 'who', label: 'who', text: callerName ? `${callerName}${row?.userId ? `（${t('keelbase.sixQ.account')} #${row.userId}）` : ''}` : t('keelbase.sixQ.someone'), answered: Boolean(callerName) },
     { key: 'when', label: 'when', text: zonedTime(row?.createdAt), answered: Boolean(row?.createdAt) },
