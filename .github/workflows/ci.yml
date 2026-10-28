@@ -361,6 +361,20 @@ jobs:
       - name: No rendered line of copy may carry a literal `**` or a backtick
         run: node scripts/check-rendered-copy.mjs "$UI_DIR"
 
+      # 闸门自己也要有人测：临时目录里搭一份只够它跑的 UI 样子，逐例种一个**算出来的**记号，看它红、点名、
+      # 复原后转绿。它挂在这里而不是别的 job，是因为它要的正是这一步已经铺好的检出 —— 换个 job 就得再铺一遍。
+      # `@babel/parser` 是上一步装的 `@vue/compiler-sfc` 的直接依赖，故表达式那一层不用多装一个包。
+      #
+      # The gate needs a keeper of its own: a fixture built in a temp directory, one **computed** marker
+      # seeded per case, and the gate must go red, name the file, and return to green once restored. It
+      # hangs here rather than in another job because it needs exactly the checkout this step has already
+      # laid down — anywhere else would lay it down a second time. `@babel/parser` is a direct dependency
+      # of the `@vue/compiler-sfc` installed above, so the expression layer needs no extra package.
+      - name: The gate goes red on a marker an expression computes
+        env:
+          KEELBASE_YUDAO_UI: target/yudao-ui-admin-vue3
+        run: node --test scripts/rendered-copy-expressions.test.mjs
+
       # 「缺检出必须是红」这件事本身也得有人守：拿一个不存在的目录跑同一个闸，断言它退出 **2**。它防的是
       # 后来有人把上面那条调用包进 `|| true`、或把闸改成一个安静的 0。
       #

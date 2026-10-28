@@ -14,7 +14,12 @@
 //      词条里都没有 `**`、也没有反引号；
 //   2. 把**这一层发布的**每个 `.vue`（覆盖目录 + 补丁改到的）的 `<template>` 交给
 //      `@vue/compiler-sfc` + `@vue/compiler-dom` 解析，断言文本节点与静态属性值里没有同样两种记号
-//      （HTML 注释不算 —— 源码注释里的强调是给维护者看的）。
+//      （HTML 注释不算 —— 源码注释里的强调是给维护者看的）；
+//   3. 同一批模板里**算出来的**那部分同样在射程内：插值 `{{ … }}` 与 `v-bind` / `v-html` / `v-text`
+//      的表达式，经 `@babel/parser`（`@vue/compiler-sfc` 自己的依赖）解析后，取其中的**字符串字面量与
+//      模板字面量的静态片段**判红。`{{ '**' + t('x') }}`、`:title="\`**x**\`"` 这类写法在渲染那一刻才
+//      产生记号，前两条路径都看不见它们 —— 2026-10-28 实测过：种进模板后本闸仍 exit 0。
+//      边界（写明，不是缩小射程）：字面量之外**不求值**，由变量或函数调用在运行期拼出来的内容看不见。
 //
 // 它要一个 UI 检出（`target/yudao-ui-admin-vue3`，或第一个参数 / `KEELBASE_YUDAO_UI`），因为渲染需要
 // 那个检出自带的 `vue-i18n` 与 Vue 编译器。缺检出时**退出 2**：不明说「跳过」，否则这个闸门会在没跑的
@@ -36,7 +41,15 @@
 //      and every rendered message must contain neither `**` nor a backtick;
 //   2. every `.vue` **this layer ships** (overlay + patched) goes through `@vue/compiler-sfc` +
 //      `@vue/compiler-dom`, and no text node or static attribute value may contain either marker (HTML
-//      comments do not count — emphasis in a source comment is for the maintainer).
+//      comments do not count — emphasis in a source comment is for the maintainer);
+//   3. the **computed** half of those templates is in range too: the expressions behind `{{ … }}` and
+//      `v-bind` / `v-html` / `v-text` are parsed with `@babel/parser` (a dependency of
+//      `@vue/compiler-sfc` itself), and the string literals and static template-literal chunks they spell
+//      out must carry no marker either. `{{ '**' + t('x') }}` and ``:title="`**x**`"`` produce their
+//      markers only at render time, and paths 1 and 2 cannot see them — measured 2026-10-28: seeded into
+//      a template, this gate still exited 0.
+//      The boundary, stated rather than quietly shortened: nothing beyond literals is **evaluated**, so
+//      copy a variable or a call assembles at runtime stays out of reach.
 //
 // It needs a UI checkout (`target/yudao-ui-admin-vue3`, or the first argument / `KEELBASE_YUDAO_UI`),
 // because rendering needs that checkout's own `vue-i18n` and Vue compilers. A missing checkout **exits
@@ -71,10 +84,15 @@ try {
 const requireFromUi = createRequire(pathToFileURL(vuePkg))
 let sfc
 let parseTemplate
+let babel
 let i18nModuleUrl
 try {
   sfc = requireFromUi('@vue/compiler-sfc')
   parseTemplate = requireFromUi('@vue/compiler-dom').parse
+  // `@babel/parser` 是 `@vue/compiler-sfc` 自己的直接依赖，故它随同一个安装进来 —— 不是额外的一项依赖。
+  // `@babel/parser` is a direct dependency of `@vue/compiler-sfc`, so it arrives with the same install —
+  // it is not one more thing to depend on.
+  babel = requireFromUi('@babel/parser')
   i18nModuleUrl = pathToFileURL(realpathSync(join(UI, 'node_modules', 'vue-i18n', 'dist', 'vue-i18n.mjs'))).href
 } catch (e) {
   missing(`the Vue toolchain (${e.message})`)
@@ -190,9 +208,53 @@ function deltaVueFiles() {
   return [...files]
 }
 
+/**
+ * 表达式里**写死**的那几段字。只读源码，不求值：读者看到的字符串可以来自变量，那部分静态看不见。
+ * 模板字面量的静态片段（`\`${n}**\`` 里的 `**`）算，它的定界符不算 —— 反引号在那里是语法，不是文本。
+ *
+ * The strings an expression **spells out**. The source is read, never evaluated: what a variable supplies
+ * to the rendered string is beyond static reach. A template literal's static chunk counts (`**` in
+ * `` `${n}**` ``); its delimiters do not — a backtick there is syntax, not copy.
+ */
+const LITERAL = {
+  StringLiteral: (node) => node.value,
+  TemplateElement: (node) => node.value.cooked ?? node.value.raw,
+}
+const SKIP_KEYS = new Set([
+  'loc',
+  'start',
+  'end',
+  'range',
+  'extra',
+  'errors',
+  'comments',
+  'leadingComments',
+  'trailingComments',
+  'innerComments',
+])
+
+function literalStrings(node, out = []) {
+  if (!node || typeof node !== 'object') return out
+  const take = LITERAL[node.type]
+  if (take) {
+    out.push(take(node))
+    return out
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (SKIP_KEYS.has(key)) continue
+    if (Array.isArray(value)) for (const item of value) literalStrings(item, out)
+    else if (value && typeof value === 'object') literalStrings(value, out)
+  }
+  return out
+}
+
+/** 读者会看到其值的指令：`v-bind`（含 `:`）、`v-html`、`v-text`。 / The directives whose value readers see. */
+const RENDERED_DIRECTIVES = new Set(['bind', 'html', 'text'])
+
 /** 2. Template text and static attribute values, through Vue's own parser. */
 function checkTemplates() {
   const files = deltaVueFiles()
+  let expressions = 0
 
   for (const file of files) {
     const rel = relative(UI, file).replace(/\\/g, '/')
@@ -211,13 +273,34 @@ function checkTemplates() {
     }
     const at = (node) => `${rel}:${base + (node.loc?.start.line ?? 1) - 1}`
 
+    const checkExpression = (node, source, kind) => {
+      expressions += 1
+      let tree
+      try {
+        tree = babel.parseExpression(source, { plugins: ['typescript'] })
+      } catch (e) {
+        // 读不出来的表达式不算干净，算**没被清过** —— 不许它悄悄从射程里掉出去。
+        // An expression this gate cannot read is not clean, it is **uncleared** — it must not slip out of
+        // range quietly.
+        violations.push({ where: at(node), text: source, why: `a template expression the gate cannot read (${e.message})` })
+        return
+      }
+      for (const text of literalStrings(tree)) {
+        checkRendered(at(node), text, `${kind} builds a string that carries a literal marker`)
+      }
+    }
+
     const visit = (node) => {
       if (!node) return
       if (node.type === 2 /* TEXT */) checkRendered(at(node), node.content, 'template text carries a literal marker')
+      if (node.type === 5 /* INTERPOLATION */) checkExpression(node, node.content.content, 'an interpolation')
       if (node.type === 1 /* ELEMENT */) {
         for (const prop of node.props ?? []) {
           if (prop.type === 6 /* static attribute */ && prop.value?.type === 2) {
             checkRendered(at(prop.value), prop.value.content, 'a static attribute value carries a literal marker')
+          }
+          if (prop.type === 7 /* DIRECTIVE */ && prop.exp?.type === 4 && RENDERED_DIRECTIVES.has(prop.name)) {
+            checkExpression(prop, prop.exp.content, `a v-${prop.name} value`)
           }
         }
       }
@@ -225,7 +308,7 @@ function checkTemplates() {
     }
     visit(ast)
   }
-  console.log(`  scanned ${files.length} .vue template(s) this layer ships`)
+  console.log(`  scanned ${files.length} .vue template(s) this layer ships, ${expressions} expression(s) in them`)
 }
 
 checkLocales()
