@@ -188,3 +188,31 @@ test('the gate record pins the SKILL path as partially governed, and names where
   assert.match(row, /gap:\s*'external-effect-no-ledger'/, 'the declared gap is an external effect with no ledger row');
   assert.match(row, /Ai1SkillToolFactory\.java:\d+/, 'the row cites the assembly point it describes');
 });
+
+test('the checks are drawn as a path × control matrix, ticked only by each row\'s own holds', () => {
+  const vue = read(PAGE);
+  const tpl = templateOf(vue);
+  const { en, zh } = boundaryMessages();
+
+  // 一列一道关：列由页面里的 `CONTROLS` 迭代，勾只由 `holds.includes(control)` 推出 —— 页面不另算一份。
+  // One column per control: the columns iterate `CONTROLS`, and a tick is only `holds.includes(control)`
+  // — the page derives no second copy of the record.
+  assert.match(tpl, /v-for="c in CONTROLS"/, 'the checks are no longer drawn as one column per control');
+  assert.match(tpl, /row\.holds\.includes\(c\)/, 'a tick no longer comes from the row\'s own holds');
+  assert.doesNotMatch(tpl, /v-for="h in row\.holds"/, 'the run-on tag list is back beside the matrix');
+
+  // `CONTROLS` 的顺序就是词表的顺序，且两边同集 —— 少一道关就是少一列，多一道就是凭空多一列。
+  // `CONTROLS` follows the vocabulary's order and carries the same set: one control missing would drop a
+  // column, one extra would invent one.
+  const list = vue.match(/const CONTROLS = \[([\s\S]*?)\] as const/);
+  assert.ok(list, 'the page no longer declares its control vocabulary');
+  const controls = [...list[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  for (const [lang, block] of [['en', en], ['zh', zh]]) {
+    assert.deepEqual(controls, Object.keys(block.holds), `${lang} control headers disagree with the matrix's columns`);
+  }
+
+  // 表头缩到 12px：九列里英文关卡名比中文长，不缩会被从单词中间断开（真栈实测过）。
+  // A 12px header: with nine columns the English control names are longer than the Chinese ones and
+  // break mid-word without it (measured in the running stack).
+  assert.match(vue, /\.boundary-matrix :deep\(th \.cell\)\s*\{[^}]*font-size:\s*12px/, 'the matrix header lost its 12px size');
+});

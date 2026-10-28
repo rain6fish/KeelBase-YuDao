@@ -114,7 +114,7 @@
       <!-- Every AI path and its posture — `stated.paths` is a design fact; the page only draws it. -->
       <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.pathsTitle') }}</div>
       <div class="text-12px mb-6px">{{ t('keelbase.boundary.pathsWhat') }}</div>
-      <el-table :data="boundary.stated.paths" stripe>
+      <el-table :data="boundary.stated.paths" stripe class="boundary-matrix">
         <!-- 代码出处收进展开行：读者要先看结论，给开发者的坐标放在随手可得但不挡路的地方。
              M7 F-8：此前它是一整列（260px），与「扣住/不扣」并排，把主结论稀释掉了。
              / The code coordinates moved into an expandable row: available, but not in the reading path. -->
@@ -132,15 +132,26 @@
             <el-tag :type="postureTagType(row.posture)" size="small">{{ t(`keelbase.boundary.posture.${row.posture}`) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('keelbase.boundary.colHolds')" min-width="220">
-          <template #default="{ row }">
-            <el-tag v-for="h in row.holds" :key="h" size="small" effect="plain" class="mr-4px mb-4px">
-              {{ t(`keelbase.boundary.holds.${h}`) }}
-            </el-tag>
-            <span v-if="!row.holds.length" class="text-12px text-[var(--el-text-color-secondary)]">
-              {{ t('keelbase.boundary.none') }}
-            </span>
-          </template>
+        <!-- 路径 × 关卡矩阵：一列一道关，勾只由本行自己的 `holds` 推出（`holds.includes(control)`）。
+             原来把这一行的关卡画成标签串，读者要比对好几行才看得出「哪条路少了哪道关」；摆成矩阵后
+             横向一读就是答案。页面仍不重算任何东西 —— `stated.paths` 里没有的关卡就不会被打勾。 -->
+        <!-- Path × control matrix: one column per control, a tick comes from the row's own `holds`
+             (`holds.includes(control)`). The tags used to read as a run-on string, so seeing which path
+             misses which control meant comparing rows; as a matrix the answer is one horizontal read.
+             Nothing is derived here — a control absent from `stated.paths` simply never ticks. -->
+        <el-table-column :label="t('keelbase.boundary.colHolds')" align="center">
+          <el-table-column
+            v-for="c in CONTROLS"
+            :key="c"
+            :label="t(`keelbase.boundary.holds.${c}`)"
+            width="110"
+            align="center"
+          >
+            <template #default="{ row }">
+              <span v-if="row.holds.includes(c)" class="text-[var(--el-color-success)]">✓</span>
+              <span v-else class="text-[var(--el-text-color-placeholder)]">—</span>
+            </template>
+          </el-table-column>
         </el-table-column>
         <el-table-column :label="t('keelbase.boundary.colGap')" min-width="300">
           <template #default="{ row }">{{ t(`keelbase.boundary.gap.${row.gap}`) }}</template>
@@ -221,6 +232,21 @@ type Boundary = {
   }
 }
 
+/**
+ * 矩阵的列顺序 = 记录里 `holds` 关键词表的顺序。是否打勾只看本行自己的 `holds`，这里只决定**排布**。
+ *
+ * The matrix's column order is the record's `holds` vocabulary; whether a cell ticks is read from the
+ * row's own `holds`, so this constant decides layout only.
+ */
+const CONTROLS = [
+  'authorization',
+  'identity',
+  'confirmation',
+  'audit',
+  'refusal',
+  'side-effect-ledger',
+] as const
+
 /** 姿态 → 标签颜色：受治理绿、部分受治理黄、未纳入红。 / posture → tag colour. */
 function postureTagType(posture: PathRow['posture']): 'success' | 'warning' | 'danger' {
   if (posture === 'governed') return 'success'
@@ -268,3 +294,14 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+/* 矩阵有九列（路径 + 姿态 + 六道关 + 缺口），英文关卡名比中文长：表头缩到 12px，避免长单词在 110px 的列里
+   被从中间断开（真栈实测过 `authorizatio n`）。只动表头字号与断行，数据与文案未动。
+   The matrix has nine columns and the English control names are longer than the Chinese ones: a 12px
+   header keeps a long word from breaking mid-word inside a 110px column. Header size only. */
+.boundary-matrix :deep(th .cell) {
+  font-size: 12px;
+  word-break: normal;
+}
+</style>

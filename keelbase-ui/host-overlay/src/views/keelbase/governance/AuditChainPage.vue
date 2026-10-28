@@ -91,7 +91,7 @@
       <div class="coverage-line">{{ t('keelbase.coverage.sources') }}：{{ coverageSourceText }}</div>
       <div v-if="coverage.gaps.length" class="coverage-gaps">
         <div v-for="gap in coverage.gaps" :key="gap.id" class="coverage-row">
-          <el-tag :type="gapTagType(gap.severity)" size="small">{{ gap.severity }}</el-tag>
+          <el-tag :type="gapTagType(gap.severity)" size="small">{{ severityText(gap.severity) }}</el-tag>
           <span>{{ gapText(gap) }}</span>
           <code class="coverage-gap-id">{{ gap.id }}</code>
         </div>
@@ -543,6 +543,13 @@ const coverageSourceText = computed(() =>
     .map((s) => `${s.id}=${s.state}${s.rows === null || s.rows === undefined ? '' : `(${s.rows})`}`)
     .join(' · '),
 )
+
+/** 缺口的严重度用读者的语言；不在词表里的原样显示 —— 前端没跟上不能让一个等级变成空白。 */
+/** Severity in the reader's language; one outside the vocabulary is shown as itself, never blanked. */
+function severityText(severity: string): string {
+  const key = `keelbase.coverage.severity_${severity}`
+  return te(key) ? t(key) : severity
+}
 
 /** 缺口的严重度，用屏幕上读得懂的那种标签颜色。 */
 /** A gap's severity, in the tag colour that reads as the same thing on screen. */

@@ -94,17 +94,28 @@
         </template>
       </el-table-column>
       <!-- F-4：两列原来直接把枚举值打在表上（`crm_customer` / `local_compensate`），读者不知道是什么。
-           表头给一句取值说明，可撤档位按词条译成人话；未知取值仍原样显示，不隐藏。 -->
-      <el-table-column :label="t('keelbase.effects.colResultType')" prop="resultType" width="180">
+           现在两列都先给**读者语言的词**，注册值留在下面一行小字里 —— 业务读者读得懂，工程师仍看得到
+           原始值；不认识的取值只显示它自己，不隐藏、也不从拼写去猜。 -->
+      <!-- F-4: both columns lead with a word in the reader's language and keep the registered value on a
+           muted second line — readable for a business reader, still honest for an engineer. An unknown
+           value is shown as itself: never hidden, and never guessed from its spelling. -->
+      <el-table-column :label="t('keelbase.effects.colResultType')" width="180">
         <template #header>
           <span :title="t('keelbase.effects.colResultTypeHint')">{{ t('keelbase.effects.colResultType') }}</span>
+        </template>
+        <template #default="{ row }">
+          <div>{{ resultTypeText(row.resultType) }}</div>
+          <div v-if="resultTypeText(row.resultType) !== (row.resultType || '—')" class="muted">{{ row.resultType }}</div>
         </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colRevokeClass')" width="180">
         <template #header>
           <span :title="t('keelbase.effects.colRevokeClassHint')">{{ t('keelbase.effects.colRevokeClass') }}</span>
         </template>
-        <template #default="{ row }">{{ revokeClassText(row.revokeClass) }}</template>
+        <template #default="{ row }">
+          <div>{{ revokeClassText(row.revokeClass) }}</div>
+          <div v-if="revokeClassText(row.revokeClass) !== (row.revokeClass || '—')" class="muted">{{ row.revokeClass }}</div>
+        </template>
       </el-table-column>
       <el-table-column :label="t('keelbase.effects.colStatus')" width="120" align="center">
         <template #default="{ row }">
@@ -141,20 +152,31 @@ import Pagination from '@/components/Pagination/index.vue'
 import { effectApi, type EffectRow } from '@/keelbase/governanceApi'
 import { runtimeErrorMessage } from '@/keelbase/runtime'
 import { resolveCallerNames } from '@/keelbase/callerNames'
-import { toolLabelKey } from '@/keelbase/labels'
+import { resultTypeLabelKey, revokeClassLabelKey, toolLabelKey } from '@/keelbase/labels'
 import { timeText } from '@/keelbase/time'
 import { maskTitle } from '@/keelbase/mask'
 import { useConsoleWriteAllowed } from '@/keelbase/consoleRole'
 
 defineOptions({ name: 'KeelbaseGovernanceTools' })
 
-const { t, te } = useI18n()
+const { t } = useI18n()
 
-/** F-4：可撤档位按词条译成人话；四个取值之外的（运行时将来新增的）原样显示，不吞掉。 */
+/**
+ * 结果类型 / 可撤档位：控制台认识的值给**读者语言的词**，不认识就原样显示注册值 —— 只补名字、不改事实。
+ *
+ * A declared result type or a revoke class: a word in the reader's language when this console knows the
+ * value, the registered value itself otherwise — a name is added, never changed.
+ */
+function resultTypeText(value: string | null | undefined): string {
+  if (!value) return '—'
+  const key = resultTypeLabelKey(value)
+  return key ? t(key) : value
+}
+
 function revokeClassText(value: string | null | undefined): string {
   if (!value) return '—'
-  const key = `keelbase.effects.revokeClass.${value}`
-  return te(key) ? t(key) : value
+  const key = revokeClassLabelKey(value)
+  return key ? t(key) : value
 }
 /** The audit reader sees no write control (revoke); the server's verdict is unchanged. */
 /** 审计读者不出现写控件（撤销）；服务端裁决不变。 */

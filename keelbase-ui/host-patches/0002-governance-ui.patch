@@ -2,7 +2,7 @@ diff --git a/src/locales/en.ts b/src/locales/en.ts
 index 96269a8..2611a9b 100644
 --- a/src/locales/en.ts
 +++ b/src/locales/en.ts
-@@ -1,4 +1,434 @@
+@@ -1,4 +1,447 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -82,6 +82,16 @@ index 96269a8..2611a9b 100644
 +        'local-compensate': 'Revocable locally',
 +        'governed-external': 'Reversible via the external system',
 +        transactional: 'Rolled back with the transaction',
++      },
++      resultType: {
++        bpm_oa_leave: 'leave request',
++        crm_customer: 'customer',
++        crm_follow_up_record: 'follow-up record',
++        infra_demo01_contact: 'sample contact',
++        fms_voucher: 'accounting voucher',
++        system_notify_message: 'in-app notification',
++        notify_mailbox: 'mailbox message',
++        products: 'product',
 +      },
 +      colStatus: 'Status',
 +      colTime: 'Time',
@@ -209,6 +219,9 @@ index 96269a8..2611a9b 100644
 +      verdict_complete: 'Complete',
 +      verdict_partial: 'Partial',
 +      verdict_unknown: 'Unknown (one reading was unavailable)',
++      severity_high: 'High',
++      severity_medium: 'Medium',
++      severity_low: 'Low',
 +      sources: 'Read from',
 +      noGaps: 'No known gaps for this window',
 +      registry: 'Gap registry revision {rev}',
@@ -441,7 +454,7 @@ diff --git a/src/locales/zh-CN.ts b/src/locales/zh-CN.ts
 index 35f1e1a..856d201 100644
 --- a/src/locales/zh-CN.ts
 +++ b/src/locales/zh-CN.ts
-@@ -1,4 +1,429 @@
+@@ -1,4 +1,442 @@
  export default {
 +  keelbase: {
 +    common: {
@@ -521,6 +534,16 @@ index 35f1e1a..856d201 100644
 +        'local-compensate': '本地可撤',
 +        'governed-external': '由外部系统撤',
 +        transactional: '随事务回滚',
++      },
++      resultType: {
++        bpm_oa_leave: '请假单',
++        crm_customer: '客户',
++        crm_follow_up_record: '跟进记录',
++        infra_demo01_contact: '示例联系人',
++        fms_voucher: '记账凭证',
++        system_notify_message: '站内通知',
++        notify_mailbox: '站内信',
++        products: '商品',
 +      },
 +      colStatus: '状态',
 +      colTime: '时间',
@@ -647,6 +670,9 @@ index 35f1e1a..856d201 100644
 +      verdict_complete: '完整',
 +      verdict_partial: '部分',
 +      verdict_unknown: '未知（缺一项读数）',
++      severity_high: '高',
++      severity_medium: '中',
++      severity_low: '低',
 +      sources: '读数来自',
 +      noGaps: '本口径下没有已知缺口',
 +      registry: '缺口登记表版本 {rev}',

@@ -199,6 +199,39 @@ export function toolDescriptionKey(name: string | null | undefined): string | nu
   return code ? `keelbase.toolDesc.${code}` : null
 }
 
+// 本宿主工具声明的结果类型，以及运行时定义的**可撤档位**。两张表封闭，理由与上面那张工具表相同：
+// 控制台只给它认识的值配名字，不认识的值原样保留 —— 不从拼写去猜。
+//
+// The result types this host's tools declare, and the runtime's **revoke classes**. Both sets are closed
+// for the same reason as the tool table above: the console names only what it knows and leaves an unknown
+// value as itself — it never guesses a meaning from the spelling.
+const RESULT_TYPES = [
+  'bpm_oa_leave',
+  'crm_customer',
+  'crm_follow_up_record',
+  'infra_demo01_contact',
+  'fms_voucher',
+  'system_notify_message',
+  'notify_mailbox',
+  'products',
+]
+
+const REVOKE_CLASSES = ['none', 'local-compensate', 'governed-external', 'transactional']
+
+/** 工具声明的结果类型对应的 i18n key；控制台不认识时为 null。 */
+/** The i18n key for a declared result type, or null when this console does not know it. */
+export function resultTypeLabelKey(value: string | null | undefined): string | null {
+  const code = inSet(RESULT_TYPES, value)
+  return code ? `keelbase.effects.resultType.${code}` : null
+}
+
+/** 可撤档位对应的 i18n key；控制台不认识时为 null。 */
+/** The i18n key for a revoke class, or null when this console does not know it. */
+export function revokeClassLabelKey(value: string | null | undefined): string | null {
+  const code = inSet(REVOKE_CLASSES, value)
+  return code ? `keelbase.effects.revokeClass.${code}` : null
+}
+
 /**
  * The i18n key for **what an outcome means**, one line — the thing a reader who is not an engineer needs
  * and a single word cannot carry. "Pending" is a state; 「还没真的写入，等有人批准」is what it means to
