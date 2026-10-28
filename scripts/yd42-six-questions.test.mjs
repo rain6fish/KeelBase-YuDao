@@ -339,3 +339,26 @@ test('the reader-facing template draws no internal tool name and no raw detail',
   assert.doesNotMatch(template, /row\.tool\b/, 'the template still prints the registered tool name')
   assert.doesNotMatch(template, /row\.detail\b/, "the template still prints the runtime's raw detail")
 })
+
+test('the caller name comes from the audit read face, not from the user administration', () => {
+  // 「谁」这一问要能答出人名或账号。名录走宿主的窄读面 `/audit/caller-names`（管理员或审计读者可读、只回
+  // 编号 / 账号 / 昵称）；**不**走 `/system/user/list` —— 那条要 `system:user:query`，且 `system_users` 受
+  // 芋道按表名的部门数据权限收窄，一个只挂 `audit_reader` 的账号在那里只拿得到它自己。
+  //
+  // The "who" question has to name a person or an account. The directory is read through the host's narrow
+  // face `/audit/caller-names` (administrators and audit readers, answering id / account / nickname only);
+  // it is **not** read through `/system/user/list`, which needs `system:user:query` and is narrowed by
+  // Yudao's table-keyed department data permission, so an account holding only `audit_reader` gets itself.
+  const source = readFileSync(join(ROOT, 'keelbase-ui/host-overlay/src/keelbase/callerNames.ts'), 'utf8')
+  // 断言只看**代码**：这个文件的注释里会提到旧路径（讲清为什么换掉），那不是它在调它。
+  // Assertions read the **code** only: the file's comments mention the old path (to say why it moved),
+  // and that is not the file calling it.
+  const code = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+  assert.match(code, /'\/audit\/caller-names'/, 'the caller name no longer comes from the audit read face')
+  assert.doesNotMatch(code, /getUserList/, 'the caller name is read from the user administration again')
+  assert.doesNotMatch(code, /\/system\/user\//, 'the caller name is read from a /system/user endpoint again')
+})
