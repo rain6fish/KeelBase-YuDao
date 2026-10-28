@@ -188,9 +188,14 @@ class YudaoGovernanceContextTest {
      * 只有这几样是容器**自己**一定给的（环境、上下文、事件总线、资源加载、消息源）；其余 Spring 类型
      * 例如 {@code PlatformTransactionManager} 在空容器里并不存在，必须 mock，否则装配直接失败。
      *
-     * <p>Only these are guaranteed by the container itself (environment, context, event bus, resource
-     * loader, message source). Other Spring types — {@code PlatformTransactionManager} is the one that
-     * bit us — do not exist in a bare container and have to be mocked.
+     * <p>跳过只看 JDK 的 {@code java.*}：{@code javax.*} **不是**容器自带 —— 空容器里没有
+     * {@code javax.sql.DataSource}，跳过它会让声明的那个 bean 装配不上（F-14 的
+     * {@code YudaoCallerDirectory} 就这样让本测试红过）。所以 {@code javax.*} 一律照常 mock。
+     *
+     * <p>English: only JDK {@code java.*} types are skipped. {@code javax.*} is not container-supplied —
+     * a bare context has no {@code javax.sql.DataSource}, and skipping it leaves the declaring bean
+     * unwired (which is how F-14's {@code YudaoCallerDirectory} turned this test red). {@code javax.*}
+     * dependencies therefore get a mock like any other.
      */
     private static final Set<String> SUPPLIED_BY_THE_CONTAINER = Set.of(
             "org.springframework.core.env.Environment",
@@ -202,7 +207,7 @@ class YudaoGovernanceContextTest {
 
     private static boolean suppliedByTheContainer(Class<?> type) {
         String name = type.getName();
-        return name.startsWith("java.") || name.startsWith("javax.")
+        return name.startsWith("java.")
                 || SUPPLIED_BY_THE_CONTAINER.contains(name);
     }
 }
