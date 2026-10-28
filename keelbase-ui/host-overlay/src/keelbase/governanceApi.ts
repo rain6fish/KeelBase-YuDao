@@ -321,6 +321,18 @@ export interface ConversationData {
   provider: string
   model: string
   summary: string | null
+  /**
+   * 用户给这条会话起的名字（`conversation-data` v2 的可选字段）。没有名字时缺席或为 null —— 页面**不**
+   * 从消息正文派生一个：那是内容摘要，属于 `conversation-meta` 刻意不带的（AU-4）。
+   *
+   * The name the user gave this conversation (v2's optional field); absent or null when unnamed. The page
+   * does **not** derive one from message text — that is a content digest, which `conversation-meta`
+   * deliberately does not carry (AU-4).
+   */
+  title?: string | null
+  /** The whole transcript's size — the list itself carries only the newest turns. */
+  /** **整段**对话记录的条数 —— 列表本身只带最新的几条回合。 */
+  messageCount?: number
   createdAt: string
   lastActivityAt: string
   messages: ConversationMessageRow[]
@@ -368,6 +380,16 @@ export const conversationApi = {
   list: () => runtime.get<ConversationData[]>('/ai/conversations').then((r) => r.data),
   trace: (id: string) =>
     runtime.get<ConversationTrace>(`/ai/conversations/${encodeURIComponent(id)}/trace`).then((r) => r.data),
+  /**
+   * 给一条会话起名；空白等于清除。属主才能改 —— 服务端按 id 判，页面不复查。
+   *
+   * Name a conversation; blank clears it. The server decides ownership by the id, and the page does not
+   * re-check what the server already enforces.
+   */
+  rename: (id: string, title: string) =>
+    runtime
+      .put<{ id: string; title: string | null }>(`/ai/conversations/${encodeURIComponent(id)}/title`, { title })
+      .then((r) => r.data),
 }
 
 export const effectApi = {
