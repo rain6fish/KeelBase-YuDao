@@ -122,58 +122,20 @@
       <el-table-column type="expand">
         <template #default="{ row }">
           <div class="row-detail">
-            <div class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.colWho') }}</span>
-              <span>{{ callerName(row.userId) }} <span v-if="row.userId" class="muted">#{{ row.userId }}</span></span>
+            <!--
+              `YD-42`：一次操作要按**业务词**答得出六问。这六行就是那六问，顺序固定；一格里答不出来时
+              它说「未记录」，而**不是**留空 —— 空格会被读成「没有这件事」。
+              `YD-42`: one operation has to answer six questions in **business words**. These six lines
+              are those questions in a fixed order; a cell that cannot be answered says so instead of
+              going blank, because a blank reads as "nothing happened".
+            -->
+            <div class="six-title">{{ t('keelbase.sixQ.title') }}</div>
+            <div v-for="a in sixOf(row)" :key="a.key" class="d-row six-row">
+              <span class="d-key">{{ t(`keelbase.sixQ.${a.label}`) }}</span>
+              <span :class="{ 'six-missing': !a.answered }">{{ a.text }}</span>
             </div>
-            <div class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.colTime') }}</span>
-              <span>{{ timeText(row.createdAt) }}</span>
-            </div>
-            <div class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.colWhat') }}</span>
-              <span>
-                {{ whatText(row) }}
-                <span class="muted">{{ actionText(row.action) }}<template v-if="row.tool"> · {{ row.tool }}</template></span>
-              </span>
-            </div>
-            <!-- What the tool says it does, in its own words — its declaration, not our summary of it. -->
-            <!-- 工具**自己**说它做什么 —— 是它的声明，不是我们对它的概括。 -->
-            <div v-if="toolDescription(row)" class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.toolDeclared') }}</span>
-              <span>
-                {{ toolDescription(row) }}
-                <el-tag v-if="toolRisk(row)" size="small" effect="plain" class="ml-6px">{{ toolRisk(row) }}</el-tag>
-                <span v-if="toolGateOf(row)" class="muted ml-6px">{{ toolGateOf(row) }}</span>
-              </span>
-            </div>
-            <div class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.colResult') }}</span>
-              <span>
-                <el-tag :type="outcomeTagType(row.outcome, row.isError)" size="small">{{ resultText(row) }}</el-tag>
-                <!-- `attempted` is not a verdict; say so where the row is read in full. -->
-                <!-- `attempted` 不是一个判定；在整行被读的地方把这一点说出来。 -->
-                <span v-if="row.outcome === 'attempted'" class="muted ml-8px">{{ t('keelbase.audit.attemptedHint') }}</span>
-              </span>
-            </div>
-            <!-- What that means, in one line: the part a single word cannot carry. -->
-            <!-- 那**意味着**什么，一句话：一个词载不动的那部分。 -->
-            <div v-if="meaningText(row)" class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.meaning') }}</span>
-              <span>{{ meaningText(row) }}</span>
-            </div>
-            <!-- The record this write landed on — only when exactly one candidate matches, and the
-                 matching rule is named here rather than left for a reader to assume. -->
-            <!-- 这次写落在的那条记录 —— 只在**恰好一个**候选对得上时显示，而配对规则写在**这里**，不留
-                 给读者去假设。 -->
-            <div v-if="recordText(row)" class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.writeRecord') }}</span>
-              <span>{{ recordText(row) }}</span>
-            </div>
-            <div class="d-row">
-              <span class="d-key">{{ t('keelbase.audit.colDetail') }}</span>
-              <span>{{ row.detail || '—' }}</span>
-            </div>
+            <!-- The one thing kept in raw form: which row this is. An id is how an auditor points at it. -->
+            <!-- 唯一按原样留着的一件东西：这是哪一行。id 正是审计人员指着它说话的方式。 -->
             <div class="d-row">
               <span class="d-key">{{ t('keelbase.audit.colId') }}</span>
               <span>#{{ row.id }}</span>
@@ -181,8 +143,10 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column :label="t('keelbase.audit.colTime')" width="175">
-        <template #default="{ row }">{{ timeText(row.createdAt) }}</template>
+      <el-table-column :label="t('keelbase.audit.colTime')" width="200">
+        <!-- 带时区：不带时区的时间戳回答不了「何时」。 -->
+        <!-- With the zone: a timestamp without one cannot answer "when". -->
+        <template #default="{ row }">{{ zonedTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colWho')" width="170">
         <template #default="{ row }">
@@ -191,18 +155,23 @@
           <div v-if="row.userId" class="muted">#{{ row.userId }}</div>
         </template>
       </el-table-column>
-      <el-table-column :label="t('keelbase.audit.colWhat')" min-width="240">
+      <el-table-column :label="t('keelbase.audit.colWhat')" min-width="180">
+        <!-- 业务词那一行；工具**注册名**不在这里，它不在读者这一面。 -->
+        <!-- The business word; the tool's registered name is not here — it is not on the reader's face. -->
         <template #default="{ row }">
           <div>{{ whatText(row) }}</div>
-          <div class="muted">{{ actionText(row.action) }}<template v-if="row.tool"> · {{ row.tool }}</template></div>
         </template>
+      </el-table-column>
+      <el-table-column :label="t('keelbase.audit.colObject')" min-width="200">
+        <!-- ③ 哪个业务对象：业务名 + 业务主键（表名、裸 id 都不算）。 -->
+        <!-- ③ which business object: business name plus business key. -->
+        <template #default="{ row }">{{ objectOf(row) }}</template>
       </el-table-column>
       <el-table-column :label="t('keelbase.audit.colResult')" width="150">
         <template #default="{ row }">
           <el-tag :type="outcomeTagType(row.outcome, row.isError)" size="small">{{ resultText(row) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('keelbase.audit.colDetail')" prop="detail" show-overflow-tooltip min-width="240" />
     </el-table>
 
     <!--
@@ -256,7 +225,7 @@
           <div v-for="n in verify.chain" :key="n.id" class="chain-node" :class="{ broken: n.broken }">
             <span class="chain-id">#{{ n.id }}</span>
             <span class="chain-time">{{ timeText(n.createdAt) }}</span>
-            <span class="chain-action">{{ n.action || '—' }}</span>
+            <span class="chain-action">{{ actionText(n.action) }}</span>
             <code class="chain-hash">{{ short(n.prevHash) }} → {{ short(n.hash) }}</code>
             <el-tag v-if="n.broken" type="danger" size="small">{{ t('keelbase.audit.broken') }}</el-tag>
           </div>
@@ -285,7 +254,6 @@ import { runtimeErrorMessage } from '@/keelbase/runtime'
 import {
   actionLabelKey,
   executedMeaningKey,
-  gateLabelKey,
   outcomeLabelKey,
   outcomeMeaningKey,
   outcomeTagType,
@@ -295,6 +263,7 @@ import {
 import { resolveCallerNames } from '@/keelbase/callerNames'
 import { maskTitle } from '@/keelbase/mask'
 import { resolveRecordName } from '@/keelbase/recordNames'
+import { composeSix, objectLine, zonedTime } from '@/keelbase/sixQuestions.mjs'
 import { timeText } from '@/keelbase/time'
 
 defineOptions({ name: 'KeelbaseGovernanceAuditChain' })
@@ -418,12 +387,20 @@ function effectiveOutcome(row: AuditRow): string {
   return row.isError ? 'failed' : 'executed'
 }
 
-/** The tool in the reader's language, falling back to the registered name. */
-/** 工具名，用读者的语言；不认识就保留注册名。 */
+/**
+ * 工具名，用读者的语言。**不认识的工具不印注册名** —— 注册名是一台机器里的标识符（`create_crm_customer`），
+ * 而这一面只认业务词，所以它说「一个本控制台没有名字的工具」。原样印注册名，正是 `YD-42` 的反向可证要抓的
+ * 那一种泄漏，而「编一个业务名」比泄漏更糟。
+ *
+ * The tool in the reader's language. An unknown tool's **registered name is not printed** — a registered
+ * name is an identifier inside one machine (`create_crm_customer`), and this face reads in business words
+ * only, so it says it has no name for it. Printing the registered name is exactly the leak `YD-42`'s
+ * reverse proof catches, and inventing a business word would be worse.
+ */
 function toolText(name: string | null | undefined): string {
   if (!name) return '—'
   const key = toolLabelKey(name)
-  return key ? t(key) : name
+  return key ? t(key) : t('keelbase.audit.toolUnnamed')
 }
 
 /** What this row did, in the reader's language: the tool if there is one, else the action. */
@@ -432,24 +409,16 @@ function whatText(row: AuditRow): string {
   return row.tool ? toolText(row.tool) : actionText(row.action)
 }
 
-/** The tool's own declaration — what it says it does — when the inventory knows this tool. */
-/** 工具**自己声明的**用途 —— 清单认识这个工具时就用它。 */
-function toolDescription(row: AuditRow): string {
-  return (row.tool && inventory.value[row.tool]?.description) || ''
-}
-
-/** 这个工具声明的风险级 —— 清单认识它时。 */
-/** The tool's declared risk level, when the inventory knows this tool. */
-function toolRisk(row: AuditRow): string {
-  return (row.tool ? inventory.value[row.tool]?.riskLevel : '') || ''
-}
-
-/** What this tool's gate does to it — the effective one, in the reader's language. */
-/** 这个工具的闸会把它怎么样 —— 生效的那道，用读者的语言。 */
-function toolGateOf(row: AuditRow): string {
-  const mode = row.tool ? inventory.value[row.tool]?.gateMode : ''
-  const key = gateLabelKey(mode)
-  return key ? t(key) : (mode || '')
+/**
+ * 这个工具**生效的闸门** —— 六问里第五问（谁确认）就按它回答。它从运行时那条清单读，不在这页里写死：
+ * 写死一个「要确认」，就等于本页自己发明了一条治理事实。
+ *
+ * The tool's **effective gate** — the basis of the fifth question (who confirmed). It is read from the
+ * inventory the runtime serves, not typed into this page: a hardcoded "asks for confirmation" would be
+ * this page inventing a governance fact.
+ */
+function toolGate(row: AuditRow): string {
+  return (row.tool ? inventory.value[row.tool]?.gateMode : '') || ''
 }
 
 /**
@@ -479,24 +448,47 @@ function recordState(e: EffectRow): string {
   return t('keelbase.effects.statePresent')
 }
 
-/** The matched record as one line: what it is, which one, and its masked title. */
-/** 对上的那条记录，一行说完：是什么、哪一条、以及**掩码后的**标题。 */
-function recordText(row: AuditRow): string {
-  const e = recordOf(row)
+/** The host's own answer for what that record is called, asked when the row was opened. Masked where drawn. */
+/** 宿主自己答的「这条记录叫什么」，行被摊开时问的。画出来时掩码。 */
+function hostNowNameOf(e: EffectRow | null): string {
   if (!e) return ''
-  // The title is drawn only where the runtime answered one: it names this deployment's sample module's
-  // records and answers nothing for the others, and a "masked" note beside a title that never existed
-  // would describe an act nobody performed.
-  // 标题只在运行时**真答了**的时候画：它只给本部署**样例模块**的记录配标题、对其余的一律不答；而在一个
-  // **本来就没有**的标题旁边写「已掩码」，是在描述一件没人做过的事。
-  const parts = [e.resultType || '—', `#${e.resultId ?? '—'}`]
-  // The host's own answer first (asked when the row was opened), then what the ledger carried. Either
-  // way it is masked before it is drawn.
-  // 先用**宿主自己的答复**（行被摊开时问的），再用台账带的那一份。无论哪一份，**画出来之前都先掩码**。
-  const shown = recordNames.value[`${e.resultType ?? ''}#${e.resultId}`] || e.targetTitle
-  if (shown) parts.push(maskTitle(shown))
-  parts.push(recordState(e))
-  return `${parts.join(' · ')} ${t('keelbase.audit.matchNote')}`
+  return recordNames.value[`${e.resultType ?? ''}#${e.resultId}`] || e.targetTitle || ''
+}
+
+/**
+ * ③ 哪个业务对象，给表格那一列。**业务名 + 业务主键**：运行时的类型名（`crm_customer` 这类）不出现在
+ * 读者这一面，控制台不认识的类型说「未登记」而不是把表名印出来。
+ *
+ * ③ which business object, for the table column: **business name plus business key**. The runtime's own
+ * type name does not appear on the reader's face; a type this console does not know says so rather than
+ * printing the table name.
+ */
+function objectOf(row: AuditRow): string {
+  const e = recordOf(row)
+  return objectLine({ effect: e, hostNowName: hostNowNameOf(e), mask: maskTitle, t, te }).text
+}
+
+/**
+ * 六问的**全部答案**，一行操作一份。`YD-42` 的判据就是这六格：答得出、且只用业务词。
+ *
+ * All six answers for one operation. `YD-42`'s criterion is exactly these six cells: answerable, and in
+ * business words only.
+ */
+function sixOf(row: AuditRow) {
+  const e = recordOf(row)
+  return composeSix({
+    row,
+    callerName: row.userId ? callerName(row.userId) : '',
+    gate: toolGate(row),
+    effect: e,
+    hostNowName: hostNowNameOf(e),
+    recordState: e ? recordState(e) : '',
+    mask: maskTitle,
+    resultWord: resultText(row),
+    resultMeaning: meaningText(row),
+    t,
+    te,
+  })
 }
 
 /**
@@ -621,9 +613,20 @@ async function loadRows() {
     }
     // The ledger, for the drill-down only: it is the one face that knows which record a write landed
     // on. Bounded to one window of it, and the page says so where it uses it.
+    //
+    // ⚠ The window has to be the **newest** one. `/ai/tool-effects` orders oldest first, so asking for
+    // page 1 under a bounded limit returned the *oldest* rows — every fresh write fell outside the
+    // window and its drill-down said 「未记录」 while the ledger held the record. The total is read
+    // first and the last page is asked for, so the window follows the money.
+    //
     // 台账，只给下钻用：它是唯一知道「这次写落在哪条记录上」的那条面。只取一窗，且页面在用到它的地方
     // 把这一点说出来。
-    const ledger = await effectApi.list(1, EFFECT_WINDOW)
+    //
+    // ⚠ 这一窗必须是**最新**的那一窗。`/ai/tool-effects` 按最旧在前排，故在有界 limit 下取第 1 页拿到的
+    // 是**最旧**的行 —— 每一次新的写都落在窗口外，下钻说「未记录」，而台账其实记着。故先读总数、再取最后一页。
+    const head = await effectApi.list(1, 1)
+    const lastPage = Math.max(1, Math.ceil(head.total / EFFECT_WINDOW))
+    const ledger = await effectApi.list(lastPage, EFFECT_WINDOW)
     effects.value = ledger.items
   } catch (e) {
     rows.value = []
@@ -679,6 +682,18 @@ onMounted(() => {
 .d-key {
   min-width: 72px;
   color: var(--el-text-color-secondary);
+}
+.six-title {
+  margin: 2px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.six-row .d-key {
+  min-width: 148px;
+  white-space: nowrap;
+}
+.six-missing {
+  color: var(--el-color-warning);
 }
 .chain {
   display: flex;

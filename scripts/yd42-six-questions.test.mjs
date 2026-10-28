@@ -1,0 +1,299 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// `YD-42` 的判据，钉在**真实操作**上：一次自动放行的写 · 一次需确认的写 · 一次被拒的写，各按六问答一遍，
+// 共 18 格；通过 = ≥15 格，且每一次至少 5 格。另有一条**反向可证**：一份会把内部工具名 / 表名 / 执行线程 id
+// 透给读者的答案，那一次记 **0 格** —— 这一条不是补充说明，它是「不是有个页面就算」那颗钉子。
+//
+//     node --test scripts/yd42-six-questions.test.mjs
+//     KEELBASE_REPO_ROOT=D:/Rain6fish/KeelBase-YuDao node --test scripts/yd42-six-questions.test.mjs   # 改前的树：红
+//
+// 三条操作是 2026-10-28 在真栈上跑出来的（宿主 48086，`admin` 一次改客户走自动放行、一次走本人确认、
+// 一次由本人拒绝），下面**行与台账的取值都是那次运行的原样**（`ai_audit_logs` 3454 / 3459 / 3464，
+// `side_effects` 438 / 439）。**没有从代码里读过任何东西**：这正是判据要的「不得查代码或表结构」。
+//
+// The `YD-42` criterion, pinned to **real operations**: one auto-allowed write, one that needs
+// confirmation, one that was refused — each answered along the six questions, 18 cells in all; a pass is
+// ≥15 cells with at least 5 in every operation. Plus one **reverse proof**: an answer set that hands an
+// internal tool name, a table name or an execution id to the reader scores **zero** for that operation —
+// that is the nail in "having the page is not the point".
+//
+//     node --test scripts/yd42-six-questions.test.mjs
+//     KEELBASE_REPO_ROOT=D:/Rain6fish/KeelBase-YuDao node --test scripts/yd42-six-questions.test.mjs   # the tree before the change: red
+//
+// The three operations were run against a real stack on 2026-10-28 (host 48086: one customer update
+// auto-allowed, one confirmed by the caller, one the caller declined). The rows and ledger values below
+// are **exactly what that run wrote** (`ai_audit_logs` 3454 / 3459 / 3464, `side_effects` 438 / 439).
+// **Nothing here was read out of the code**: that is precisely the criterion's "no peeking at code or at
+// the table structure".
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const ROOT = process.env.KEELBASE_REPO_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..')
+const MODULE = join(ROOT, 'keelbase-ui/host-overlay/src/keelbase/sixQuestions.mjs')
+const PAGE = 'keelbase-ui/host-overlay/src/views/keelbase/governance/AuditChainPage.vue'
+
+const six = await import(pathToFileURL(MODULE).href)
+
+/**
+ * 英文词条，与 `0002-governance-ui.patch` 里那一份逐字相同。测试**不**去解析那份 patch：两处各写一遍，
+ * 谁改了另一处，这里的读数就会变，而不会悄悄跟着走。
+ *
+ * The English messages, verbatim from `0002-governance-ui.patch`. The test does not parse that patch: both
+ * sides carry their own copy, so editing one shows up as a changed reading instead of following silently.
+ */
+const MESSAGES = {
+  'keelbase.sixQ.title': 'The six questions',
+  'keelbase.sixQ.who': 'Who',
+  'keelbase.sixQ.when': 'When (with the zone)',
+  'keelbase.sixQ.object': 'Which business object',
+  'keelbase.sixQ.change': 'What it became (before → after)',
+  'keelbase.sixQ.confirmation': 'Who confirmed',
+  'keelbase.sixQ.result': 'What came of it',
+  'keelbase.sixQ.account': 'account',
+  'keelbase.sixQ.someone': 'Someone',
+  'keelbase.sixQ.confirmNotNeeded': 'No confirmation needed — this tool is set to run on its own',
+  'keelbase.sixQ.confirmSelf': 'confirmed it themselves, inside the conversation',
+  'keelbase.sixQ.confirmWaiting': 'has not answered yet — the write is still waiting',
+  'keelbase.sixQ.confirmDeclined': 'refused it, inside the conversation',
+  'keelbase.sixQ.confirmApprovalUnrecorded': 'a second person approved it — this row does not record who',
+  'keelbase.sixQ.confirmBlocked': 'no one can — this tool is held at a blocking risk level',
+  'keelbase.sixQ.objectUnrecorded': 'not recorded — this call wrote no record',
+  'keelbase.sixQ.objectUnnamed': 'a business object this console has no name for',
+  'keelbase.sixQ.changeNone': 'nothing was changed — no write happened',
+  'keelbase.sixQ.changeCreated': 'a new record: it has no before, and the write itself recorded no field values',
+  'keelbase.sixQ.changeBefore': 'Before',
+  'keelbase.sixQ.changeAfter': 'After',
+  'keelbase.sixQ.changeAfterUnrecorded': 'values the runtime did not record are not filled in here',
+  'keelbase.sixQ.hostNow': "the host's record as it stands now, not the snapshot taken at the write",
+  'keelbase.sixQ.fieldName': 'Customer name',
+  'keelbase.sixQ.fieldLevel': 'Level',
+  'keelbase.sixQ.fieldSource': 'Source',
+  'keelbase.sixQ.fieldDealStatus': 'Deal closed',
+  'keelbase.sixQ.fieldFollowUpStatus': 'Followed up',
+  'keelbase.record.crm_customer': 'Customer',
+}
+
+const t = (key) => MESSAGES[key] ?? key
+const te = (key) => Object.hasOwn(MESSAGES, key)
+const mask = (text) => `${[...String(text)].slice(0, 1).join('')}****`
+
+/**
+ * 三条操作，按它们**实际写下的样子**。第四条 `for` 指的是这一行在台账里配到的那条副作用（运行时的配对
+ * 规则：同一工具、五秒之内、且恰好一个候选）。
+ *
+ * The three operations, exactly as they were written. `effect` is the ledger row each one matches (the
+ * runtime's own rule: same tool, within five seconds, and exactly one candidate).
+ */
+const OPERATIONS = [
+  {
+    name: 'A · auto-allowed write',
+    row: {
+      id: 3454,
+      userId: '1',
+      action: 'tool_call',
+      detail: 'update_crm_customer -> ok',
+      isError: false,
+      createdAt: '2026-10-28T05:37:06.564268Z',
+      outcome: 'executed',
+      tool: 'update_crm_customer',
+      executionId: 'fda3e3d0-2954-4c48-be60-f1e1ece29c61',
+    },
+    gate: 'auto',
+    effect: {
+      resultType: 'crm_customer',
+      resultId: 9005,
+      targetTitle: null,
+      beforeSnapshot:
+        '{"id":9005,"name":"万象商业服务有限公司","ownerUserId":1,"dealStatus":false,"followUpStatus":false,"level":3,"source":8}',
+      afterSnapshot: '{"id":9005}',
+    },
+    hostNowName: '修改客户',
+    recordState: 'still there',
+    resultWord: 'Executed',
+    resultMeaning: 'It really happened; the write is in the system',
+  },
+  {
+    name: 'B · write that needed confirmation',
+    row: {
+      id: 3459,
+      userId: '1',
+      action: 'tool_call',
+      detail: 'update_crm_customer -> ok',
+      isError: false,
+      createdAt: '2026-10-28T05:37:14.633602Z',
+      outcome: 'executed',
+      tool: 'update_crm_customer',
+      executionId: 'f8f1bda5-246c-45b0-9fbe-88dc4131be92',
+    },
+    gate: 'confirm',
+    effect: {
+      resultType: 'crm_customer',
+      resultId: 9006,
+      targetTitle: null,
+      beforeSnapshot:
+        '{"id":9006,"name":"江城市政信息服务有限公司","ownerUserId":1,"dealStatus":false,"followUpStatus":false,"level":2,"source":4}',
+      afterSnapshot: '{"id":9006}',
+    },
+    hostNowName: '修改客户',
+    recordState: 'still there',
+    resultWord: 'Executed',
+    resultMeaning: 'It really happened; the write is in the system',
+  },
+  {
+    name: 'C · write that was refused',
+    row: {
+      id: 3464,
+      userId: '1',
+      action: 'tool_confirmation',
+      detail: 'update_crm_customer declined (in_band)',
+      isError: true,
+      createdAt: '2026-10-28T05:37:56.165526Z',
+      outcome: 'declined',
+      tool: 'update_crm_customer',
+      executionId: null,
+    },
+    gate: 'confirm',
+    effect: null,
+    hostNowName: '',
+    recordState: '',
+    resultWord: 'Declined',
+    resultMeaning: 'A person declined it, so it will not happen',
+  },
+]
+
+const answersFor = (op) =>
+  six.composeSix({
+    row: op.row,
+    callerName: 'KeelBase',
+    gate: op.gate,
+    effect: op.effect,
+    hostNowName: op.hostNowName,
+    recordState: op.recordState,
+    mask,
+    resultWord: op.resultWord,
+    resultMeaning: op.resultMeaning,
+    t,
+    te,
+  })
+
+test('every operation answers at least five of the six questions', () => {
+  for (const op of OPERATIONS) {
+    const scored = six.scoreSix(answersFor(op))
+    assert.equal(scored.leaked.length, 0, `${op.name}: leaked ${scored.leaked.join(', ')}`)
+    assert.ok(scored.cells >= 5, `${op.name}: only ${scored.cells} of 6 answered`)
+  }
+})
+
+test('the eighteen cells come to at least fifteen', () => {
+  const cells = OPERATIONS.map((op) => six.scoreSix(answersFor(op)).cells)
+  const total = cells.reduce((a, b) => a + b, 0)
+  assert.ok(total >= 15, `total ${total} of 18 (${cells.join(' + ')})`)
+})
+
+test('the auto-allowed write says 「无需确认」 out loud', () => {
+  const answers = answersFor(OPERATIONS[0])
+  const confirmation = answers.find((a) => a.key === 'confirmation')
+  assert.equal(confirmation.answered, true, 'the auto-allowed row leaves the fifth question blank')
+  assert.match(confirmation.text, /No confirmation needed/, 'the auto-allowed row does not say so')
+})
+
+test('the confirmed write names who confirmed, and the refused one says a person said no', () => {
+  const confirmed = answersFor(OPERATIONS[1]).find((a) => a.key === 'confirmation')
+  assert.match(confirmed.text, /KeelBase confirmed it themselves/)
+  const refused = answersFor(OPERATIONS[2]).find((a) => a.key === 'confirmation')
+  assert.match(refused.text, /KeelBase refused it/)
+})
+
+test('the time carries a zone', () => {
+  const when = answersFor(OPERATIONS[0]).find((a) => a.key === 'when')
+  assert.match(when.text, /^2026-10-28 \d{2}:\d{2}:\d{2} UTC[+-]\d{2}:\d{2}$/, `got "${when.text}"`)
+})
+
+test('the business object is a business name and a key, never the type name', () => {
+  const object = answersFor(OPERATIONS[0]).find((a) => a.key === 'object')
+  assert.match(object.text, /^Customer · #9005/, `got "${object.text}"`)
+  assert.doesNotMatch(object.text, /crm_customer/)
+})
+
+test('the change shows the before it recorded and says what the after lacks', () => {
+  const change = answersFor(OPERATIONS[0]).find((a) => a.key === 'change')
+  assert.match(change.text, /Before: Customer name 万\*\*\*\* · Level 3 · Source 8/)
+  assert.match(change.text, /Customer name 万\*\*\*\* → 修\*\*\*\*/, 'the changed field is not named')
+  assert.match(change.text, /not filled in here/, 'the runtime-missing after is not disclosed')
+})
+
+test('a refused write says nothing in the system changed', () => {
+  const change = answersFor(OPERATIONS[2]).find((a) => a.key === 'change')
+  assert.match(change.text, /nothing was changed/)
+})
+
+// ---------------------------------------------------------------------------------------------------
+// 反向可证：把改前那一面的答案交回来，必须记 0 格。
+// The reverse proof: hand back the answers the face gave before the change, and it has to score zero.
+// ---------------------------------------------------------------------------------------------------
+
+/**
+ * 改前那一面答出来的东西 —— 逐项照着它当时**画**的东西写：`recordText` 第一条就是运行时的类型名
+ * （`crm_customer`，一张表），时间是本地时间但**不带时区**，第四问与第五问根本不画。
+ *
+ * What the face answered before the change, item by item as it **drew** them: `recordText`'s first part
+ * is the runtime's type name (`crm_customer`, a table), the time is local but carries **no zone**, and
+ * the fourth and fifth questions were not drawn at all.
+ */
+function preChangeAnswers(op) {
+  const e = op.effect
+  return [
+    { key: 'who', text: 'KeelBase（account #1）', answered: true },
+    { key: 'when', text: '2026-10-28 13:37:06', answered: true },
+    {
+      key: 'object',
+      text: e ? `${e.resultType} · #${e.resultId} · 万**** · still there` : '—',
+      answered: Boolean(e),
+    },
+    { key: 'change', text: '', answered: false },
+    { key: 'confirmation', text: '', answered: false },
+    { key: 'result', text: op.resultWord, answered: true },
+  ]
+}
+
+test('the pre-change face scores zero for the operation it leaks on', () => {
+  const scored = six.scoreSix(preChangeAnswers(OPERATIONS[0]))
+  assert.equal(scored.cells, 0, 'a version that prints the table name still scored cells')
+  assert.deepEqual(scored.leaked, ['crm_customer'], `leak reported as ${JSON.stringify(scored.leaked)}`)
+  assert.equal(scored.answer, 'object')
+})
+
+test('the leak detector is not vacuous, and prose is not a leak', () => {
+  assert.deepEqual(six.leaksIn('crm_customer · #9005'), ['crm_customer'])
+  assert.deepEqual(six.leaksIn('update_crm_customer'), ['update_crm_customer'])
+  assert.deepEqual(six.leaksIn('fda3e3d0-2954-4c48-be60-f1e1ece29c61'), ['fda3e3d0-2954-4c48-be60-f1e1ece29c61'])
+  assert.deepEqual(six.leaksIn('{"ownerUserId":1}'), ['ownerUserId'])
+  assert.deepEqual(six.leaksIn('declined'), ['declined'])
+  // ordinary sentences are not leaks
+  assert.deepEqual(six.leaksIn('A person declined it, so it will not happen'), [])
+  assert.deepEqual(six.leaksIn('Customer · #9005 · 万**** · still there'), [])
+})
+
+// ---------------------------------------------------------------------------------------------------
+// 读者那一面：页面上不再画工具注册名，也不再画运行时原文的 `detail`。
+// The reader's face: the page no longer draws the registered tool name, nor the runtime's raw `detail`.
+// ---------------------------------------------------------------------------------------------------
+
+const page = readFileSync(join(ROOT, PAGE), 'utf8')
+const template = page.slice(0, page.indexOf('<script'))
+
+test('the expanded row is the six questions', () => {
+  const start = template.indexOf('<el-table-column type="expand">')
+  const block = start < 0 ? '' : template.slice(start, template.indexOf('</el-table-column>', start))
+  assert.ok(block, 'no expand column')
+  assert.match(block, /sixOf\(row\)/, 'the expansion does not draw the six answers')
+  assert.match(block, /keelbase\.sixQ\.title/)
+})
+
+test('the reader-facing template draws no internal tool name and no raw detail', () => {
+  assert.doesNotMatch(template, /row\.tool\b/, 'the template still prints the registered tool name')
+  assert.doesNotMatch(template, /row\.detail\b/, "the template still prints the runtime's raw detail")
+})

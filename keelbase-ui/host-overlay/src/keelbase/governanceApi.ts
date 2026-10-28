@@ -30,6 +30,24 @@ export interface AuditRow {
   /** C-3: the tool this row is about; null when the row is not about one. */
   /** C-3：这一行讲的那个工具；这一行不是在讲某个工具时为 null。 */
   tool: string | null
+  /**
+   * v6: the governed execution this row belongs to. It is what pairs an intent row with its result
+   * row; a block, a pending decision, an approval or a decline is not part of an execution and carries
+   * null. Declared here because the runtime already sends it (`AuditService#row`) — nothing is asked of
+   * the wire that it does not answer today.
+   *
+   * v6：这一行所属的那一次受治理执行。它把一次尝试的 intent 行与结果行配到一起；拦截、待决、批准与否决
+   * 不属于任何一次执行、带 null。这里声明它，是因为运行时**已经在发**它（`AuditService#row`）——
+   * 没有向线缆要任何它今天不答的东西。
+   */
+  executionId?: string | null
+  /**
+   * What allowed or refused this row — the structured verdict of the gate that let the write run. It is
+   * not drawn on this page: the six-question block says what happened in business words instead.
+   *
+   * 凭什么允许或拒绝这一行 —— 那道让写跑起来的闸的结构化裁决。本页不画它：六问那一块用业务词说结果。
+   */
+  authorization?: string | null
 }
 
 /** One node of the walk `/audit/verify` performs — the chain itself, not a summary of it. */
@@ -70,6 +88,24 @@ export interface EffectRow {
   status: 'executed' | 'revoked' | string
   revokeStatus: string | null
   revocable: boolean
+  /**
+   * The row as it was before this write, and what the tool returned as having written. Both are on the
+   * wire already (`EffectController`); the audit detail draws them as the "before → after" of the
+   * changed fields. For an update the runtime records only an `id` in the after — that is what the tool
+   * hands back — so the page says which half it has rather than dressing one up as the other.
+   *
+   * 这一行在这次写**之前**的样子，以及工具交回来的、它写了什么。两者都已经在线缆上（`EffectController`）；
+   * 审计详情把它们画成被改字段的「改前 → 改后」。一次改行的改后，运行时**只**记下了一个 `id`——那正是工具
+   * 交回来的东西——故页面说清楚它拿到的是哪一半，而不是把一半装成另一半。
+   */
+  beforeSnapshot?: string | null
+  afterSnapshot?: string | null
+  /** The conversation this effect belongs to; null for a write made outside one. */
+  /** 这条副作用所属的会话；不在会话里发生的写为 null。 */
+  conversationId?: string | null
+  /** The governed execution that wrote this row. Empty on this deployment's ledger rows today. */
+  /** 写下这一行的那次受治理执行。本部署的台账行今天这一列是空的。 */
+  executionId?: string | null
 }
 
 export interface EffectPage {

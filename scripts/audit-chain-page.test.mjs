@@ -98,11 +98,11 @@ function undefinedCalls(source) {
   return [...calledNames(block)].filter((name) => !allowed.has(name)).sort()
 }
 
-test('the expand column exists and draws the write-record line from a helper', () => {
+test('the expand column exists and draws the six answers from a helper', () => {
   const block = expandBlock(page)
   assert.ok(block, 'no `type="expand"` column in the template')
-  assert.match(block, /keelbase\.audit\.writeRecord/, 'the expansion no longer labels the write record')
-  assert.match(block, /recordText\(row\)/, 'the expansion no longer draws the matched record')
+  assert.match(block, /keelbase\.sixQ\.title/, 'the expansion no longer labels the six questions')
+  assert.match(block, /sixOf\(row\)/, 'the expansion no longer draws the six answers')
 })
 
 test('every helper the expansion calls resolves in the same file', () => {
@@ -131,10 +131,16 @@ test('the write record is shown only when exactly one candidate matches', () => 
   )
 })
 
-test('the risk level is read from the inventory, not typed into the page', () => {
+test('the gate is read from the inventory, not typed into the page', () => {
+  // The expansion used to print the declared risk level; it now answers 「谁确认」 from the tool's
+  // effective **gate**. The rule is the same one, on the fact that now matters: a governance fact is
+  // read from the inventory the runtime serves, never typed into this page.
+  //
+  // 展开块此前印的是声明的风险级；现在它按工具**生效的闸门**回答「谁确认」。规则没变、只是换了那个要紧的事实：
+  // 治理事实从运行时那条清单读，绝不在本页写死。
   assert.match(
     script,
-    /function toolRisk\(row: AuditRow\): string \{\s*return \(row\.tool \? inventory\.value\[row\.tool\]\?\.riskLevel : ''\) \|\| ''/,
-    'toolRisk no longer takes the level from the tool inventory',
+    /function toolGate\(row: AuditRow\): string \{\s*return \(row\.tool \? inventory\.value\[row\.tool\]\?\.gateMode : ''\) \|\| ''/,
+    'toolGate no longer takes the gate from the tool inventory',
   )
 })
