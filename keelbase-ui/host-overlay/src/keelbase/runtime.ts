@@ -29,16 +29,35 @@ export const runtime: AxiosInstance = axios.create({ baseURL, timeout: 20000 })
  * runtime carries an advice of its own that wraps them so an embedded deployment answers like its
  * host. Callers here want the object, not the envelope around it. A bare object is passed through
  * unchanged, so the client does not depend on which of the two it is talking to; the test for "is
- * this an envelope" is the numeric `code`, which is what the host's own interceptor tests too.
+ * this an envelope" is the numeric `code`.
+ *
+ * **A non-success code is an error, not data.** The host answers a failed call as HTTP 200 with
+ * `{code:500, data:null, msg:'系统异常'}`, and the runtime's own advice says 200 for success (the
+ * host's own envelope says 0) — so unwrapping without checking the code handed callers `null` and
+ * made a failed decision look like an answer. A decision page then reported "approved" for a write
+ * the server had refused. Both success codes are accepted; anything else rejects with the server's
+ * message.
  *
  * 运行时的答复是包在**宿主的信封**里的——`{code, message, data}`——因为运行时自带一条 advice 把它们
  * 包起来，好让嵌入部署答得像它的宿主。这里的调用方要的是那个对象，不是它外面那层信封。裸对象原样
- * 放行，故客户端不依赖自己在跟哪一个说话；判「是不是信封」看的是那个**数字** `code`——宿主自己的
- * 拦截器判的也是它。
+ * 放行，故客户端不依赖自己在跟哪一个说话；判「是不是信封」看的是那个**数字** `code`。
+ *
+ * **非成功码是错误、不是数据。** 宿主把一次失败的调用答成 HTTP 200 + `{code:500,data:null,msg:'系统异常'}`，
+ * 而运行时自己的 advice 成功时写 200（宿主自己的信封写 0）—— 于是不看码就拆信封会把 `null` 交给调用方，
+ * 一次失败的裁决被读成了答复，页面随即对一次**服务端已拒绝**的写报「已批准」。两个成功码都认，其余一律以
+ * 服务端自己的消息 reject。
  */
+const ENVELOPE_OK_CODES = new Set([0, 200])
+
 function unwrapEnvelope(payload: unknown): unknown {
-  const p = payload as { code?: unknown; data?: unknown } | null | undefined
-  if (p && typeof p === 'object' && typeof p.code === 'number' && 'data' in p) return p.data
+  const p = payload as { code?: unknown; data?: unknown; message?: unknown; msg?: unknown } | null | undefined
+  if (p && typeof p === 'object' && typeof p.code === 'number') {
+    if (!ENVELOPE_OK_CODES.has(p.code)) {
+      const said = p.message ?? p.msg
+      throw new Error(typeof said === 'string' && said ? said : `runtime error ${p.code}`)
+    }
+    return 'data' in p ? p.data : payload
+  }
   return payload
 }
 

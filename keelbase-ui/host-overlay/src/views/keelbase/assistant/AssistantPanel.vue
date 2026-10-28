@@ -454,8 +454,29 @@ async function send() {
 
 async function decide(token: string, decision: 'approve' | 'decline') {
   try {
-    await confirmationApi.decide(token, decision)
-    ElMessage.success(decision === 'approve' ? '已批准' : '已拒绝')
+    const res = await confirmationApi.decide(token, decision)
+    // The server says whether the approved write actually ran. Reporting only "已批准" hid a failed
+    // execution: the row left this card and no ledger row appeared, so the reader saw success.
+    //
+    // 服务端会说批准的那次写到底跑没跑成。只报「已批准」会把失败的执行藏起来：那一行从这张卡上消失、
+    // 台账也没有新行，读者看到的就成了成功。
+    if (res?.ok === false) {
+      ElMessage.error(res.message || '裁决没有通过')
+    } else if (decision === 'decline') {
+      ElMessage.success('已拒绝')
+    } else if (res?.success === true) {
+      ElMessage.success('已批准并执行成功')
+    } else if (res?.success === false) {
+      ElMessage.warning(
+        res.message
+          ? `已批准，但没有执行成功：${res.message}`
+          : '已批准，但没有执行成功。系统没有记下原因。',
+      )
+    } else {
+      // No answer about execution; say exactly that rather than announcing "approved".
+      // 对执行结果没有答复；就照实这么说，而不是宣布「已批准」。
+      ElMessage.warning('已批准，但没有拿到执行结果。')
+    }
     await loadCards()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : String(e))

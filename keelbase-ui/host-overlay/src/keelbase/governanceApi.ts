@@ -15,6 +15,30 @@
 // 它们。另一条路是画一个永远只能空着的列、或者编一个值，两者都比一张更窄的表更糟。
 import { runtime } from './runtime'
 
+/** One check the gate evaluated, in the frozen authorization shape. */
+/** 闸门评估过的一道检查，按冻结的授权形状。 */
+export interface AuthorizationCheck {
+  name: string
+  ok: boolean
+  note?: string
+}
+
+/**
+ * Why a call was allowed or refused — the runtime's frozen authorization snapshot, carried on the
+ * audit row. The console used to drop it; F-18 renders the checks it already receives.
+ *
+ * 一次调用**凭什么**被允许或被拒 —— 运行时那份冻结的授权快照，随审计行一起到。控制台过去把它丢掉；
+ * F-18 把已经收到的这几道检查画出来。
+ */
+export interface AuthorizationBasis {
+  tool?: string
+  riskLevel?: string
+  riskStrategy?: string
+  requiresConfirmation?: boolean
+  checks?: AuthorizationCheck[]
+  policy?: { revision?: string } | null
+}
+
 /** One audit row, in the frozen `ai-audit-log-row` shape the runtime fills. */
 /** 一行审计行，按运行时填的冻结对象 `ai-audit-log-row` 的形状。 */
 export interface AuditRow {
@@ -42,12 +66,15 @@ export interface AuditRow {
    */
   executionId?: string | null
   /**
-   * What allowed or refused this row — the structured verdict of the gate that let the write run. It is
-   * not drawn on this page: the six-question block says what happened in business words instead.
+   * What let it through, or refused it — null when the runtime recorded no basis for this row.
+   * This host stores the basis as a canonical JSON string and sends it verbatim; the reader parses
+   * that string, and also accepts an already-parsed object so the type does not depend on which
+   * shape a deployment happens to send.
    *
-   * 凭什么允许或拒绝这一行 —— 那道让写跑起来的闸的结构化裁决。本页不画它：六问那一块用业务词说结果。
+   * 放行或拒绝它的依据 —— 运行时没有为这一行记下依据时为 null。本宿主把它存成规范 JSON 串并原样发出；
+   * 读侧解析这个串，也接受已解析的对象，使类型不依赖某个部署恰好发的是哪一种形状。
    */
-  authorization?: string | null
+  authorization?: AuthorizationBasis | string | null
 }
 
 /** One node of the walk `/audit/verify` performs — the chain itself, not a summary of it. */
@@ -221,13 +248,30 @@ export const coverageApi = {
     runtime.get<CoverageStatement>('/audit/coverage', { params: query }).then((r) => r.data),
 }
 
+/**
+ * What an out-of-band decision did, in the shape both runtimes answer (`OutOfBandDecision`).
+ * `ok=false` means the row changed nothing (already decided, past its window, not yours);
+ * `success` says whether the approved write actually ran, and `message` why it did not.
+ *
+ * 一次离线裁决做了什么，按两个运行时都这么答的形状。`ok=false` 指这一行什么都没改（已被裁决、
+ * 过了窗口、不是你的）；`success` 说批准的那次写到底跑没跑成，`message` 说为什么没成。
+ */
+export interface OutOfBandDecision {
+  ok: boolean
+  success?: boolean | null
+  resultId?: number | string | null
+  message?: string | null
+}
+
 export const confirmationApi = {
   mine: (status?: string) =>
     runtime
       .get<ConfirmationItem[]>('/ai/my/confirmations', { params: status ? { status } : {} })
       .then((r) => r.data),
   decide: (token: string, decision: 'approve' | 'decline') =>
-    runtime.post(`/ai/my/confirmations/${encodeURIComponent(token)}/decide`, { decision }).then((r) => r.data),
+    runtime
+      .post<OutOfBandDecision>(`/ai/my/confirmations/${encodeURIComponent(token)}/decide`, { decision })
+      .then((r) => r.data),
 }
 
 /**
@@ -367,6 +411,9 @@ export interface TraceStep {
   toolName?: string | null
   success?: boolean | null
   errorMessage?: string | null
+  /** The runtime's own record line for the step — where a blocked call names its cause. */
+  /** 运行时给这一步自己的记录行 —— 被拦下的调用在这里点名成因。 */
+  detail?: string | null
   outcome?: string | null
   effect?: TraceEffect | null
 }

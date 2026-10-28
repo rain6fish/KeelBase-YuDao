@@ -45,6 +45,10 @@
             <el-tag v-if="c.riskLevel" size="small" effect="plain">{{ c.riskLevel }}</el-tag>
             <el-tag v-if="c.mode !== 'immediate'" size="small" type="info" effect="plain">{{ c.mode }}</el-tag>
           </div>
+          <!-- F-18：为什么需要一个人点头，以及它停在哪一步 —— 两句都由行上已有的字段说。 -->
+          <!-- F-18: why a person is needed, and which step it stopped at — both from fields the row already carries. -->
+          <div class="row-reason">{{ reasonText(c) }}</div>
+          <div class="row-step">{{ stepLine(c) }}</div>
           <!--
             A human-readable summary is a field the runtime sends as null: it has no presentation
             layer. The arguments are shown verbatim instead — they are what the call would carry,
@@ -74,8 +78,47 @@
         <div v-else-if="c.mode !== 'immediate'" class="row-actions text-12px text-[var(--el-text-color-secondary)]">
           {{ t('keelbase.actionCenter.notDecidableHere') }}
         </div>
+        <!-- F-18：只读角色看到的是同一行、没有按钮 —— 这里把「为什么没有」说出来，而不是留白。 -->
+        <!-- F-18: a read-only role sees the same row with no buttons — say why instead of leaving it blank. -->
+        <div v-else class="row-actions text-12px text-[var(--el-text-color-secondary)]">
+          {{ t('keelbase.actionCenter.readOnlyNote') }}
+        </div>
       </div>
     </div>
+  </ContentWrap>
+
+  <!-- F-18：判决落下的那些行不该消失。这里只渲染运行时已经返回、而页面过去没要的字段。 -->
+  <!-- F-18: rows that were decided should not vanish. This renders only fields the runtime already
+       returns and the page never asked for. -->
+  <ContentWrap :title="t('keelbase.actionCenter.historyTitle')">
+    <template #header>
+      <el-tag v-if="decided.length" size="small" effect="plain">
+        {{ t('keelbase.actionCenter.historyCount', { n: decided.length }) }}
+      </el-tag>
+      <el-button class="ml-auto" size="small" :loading="pendingLoading" @click="loadPending">
+        {{ t('keelbase.common.refresh') }}
+      </el-button>
+    </template>
+
+    <div class="mb-10px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.actionCenter.historyHint') }}</div>
+
+    <el-empty v-if="!decided.length" :description="t('keelbase.actionCenter.historyEmpty')" />
+    <div v-else>
+      <div v-for="h in decided" :key="h.token" class="row">
+        <div class="row-main">
+          <div class="row-head">
+            <span class="font-weight-medium">{{ toolText(h.toolName) }}</span>
+            <el-tag :type="historyTagType(h)" size="small">{{ historyOutcome(h) }}</el-tag>
+          </div>
+          <div class="row-step">{{ t('keelbase.actionCenter.stepReached', { step: historyStep(h) }) }}</div>
+          <div v-if="historyReason(h)" class="row-reason">
+            {{ t('keelbase.actionCenter.reasonLabel', { reason: historyReason(h) }) }}
+          </div>
+          <div class="row-meta">{{ t('keelbase.actionCenter.decidedLabel', { at: timeText(h.decidedAt) }) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-8px text-12px text-[var(--el-text-color-secondary)]">{{ t('keelbase.actionCenter.notHereNote') }}</div>
   </ContentWrap>
 
   <ContentWrap :title="t('keelbase.actionCenter.writesTitle')">
@@ -269,6 +312,9 @@ function stateText(row: EffectRow): string {
 }
 
 const pending = ref<ConfirmationItem[]>([])
+/** Decisions that have already been taken — the endpoint answers them when `status` is left out. */
+/** 已经裁决过的记录 —— 不带 `status` 时端点就会把它们答回来。 */
+const decided = ref<ConfirmationItem[]>([])
 const pendingLoading = ref(false)
 const deciding = ref<string | null>(null)
 
@@ -296,6 +342,69 @@ function formatArgs(args: Record<string, unknown> | null): string {
   }
 }
 
+/**
+ * Why this row needs a person. Built from what the row already carries (`mode` + `riskLevel`) —
+ * no new field, and no guess about a check list the runtime does not store on the row.
+ *
+ * 这一行为什么需要一个人。由行上已有的 `mode` + `riskLevel` 拼出 —— 不加字段，也不去猜运行时
+ * 并没有存在行上的那份检查清单。
+ */
+function reasonText(c: ConfirmationItem): string {
+  if (c.mode === 'approval') return t('keelbase.actionCenter.reasonApproval')
+  if (c.mode === 'run') return t('keelbase.actionCenter.reasonRun')
+  return t('keelbase.actionCenter.reasonImmediate')
+}
+
+/** Which step the row stopped at, and who it is waiting for. */
+/** 这一行停在哪一步、在等谁。 */
+function stepLine(c: ConfirmationItem): string {
+  const who = c.mode === 'immediate'
+    ? t('keelbase.actionCenter.stepWaitingYou')
+    : t('keelbase.actionCenter.stepWaitingOther')
+  return `${t('keelbase.actionCenter.stepConfirm')} · ${t('keelbase.actionCenter.stepHere')} · ${who}`
+}
+
+/** The word for a decided row: the decision axis first, then whether the approved write ran. */
+/** 一条已裁决记录的词：先看决策轴，再看批准的那次写到底跑没跑成。 */
+function historyOutcome(h: ConfirmationItem): string {
+  if (h.status === 'declined') return t('keelbase.actionCenter.outcomeDeclined')
+  if (h.status === 'timeout') return t('keelbase.actionCenter.outcomeTimeout')
+  if (h.status === 'approved') {
+    if (h.executionState === 'failed') return t('keelbase.actionCenter.outcomeFailed')
+    if (h.executionState === 'succeeded') return t('keelbase.actionCenter.outcomeExecuted')
+    return t('keelbase.actionCenter.outcomeApproved')
+  }
+  return h.status
+}
+
+function historyTagType(h: ConfirmationItem): 'success' | 'warning' | 'info' | 'danger' {
+  if (h.status !== 'approved') return 'info'
+  if (h.executionState === 'failed') return 'danger'
+  if (h.executionState === 'succeeded') return 'success'
+  return 'warning'
+}
+
+/** Where the row got to: the decision gate closed, or the write reached execution and how that went. */
+/** 这一行走到了哪：裁决门关上了，或者这次写到了执行、结果如何。 */
+function historyStep(h: ConfirmationItem): string {
+  if (h.status !== 'approved') return t('keelbase.actionCenter.stepConfirm')
+  if (h.executionState === 'succeeded') return t('keelbase.actionCenter.stepLedger')
+  if (h.executionState === 'failed') {
+    return `${t('keelbase.actionCenter.stepExecute')} · ${t('keelbase.actionCenter.stepFailed')}`
+  }
+  if (h.executionState === 'running') {
+    return `${t('keelbase.actionCenter.stepExecute')} · ${t('keelbase.actionCenter.stepRunning')}`
+  }
+  return t('keelbase.actionCenter.stepExecute')
+}
+
+/** Why an approved write did not run — the runtime's own message, or the honest "no reason recorded". */
+/** 批准的那次写为什么没跑成 —— 运行时自己的那句话，或诚实的「没有记下原因」。 */
+function historyReason(h: ConfirmationItem): string {
+  if (h.executionState !== 'failed') return ''
+  return h.executionError || t('keelbase.actionCenter.unknownReason')
+}
+
 function statusLabel(status: string): string {
   if (status === 'revoked') return t('keelbase.effects.statusRevoked')
   return t('keelbase.effects.statusExecuted')
@@ -307,14 +416,31 @@ function statusTag(status: string): 'success' | 'info' {
 
 async function loadPending() {
   pendingLoading.value = true
-  try {
-    pending.value = await confirmationApi.mine('pending')
-  } catch (e) {
+  // One call asks only for what is waiting; the other leaves `status` out, which is how the same
+  // endpoint answers the caller's decided rows. The two are **settled independently**: a history read
+  // that fails (403, a broken envelope) must not empty the card that is waiting on the person — that
+  // card is the one they came to act on.
+  //
+  // 一次只问在等的那些；另一次不带 `status`，同一端点就会把调用方**已裁决**的行答回来。两次**各自结算**：
+  // 「历史」那一半失败（403、坏信封）不得把「等这个人处理」的那张卡清空 —— 那张卡正是他来这里要做的事。
+  const [waiting, all] = await Promise.allSettled([confirmationApi.mine('pending'), confirmationApi.mine()])
+  if (waiting.status === 'fulfilled') {
+    pending.value = waiting.value
+  } else {
     pending.value = []
-    ElMessage.error(runtimeErrorMessage(e, t('keelbase.common.loadFailed')))
-  } finally {
-    pendingLoading.value = false
+    ElMessage.error(runtimeErrorMessage(waiting.reason, t('keelbase.common.loadFailed')))
   }
+  if (all.status === 'fulfilled') {
+    decided.value = all.value.filter((r) => r.status !== 'pending')
+  } else {
+    decided.value = []
+    // Say it once: if the pending half already reported, a second toast would describe the same outage.
+    // 只说一次：待决那一半已经报过时，再来一条只是在描述同一次故障。
+    if (waiting.status === 'fulfilled') {
+      ElMessage.warning(runtimeErrorMessage(all.reason, t('keelbase.common.loadFailed')))
+    }
+  }
+  pendingLoading.value = false
 }
 
 async function loadEffects() {
@@ -361,8 +487,38 @@ async function onExpand(row: EffectRow, expandedRows: EffectRow[]) {
 async function decide(item: ConfirmationItem, decision: 'approve' | 'decline') {
   deciding.value = item.token
   try {
-    await confirmationApi.decide(item.token, decision)
-    ElMessage.success(t(decision === 'approve' ? 'keelbase.actionCenter.approved' : 'keelbase.actionCenter.declined'))
+    const res = await confirmationApi.decide(item.token, decision)
+    // `ok=false` means nothing moved (already decided, past the window, not this caller's row).
+    // Saying "approved" here would describe a decision the server did not take.
+    //
+    // `ok=false` 指这一行什么都没改（已被裁决、过了窗口、不是这个调用方的行）。在这里说「已批准」，
+    // 等于描述一次服务端并没有作出的裁决。
+    if (res?.ok === false) {
+      ElMessage.error(res.message || t('keelbase.actionCenter.decideFailed'))
+      await loadPending()
+      return
+    }
+    if (decision === 'decline') {
+      ElMessage.success(t('keelbase.actionCenter.declined'))
+    } else if (res?.success === true) {
+      ElMessage.success(t('keelbase.actionCenter.executedOk'))
+    } else if (res?.success === false) {
+      // Approved, but the write did not run. The reason is the runtime's own message; when it
+      // recorded none (a crash or a hang), say exactly that instead of inventing one.
+      //
+      // 已批准，但写没跑成。原因是运行时自己的那句话；它没记下原因时（崩溃或挂起），就照实这么说。
+      ElMessage.warning(
+        res.message
+          ? t('keelbase.actionCenter.approvedNotRun', { reason: res.message })
+          : t('keelbase.actionCenter.approvedNotRunUnknown'),
+      )
+    } else {
+      // No answer about execution (an older runtime, or an empty body). Say exactly that rather
+      // than announcing "approved" — the write below is the part we do not know.
+      // 对执行结果没有答复（旧运行时，或空正文）。就照实这么说，而不是宣布「已批准」—— 下面那件事
+      // 正是我们不知道的。
+      ElMessage.warning(t('keelbase.actionCenter.approvedNoResult'))
+    }
     // An approval runs the write, so the ledger is refreshed alongside the pending list.
     // 批准会**真的执行**那笔写，故台账与待决列表一起刷新。
     await Promise.all([loadPending(), loadEffects()])
@@ -423,6 +579,15 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-top: 6px;
+}
+.row-reason {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.row-step {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .row-actions {
   display: flex;
