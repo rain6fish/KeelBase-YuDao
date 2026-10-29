@@ -272,11 +272,35 @@ export interface OutOfBandDecision {
   message?: string | null
 }
 
+/**
+ * 一页确认记录，按 `/ai/confirmations` 答的形状：与 `/ai/my/confirmations` **同一份**行投影，只是覆盖
+ * 所有调用方、且不按调用方自己的窗口收窄。
+ *
+ * One page of confirmation records, as `/ai/confirmations` answers it: the **same** row projection as
+ * `/ai/my/confirmations`, over every caller and without the caller's own window narrowing it.
+ */
+export interface ConfirmationPage {
+  total: number
+  page: number
+  limit: number
+  items: ConfirmationItem[]
+}
+
 export const confirmationApi = {
   mine: (status?: string) =>
     runtime
       .get<ConfirmationItem[]>('/ai/my/confirmations', { params: status ? { status } : {} })
       .then((r) => r.data),
+  /**
+   * 全量确认队列，只读。审计页用它回答「被扣下或被拒的那次调用落在哪条记录上」：台账里没有那一行，而
+   * 确认记录带着这次提议的参数（`arguments`）。闸是 `read Confirmation` —— 审计读者也持有。
+   *
+   * The whole confirmation queue, read-only. The audit page uses it to answer "which record was the held
+   * or refused call about": the ledger has no such row, and the confirmation record carries the
+   * arguments of that proposal. The guard is `read Confirmation` — an audit reader holds it too.
+   */
+  listAll: (page = 1, limit = 50) =>
+    runtime.get<ConfirmationPage>('/ai/confirmations', { params: { page, limit } }).then((r) => r.data),
   decide: (token: string, decision: 'approve' | 'decline') =>
     runtime
       .post<OutOfBandDecision>(`/ai/my/confirmations/${encodeURIComponent(token)}/decide`, { decision })

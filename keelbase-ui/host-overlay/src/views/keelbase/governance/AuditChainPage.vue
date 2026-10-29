@@ -256,12 +256,14 @@ import { useI18n } from 'vue-i18n'
 import { ContentWrap } from '@/components/ContentWrap'
 import {
   auditApi,
+  confirmationApi,
   coverageApi,
   effectApi,
   toolApi,
   type AuditRow,
   type AuthorizationBasis,
   type ChainVerification,
+  type ConfirmationItem,
   type CoverageStatement,
   type EffectRow,
   type ToolInventoryItem,
@@ -278,7 +280,7 @@ import {
 } from '@/keelbase/labels'
 import { resolveCallerNames } from '@/keelbase/callerNames'
 import { maskTitle } from '@/keelbase/mask'
-import { resolveRecordName } from '@/keelbase/recordNames'
+import { resolveRecordName, toolResultType } from '@/keelbase/recordNames'
 import { composeSix, objectLine, zonedTime } from '@/keelbase/sixQuestions.mjs'
 import { timeText } from '@/keelbase/time'
 
@@ -352,6 +354,25 @@ const inventory = ref<Record<string, ToolInventoryItem>>({})
 const effects = ref<EffectRow[]>([])
 
 /**
+ * 确认队列里的一窗，只读 —— 被**扣下**或被**拒**的调用不写台账，但运行时把那次提议记在确认记录里
+ * （工具名 + 它当时要用的参数）。没有这一窗，第三问（哪个业务对象）在**恰恰最该追问**的那次调用上
+ * 只能答「未记录」，尽管库里记着 `{"id":9004,…}`。
+ *
+ * 一句边界，与台账同一条：两条轨之间没有共同的键，故只在「同一工具、五秒之内、恰好一个候选」时才配上；
+ * 配不上就不画，不猜。取的是**最新**一窗（该面按最新在前排，故直接取第 1 页即是新的那一窗）。
+ *
+ * One window of the confirmation queue, read-only — a **held** or **refused** call writes no ledger row,
+ * but the runtime records that proposal in a confirmation record (the tool plus the arguments it would
+ * have run with). Without this window the third question can only say 「未记录」 on exactly the call a
+ * reader most wants to ask about, while the record sits in the database as `{"id":9004,…}`.
+ *
+ * The same boundary as the ledger: the two trails share no key, so a pair is drawn only when it is the
+ * same tool, within five seconds, and **exactly one** candidate; otherwise nothing is drawn rather than a
+ * guess. The **newest** window is read — that face orders newest first, so page 1 is that window.
+ */
+const proposals = ref<ConfirmationItem[]>([])
+
+/**
  * What each matched record is called, asked of this host on the row that needs it. Resolved when a row
  * is opened rather than for the whole page: one request per row a reader actually looks at, and the
  * host is asked only about records the ledger already named.
@@ -375,6 +396,10 @@ async function onExpand(row: AuditRow) {
 /** How many ledger rows to look through when matching. Bounded on purpose, and said on the page. */
 /** 配对时翻多少条台账行。**刻意有界**，并在页面上说出来。 */
 const EFFECT_WINDOW = 50
+
+/** 给被扣下/被拒的调用配对时翻多少条确认记录。同一个上界。 */
+/** How many confirmation records to look through when matching a held or refused call. Same bound. */
+const PROPOSAL_WINDOW = 50
 
 const query = reactive<{ userId: string; isError: string }>({ userId: '', isError: '' })
 
@@ -490,6 +515,47 @@ function recordOf(row: AuditRow): EffectRow | null {
   return near.length === 1 ? near[0] : null
 }
 
+/**
+ * 这次调用**本来**落在哪条记录上，当它被扣下或被拒时 —— 与 `recordOf` 同一条规则（同一工具、五秒之内、
+ * 恰好一个候选），只是读的是确认记录：台账只记「真的写成了什么」，确认记录记「提议了什么」。
+ *
+ * 时间对哪一端都算：扣下那一刻写的审计行离确认记录的 `createdAt` 近，裁决那一刻写的离 `decidedAt` 近。
+ *
+ * Which record the call **was about** when it was held or refused — the same rule as `recordOf` (same
+ * tool, within five seconds, exactly one candidate), read from the confirmation records: the ledger only
+ * says what was really written, a confirmation says what was proposed.
+ *
+ * Either end of the clock counts: the audit row written when the call was held is near the record's
+ * `createdAt`, and the one written when it was decided is near its `decidedAt`.
+ */
+function proposalOf(row: AuditRow): ConfirmationItem | null {
+  if (!row.tool) return null
+  const at = Date.parse(row.createdAt)
+  const near = proposals.value.filter((c) => {
+    if (c.toolName !== row.tool) return false
+    if (Math.abs(Date.parse(c.createdAt) - at) <= 5000) return true
+    return Boolean(c.decidedAt) && Math.abs(Date.parse(c.decidedAt as string) - at) <= 5000
+  })
+  return near.length === 1 ? near[0] : null
+}
+
+/**
+ * 那次提议的对象，按第三问要的两样给出：记录**类型**（从工具自己的声明查，见 `recordNames`）与主键
+ * （提议参数里的 `id`）。参数里没有 id 的提议（新建类，行当时还不存在）就说不出对象，回 `null`，这一格
+ * 照旧说「未记录」—— 那才是当时的事实。
+ *
+ * The object of that proposal, in the two parts the third question asks for: the record **type** (looked
+ * up from the tool's own declaration, see `recordNames`) and the key (the `id` among the proposed
+ * arguments). A proposal whose arguments carry no id (a create — the row did not exist yet) has no object
+ * to name, so it returns `null` and the cell keeps saying 「未记录」 — which is what was true then.
+ */
+function proposalArgumentOf(row: AuditRow): { resultType: string; resultId: number | string } | null {
+  const proposal = proposalOf(row)
+  const id = proposal?.arguments?.id
+  if (!proposal || id === null || id === undefined) return null
+  return { resultType: toolResultType(proposal.toolName), resultId: id as number | string }
+}
+
 /** Whether that record is still there — read off the ledger row, never re-derived. */
 /** 那条记录**还在不在** —— 按台账行读，绝不自己重算。 */
 function recordState(e: EffectRow): string {
@@ -515,7 +581,8 @@ function hostNowNameOf(e: EffectRow | null): string {
  */
 function objectOf(row: AuditRow): string {
   const e = recordOf(row)
-  return objectLine({ effect: e, hostNowName: hostNowNameOf(e), mask: maskTitle, t, te }).text
+  const proposal = e ? null : proposalArgumentOf(row)
+  return objectLine({ effect: e, proposal, hostNowName: hostNowNameOf(e), mask: maskTitle, t, te }).text
 }
 
 /**
@@ -530,6 +597,7 @@ function sixOf(row: AuditRow) {
     row,
     callerName: row.userId ? callerName(row.userId) : '',
     effect: e,
+    proposal: e ? null : proposalArgumentOf(row),
     hostNowName: hostNowNameOf(e),
     recordState: e ? recordState(e) : '',
     mask: maskTitle,
@@ -684,6 +752,18 @@ async function loadRows() {
     const lastPage = Math.max(1, Math.ceil(head.total / EFFECT_WINDOW))
     const ledger = await effectApi.list(lastPage, EFFECT_WINDOW)
     effects.value = ledger.items
+    // 确认队列，给那些从没进过台账的调用用。它有自己的闸（`read Confirmation`），故一个能打开审计页、
+    // 却被那道闸拒的调用方照样拿到这一页：被扣下/被拒的调用第三问说「未记录」，也就是它原来的样子。
+    //
+    // The confirmation queue, for the calls that never reached the ledger. It has its own guard
+    // (`read Confirmation`), so a caller the audit page reaches but that guard refuses still gets the
+    // page: the third question on a held or refused call then says 「未记录」, which is where it was.
+    try {
+      const held = await confirmationApi.listAll(1, PROPOSAL_WINDOW)
+      proposals.value = held.items
+    } catch {
+      proposals.value = []
+    }
   } catch (e) {
     rows.value = []
     hasMore.value = false

@@ -224,15 +224,34 @@ export function confirmationLine({ gate, outcome, callerName, t }) {
 }
 
 /**
- * ③ 哪个业务对象 —— 业务名 + 业务主键，外加宿主自己的那条记录名（**掩码之后**）。运行时没记这行落在哪条
- * 记录上时说「未记录」：一次没写成的调用本来就不会有那条记录，那是事实。
+ * ③ 哪个业务对象 —— 业务名 + 业务主键，外加宿主自己的那条记录名（**掩码之后**）。
  *
- * ③ which business object — its business name and key, plus the host's own record name (masked). When
- * the runtime recorded no record for the row it says so: a call that wrote nothing has no record, and
- * that is a fact rather than a gap to paper over.
+ * 台账里没有这一行，**不等于**运行时没记。被扣下或被拒的调用不写台账（什么都没进系统），但运行时把这次
+ * 提议原样记在确认记录里 —— 工具名，以及它当时要用的参数。`proposal` 就是那条记录；有它时这一格答「这次
+ * 调用本来落在哪条记录上」，而不是说没有那条记录。
+ *
+ * 两者都没有时才说「未记录」：既没有台账行、也没有提议，那才是运行时确实没记下它落在哪条记录上。
+ *
+ * ③ which business object — its business name and key, plus the host's own record name (masked).
+ *
+ * No ledger row does **not** mean the runtime recorded nothing. A call that was held or refused writes
+ * no ledger row (nothing entered the system), but the runtime records the proposal itself — the tool and
+ * the arguments it would have run with — in the confirmation row. When `proposal` is that row, this cell
+ * answers which record the call **was about** instead of saying there is none.
+ *
+ * Only with neither does it say 「未记录」: no ledger row and no proposal is the runtime genuinely not
+ * having recorded where the call landed.
  */
-export function objectLine({ effect, hostNowName, state, mask, t, te }) {
-  if (!effect) return { text: t('keelbase.sixQ.objectUnrecorded'), answered: false }
+export function objectLine({ effect, proposal, hostNowName, state, mask, t, te }) {
+  if (!effect) {
+    if (!proposal || proposal.resultId === null || proposal.resultId === undefined) {
+      return { text: t('keelbase.sixQ.objectUnrecorded'), answered: false }
+    }
+    const heldTypeWord = proposal.resultType
+      ? word(te, t, `keelbase.record.${proposal.resultType}`, t('keelbase.sixQ.objectUnnamed'))
+      : ''
+    return { text: [heldTypeWord, `#${proposal.resultId}`].filter(Boolean).join(' · '), answered: true }
+  }
   const typeWord = effect.resultType
     ? word(te, t, `keelbase.record.${effect.resultType}`, t('keelbase.sixQ.objectUnnamed'))
     : ''
@@ -256,8 +275,8 @@ export function objectLine({ effect, hostNowName, state, mask, t, te }) {
  * The fifth question's basis is **the row alone** (`gateFromRow`); a caller cannot hand a gate in from
  * elsewhere — that is exactly what used to make one audit row answer differently after a policy change.
  */
-export function composeSix({ row, callerName, effect, hostNowName, recordState, mask, resultWord, resultMeaning, t, te }) {
-  const object = objectLine({ effect, hostNowName, state: recordState, mask, t, te })
+export function composeSix({ row, callerName, effect, proposal, hostNowName, recordState, mask, resultWord, resultMeaning, t, te }) {
+  const object = objectLine({ effect, proposal, hostNowName, state: recordState, mask, t, te })
   const change = changeLine({ effect, hostNowName, mask, t, te })
   const confirmation = confirmationLine({ gate: gateFromRow(row), outcome: row?.outcome, callerName, t })
   return [
