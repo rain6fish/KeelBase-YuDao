@@ -377,6 +377,18 @@ jobs:
           KEELBASE_YUDAO_UI: target/yudao-ui-admin-vue3
         run: node --test scripts/rendered-copy-expressions.test.mjs
 
+      # 挂载闸门也要有人测：一条只有挂载才看得见的种子（`{{ '*' + '*' }}`），解析闸必须绿、挂载闸必须红并点名。
+      # 它顺带守住「桩层坏掉时不许假绿」—— 桩把模板渲染空了，那条种子就红不起来，这一步随之红。
+      #
+      # The mount gate needs a keeper too: one seed only a mount can see (`{{ '*' + '*' }}`), where the parse
+      # gate must stay green and the mount gate must go red naming the file. It also keeps "a broken stub
+      # layer must not read green" — if the stubs render everything empty, the seed cannot go red, and this
+      # step goes red with it.
+      - name: The mount gate goes red on a marker only a mount can see
+        env:
+          KEELBASE_YUDAO_UI: target/yudao-ui-admin-vue3
+        run: node --test scripts/rendered-copy-components.test.mjs
+
       # 2a 段的另一半：把每个模板**真挂载**一次，表达式被求值。解析看不见 `{{ '*' + '*' }}` 这类
       # 算出来的记号；这一步看得见。边界（不执行 `<script>`、不用接口数据）写在那份脚本头部。
       # The other half of §2a: every template is **mounted**, so expressions are evaluated. A parse
