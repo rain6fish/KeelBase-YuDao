@@ -23,14 +23,12 @@
 // back to lying. This check reads both sources, confirms the two type sets are equal, and pins the
 // three rules — only `/ai/tool-effects`, before the envelope advice, and a failed read changes nothing.
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = process.cwd()
-const COMPENSATORS = join(
-  ROOT, 'yudao-server', 'src', 'main', 'java', 'cn', 'iocoder', 'yudao', 'server', 'keelbase',
-  'YudaoLocalCompensators.java',
-)
+const PACKAGE = join(ROOT, 'yudao-server', 'src', 'main', 'java', 'cn', 'iocoder', 'yudao', 'server', 'keelbase')
+const COMPENSATORS = join(PACKAGE, 'YudaoLocalCompensators.java')
 const ADVICE = join(
   ROOT, 'yudao-server', 'src', 'main', 'java', 'cn', 'iocoder', 'yudao', 'server', 'keelbase',
   'YudaoEffectTargetExistence.java',
@@ -47,7 +45,27 @@ const read = (file) => {
   }
 }
 
-const compensators = read(COMPENSATORS)
+// 补偿器**随模块走**（YD-44）：除 `YudaoLocalCompensators` 外，一个模块还可以在自己的
+// `*Governance.java` 里声明补偿器。故按**声明**找 —— 凡实现了 `SideEffectCompensator` 的文件都读，
+// 而不是只读那一个文件；工具类也声明 `resultType()`，**不**能按方法名收进来。
+//
+// A compensator **travels with its module** (YD-44): besides `YudaoLocalCompensators`, a module may
+// declare one in its own `*Governance.java`. So the files are found by **declaration** — every file
+// implementing `SideEffectCompensator` is read, not just that one — while the tool classes, which also
+// declare `resultType()`, must not be collected by method name.
+const compensatorFiles = readdirSync(PACKAGE)
+  .filter((name) => name.endsWith('.java'))
+  .map((name) => join(PACKAGE, name))
+  .filter((file) => {
+    try {
+      return readFileSync(file, 'utf8').includes('implements SideEffectCompensator')
+    } catch {
+      return false
+    }
+  })
+if (compensatorFiles.length === 0) fail(`没有找到任何 SideEffectCompensator 声明（${PACKAGE}）`)
+
+const compensators = compensatorFiles.map(read).join('\n')
 const advice = read(ADVICE)
 
 const resultTypes = (source) =>
