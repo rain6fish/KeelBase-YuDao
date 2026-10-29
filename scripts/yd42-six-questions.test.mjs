@@ -170,6 +170,7 @@ const answersFor = (op) =>
     callerName: 'KeelBase',
     gate: op.gate,
     effect: op.effect,
+    proposal: op.proposal,
     hostNowName: op.hostNowName,
     recordState: op.recordState,
     mask,
@@ -228,6 +229,74 @@ test('the change shows the before it recorded and says what the after lacks', ()
 test('a refused write says nothing in the system changed', () => {
   const change = answersFor(OPERATIONS[2]).find((a) => a.key === 'change')
   assert.match(change.text, /nothing was changed/)
+})
+
+// ---------------------------------------------------------------------------------------------------
+// C 的第三问：被拒的那次调用**记了**，只是没人读 —— 确认记录里带着这次提议的参数。
+// C's third question: the refused call **was** recorded, just never read — its confirmation record
+// carries the arguments of the proposal.
+// ---------------------------------------------------------------------------------------------------
+
+/**
+ * 同一次拒绝，按 2026-10-29 那次重测在库里**实际**写下的两行：审计行 #8（`declined`、无台账行、无名录依据）
+ * 与它配上的确认记录 #2（`args_json` = `{"id":9004,"name":"改客户 明远置业集团有限公司"}`、`decided_at` 与那
+ * 一行同一秒）。第三问要的两样都在：记录类型来自工具自己的声明（`update_crm_customer` → `crm_customer`），
+ * 主键来自提议参数里的 `id`。
+ *
+ * The same refusal, exactly as that retest of 2026-10-29 wrote the two rows: audit row #8 (`declined`, no
+ * ledger row, no authorization basis) and the confirmation record #2 it pairs with (`args_json` =
+ * `{"id":9004,"name":"改客户 明远置业集团有限公司"}`, its `decided_at` in the same second). Both parts the
+ * third question wants are there: the record type from the tool's own declaration
+ * (`update_crm_customer` → `crm_customer`), the key from the `id` among the proposed arguments.
+ */
+const REFUSED_WITH_PROPOSAL = {
+  row: {
+    id: 8,
+    userId: '1',
+    action: 'tool_confirmation',
+    detail: 'update_crm_customer declined (in_band)',
+    isError: true,
+    createdAt: '2026-10-29T00:56:19Z',
+    outcome: 'declined',
+    tool: 'update_crm_customer',
+    executionId: null,
+  },
+  proposal: { resultType: 'crm_customer', resultId: 9004 },
+}
+
+const refusedAnswers = (proposal) =>
+  six.composeSix({
+    row: REFUSED_WITH_PROPOSAL.row,
+    callerName: 'KeelBase',
+    gate: 'confirm',
+    effect: null,
+    proposal,
+    hostNowName: '',
+    recordState: '',
+    mask,
+    resultWord: 'Declined',
+    resultMeaning: 'A person declined it, so it will not happen',
+    t,
+    te,
+  })
+
+test('the refused call names the record its proposal was about', () => {
+  const object = refusedAnswers(REFUSED_WITH_PROPOSAL.proposal).find((a) => a.key === 'object')
+  assert.equal(object.text, 'Customer · #9004', `got "${object.text}"`)
+  assert.equal(object.answered, true, 'the refused call still answers the third question with 「未记录」')
+  assert.doesNotMatch(object.text, /crm_customer/)
+})
+
+test('with the proposal the refused operation answers all six questions', () => {
+  const scored = six.scoreSix(refusedAnswers(REFUSED_WITH_PROPOSAL.proposal))
+  assert.deepEqual(scored.leaked, [])
+  assert.equal(scored.cells, 6, `only ${scored.cells} of 6 answered`)
+})
+
+test('without a paired proposal the same row still says it was not recorded', () => {
+  const object = refusedAnswers(null).find((a) => a.key === 'object')
+  assert.equal(object.text, MESSAGES['keelbase.sixQ.objectUnrecorded'])
+  assert.equal(object.answered, false)
 })
 
 // ---------------------------------------------------------------------------------------------------

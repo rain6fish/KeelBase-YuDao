@@ -144,3 +144,31 @@ test('the gate is read from the inventory, not typed into the page', () => {
     'toolGate no longer takes the gate from the tool inventory',
   )
 })
+
+test('a held or refused call takes its object from the confirmation record', () => {
+  // 被扣下或被拒的调用不写台账，第三问此前只能答「未记录」—— 而运行时其实把这次提议记在确认记录里。
+  // 这一条钉住接线：页面真的去读那条队列，按与台账**同一条**规则（恰好一个候选）配对，再把结果交给六问。
+  //
+  // A held or refused call writes no ledger row, so the third question could only say 「未记录」 — while
+  // the runtime did record the proposal in a confirmation record. This pins the wiring: the page really
+  // reads that queue, pairs it under the **same** rule as the ledger (exactly one candidate), and hands
+  // the result to the six answers.
+  assert.match(script, /confirmationApi\.listAll\(1, PROPOSAL_WINDOW\)/, 'the page never reads the confirmation queue')
+  assert.match(
+    script,
+    /function proposalOf\(row: AuditRow\): ConfirmationItem \| null \{[\s\S]*?near\.length === 1 \? near\[0\] : null/,
+    'no proposal matcher, or it pairs without the "exactly one candidate" rule',
+  )
+  assert.match(
+    script,
+    /confirmationApi\.listAll\(1, PROPOSAL_WINDOW\)[\s\S]*?catch/,
+    'a refused queue read would break the page instead of leaving the cell as it was',
+  )
+  assert.match(
+    script,
+    /proposal: e \? null : proposalArgumentOf\(row\)/,
+    'the six answers no longer receive the proposal',
+  )
+  assert.match(script, /toolResultType\(proposal\.toolName\)/, 'the object type is not taken from the tool declaration')
+  assert.match(script, /objectLine\(\{ effect: e, proposal, /, 'the object column no longer receives the proposal')
+})
