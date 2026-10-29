@@ -463,16 +463,13 @@ function whatText(row: AuditRow): string {
 }
 
 /**
- * 这个工具**生效的闸门** —— 六问里第五问（谁确认）就按它回答。它从运行时那条清单读，不在这页里写死：
- * 写死一个「要确认」，就等于本页自己发明了一条治理事实。
+ * 第五问（谁确认）的依据在**每一行自己记下的 `authorization`** 里，由 `gateFromRow` 读 —— 不在这页里
+ * 写死，也不问工具清单：清单答的是**此刻**的闸，而一行审计说的是**当时**那一次。
  *
- * The tool's **effective gate** — the basis of the fifth question (who confirmed). It is read from the
- * inventory the runtime serves, not typed into this page: a hardcoded "asks for confirmation" would be
- * this page inventing a governance fact.
+ * The fifth question's basis is the `authorization` **each row recorded**, read by `gateFromRow` — not
+ * typed into this page, and not asked of the tool inventory: the inventory answers the gate **now**,
+ * while an audit row is about **that one time**.
  */
-function toolGate(row: AuditRow): string {
-  return (row.tool ? inventory.value[row.tool]?.gateMode : '') || ''
-}
 
 /**
  * The write record this row landed on, when **exactly one** candidate matches. The two trails carry no
@@ -532,7 +529,6 @@ function sixOf(row: AuditRow) {
   return composeSix({
     row,
     callerName: row.userId ? callerName(row.userId) : '',
-    gate: toolGate(row),
     effect: e,
     hostNowName: hostNowNameOf(e),
     recordState: e ? recordState(e) : '',

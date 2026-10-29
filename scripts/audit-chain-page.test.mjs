@@ -131,16 +131,23 @@ test('the write record is shown only when exactly one candidate matches', () => 
   )
 })
 
-test('the gate is read from the inventory, not typed into the page', () => {
-  // The expansion used to print the declared risk level; it now answers 「谁确认」 from the tool's
-  // effective **gate**. The rule is the same one, on the fact that now matters: a governance fact is
-  // read from the inventory the runtime serves, never typed into this page.
+test('the gate is read from the row, never from the tool inventory', () => {
+  // 第五问读的是**这一行记下的**那道闸（`authorization` 里的 `requiresConfirmation` 与
+  // `riskStrategy`），不是工具清单**此刻**的 `gateMode`：清单答的是今天，而审计行说的是当时那一次。
+  // 这一点曾经相反 —— 页面按清单回答，于是同一条审计行在策略改过之后改口（一次自动放行的写被说成
+  // 「本人确认了」）。这条用例钉住那个方向，不让它回来。
   //
-  // 展开块此前印的是声明的风险级；现在它按工具**生效的闸门**回答「谁确认」。规则没变、只是换了那个要紧的事实：
-  // 治理事实从运行时那条清单读，绝不在本页写死。
-  assert.match(
+  // The fifth question is read from **the gate this row recorded** (`requiresConfirmation` and
+  // `riskStrategy` inside `authorization`), never from the inventory's `gateMode` — the inventory answers
+  // today, while an audit row is about that one time. It used to be the opposite: the page answered from
+  // the inventory, so one audit row changed its answer after a policy change (an auto-allowed write was
+  // reported as "confirmed it themselves"). This case pins the direction so it cannot come back.
+  assert.doesNotMatch(script, /gateMode/, 'the page reads the inventory\'s gate again')
+  assert.doesNotMatch(script, /function toolGate\(/, 'toolGate is back — the gate is being taken from the inventory')
+  assert.match(script, /function sixOf\(row: AuditRow\)/, 'sixOf is gone')
+  assert.doesNotMatch(
     script,
-    /function toolGate\(row: AuditRow\): string \{\s*return \(row\.tool \? inventory\.value\[row\.tool\]\?\.gateMode : ''\) \|\| ''/,
-    'toolGate no longer takes the gate from the tool inventory',
+    /composeSix\(\{[^}]*\bgate:/,
+    'sixOf hands a gate in from outside; the fifth answer must come from the row alone',
   )
 })

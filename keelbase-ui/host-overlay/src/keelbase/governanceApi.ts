@@ -66,13 +66,22 @@ export interface AuditRow {
    */
   executionId?: string | null
   /**
-   * What let it through, or refused it — null when the runtime recorded no basis for this row.
-   * This host stores the basis as a canonical JSON string and sends it verbatim; the reader parses
-   * that string, and also accepts an already-parsed object so the type does not depend on which
-   * shape a deployment happens to send.
+   * 凭什么允许或拒绝这一行 —— 那道让写跑起来的闸的结构化裁决；运行时没有为这一行记下依据时为 null。
+   * 它**不**在页面上印出来，而是第五问（谁确认）**唯一**的依据：这一行**当时**的裁决，不是工具清单
+   * **此刻**的设定。读者这一面放弃的是把那串 JSON 原样印出来，留下的是用它答一句业务话。
    *
-   * 放行或拒绝它的依据 —— 运行时没有为这一行记下依据时为 null。本宿主把它存成规范 JSON 串并原样发出；
-   * 读侧解析这个串，也接受已解析的对象，使类型不依赖某个部署恰好发的是哪一种形状。
+   * 本宿主把它存成规范 JSON 串并原样发出；读侧解析这个串，也接受已解析的对象，使类型不依赖某个部署
+   * 恰好发的是哪一种形状。
+   *
+   * What allowed or refused this row — the structured verdict of the gate that let the write run; null
+   * when the runtime recorded no basis for this row. It is **not printed** on this page, and it is the
+   * only basis of the fifth question (who confirmed): this row's own decision, not the tool inventory's
+   * setting today. Printing the raw JSON is what the reader's face gave up; using it to answer in
+   * business words is what it kept.
+   *
+   * This host stores the basis as a canonical JSON string and sends it verbatim; the reader parses that
+   * string, and also accepts an already-parsed object so the type does not depend on which shape a
+   * deployment happens to send.
    */
   authorization?: AuthorizationBasis | string | null
 }
