@@ -382,15 +382,32 @@ const proposals = ref<ConfirmationItem[]>([])
  */
 const recordNames = ref<Record<string, string>>({})
 
-/** Ask the host about the row's record once, when the row is opened. */
-/** 行被摊开时，问宿主一次那条记录。 */
+/** Ask the host about a reference once; cached by type and key so re-opening a row costs nothing. */
+/** 问宿主一次某个引用；按类型与主键缓存，再摊开同一行不再发请求。 */
+async function askRecordName(resultType: string | null | undefined, resultId: string | number | null | undefined) {
+  if (resultId === null || resultId === undefined) return
+  const key = `${resultType ?? ''}#${resultId}`
+  if (recordNames.value[key] !== undefined) return
+  const name = await resolveRecordName(resultType, resultId)
+  recordNames.value = { ...recordNames.value, [key]: name }
+}
+
+/**
+ * Ask the host about the row's record once, when the row is opened — **whichever road the row took**: a
+ * write that landed somewhere has a ledger row, and a held or refused call has only its proposal. Both
+ * carry a type and a key; the name comes from the same narrow read face either way.
+ *
+ * 行被摊开时，问宿主一次那条记录 —— **这一行走的哪条路都算**：真写成了的有台账行，被扣下或被拒的只有提议。
+ * 两条路都带着类型与主键，名字来自同一条窄读面。
+ */
 async function onExpand(row: AuditRow) {
   const e = recordOf(row)
-  if (!e || e.resultId === null || e.resultId === undefined) return
-  const key = `${e.resultType ?? ''}#${e.resultId}`
-  if (recordNames.value[key] !== undefined) return
-  const name = await resolveRecordName(e.resultType, e.resultId)
-  recordNames.value = { ...recordNames.value, [key]: name }
+  if (e) {
+    await askRecordName(e.resultType, e.resultId)
+    return
+  }
+  const proposal = proposalArgumentOf(row)
+  if (proposal) await askRecordName(proposal.resultType, proposal.resultId)
 }
 
 /** How many ledger rows to look through when matching. Bounded on purpose, and said on the page. */
@@ -572,6 +589,16 @@ function hostNowNameOf(e: EffectRow | null): string {
 }
 
 /**
+ * The same answer for a held or refused call's object — no ledger row, so nothing else could name it.
+ *
+ * 被扣下或被拒那次的对象，同样问宿主 —— 它没有台账行，别处没有名字可拿。
+ */
+function proposalNameOf(ref: { resultType: string; resultId: number | string } | null): string {
+  if (!ref) return ''
+  return recordNames.value[`${ref.resultType ?? ''}#${ref.resultId}`] || ''
+}
+
+/**
  * ③ 哪个业务对象，给表格那一列。**业务名 + 业务主键**：运行时的类型名（`crm_customer` 这类）不出现在
  * 读者这一面，控制台不认识的类型说「未登记」而不是把表名印出来。
  *
@@ -582,7 +609,15 @@ function hostNowNameOf(e: EffectRow | null): string {
 function objectOf(row: AuditRow): string {
   const e = recordOf(row)
   const proposal = e ? null : proposalArgumentOf(row)
-  return objectLine({ effect: e, proposal, hostNowName: hostNowNameOf(e), mask: maskTitle, t, te }).text
+  return objectLine({
+    effect: e,
+    proposal,
+    hostNowName: hostNowNameOf(e),
+    proposalName: proposalNameOf(proposal),
+    mask: maskTitle,
+    t,
+    te,
+  }).text
 }
 
 /**
@@ -593,12 +628,14 @@ function objectOf(row: AuditRow): string {
  */
 function sixOf(row: AuditRow) {
   const e = recordOf(row)
+  const proposal = e ? null : proposalArgumentOf(row)
   return composeSix({
     row,
     callerName: row.userId ? callerName(row.userId) : '',
     effect: e,
-    proposal: e ? null : proposalArgumentOf(row),
+    proposal,
     hostNowName: hostNowNameOf(e),
+    proposalName: proposalNameOf(proposal),
     recordState: e ? recordState(e) : '',
     mask: maskTitle,
     resultWord: resultText(row),

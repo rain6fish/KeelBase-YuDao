@@ -232,6 +232,9 @@ export function confirmationLine({ gate, outcome, callerName, t }) {
  *
  * 两者都没有时才说「未记录」：既没有台账行、也没有提议，那才是运行时确实没记下它落在哪条记录上。
  *
+ * `proposalName` 与 `hostNowName` 是同一件东西的两种来源（提议那条路没有台账行，故名字要单独给）：宿主
+ * 窄读面答回来的记录名，**已经掩码**；这里再掩一次是幂等的，且保证没有名字时什么都不补。
+ *
  * ③ which business object — its business name and key, plus the host's own record name (masked).
  *
  * No ledger row does **not** mean the runtime recorded nothing. A call that was held or refused writes
@@ -242,7 +245,7 @@ export function confirmationLine({ gate, outcome, callerName, t }) {
  * Only with neither does it say 「未记录」: no ledger row and no proposal is the runtime genuinely not
  * having recorded where the call landed.
  */
-export function objectLine({ effect, proposal, hostNowName, state, mask, t, te }) {
+export function objectLine({ effect, proposal, hostNowName, proposalName, state, mask, t, te }) {
   if (!effect) {
     if (!proposal || proposal.resultId === null || proposal.resultId === undefined) {
       return { text: t('keelbase.sixQ.objectUnrecorded'), answered: false }
@@ -250,7 +253,11 @@ export function objectLine({ effect, proposal, hostNowName, state, mask, t, te }
     const heldTypeWord = proposal.resultType
       ? word(te, t, `keelbase.record.${proposal.resultType}`, t('keelbase.sixQ.objectUnnamed'))
       : ''
-    return { text: [heldTypeWord, `#${proposal.resultId}`].filter(Boolean).join(' · '), answered: true }
+    const heldName = proposalName ? mask(proposalName) : ''
+    return {
+      text: [heldTypeWord, `#${proposal.resultId}`, heldName].filter(Boolean).join(' · '),
+      answered: true,
+    }
   }
   const typeWord = effect.resultType
     ? word(te, t, `keelbase.record.${effect.resultType}`, t('keelbase.sixQ.objectUnnamed'))
@@ -275,8 +282,8 @@ export function objectLine({ effect, proposal, hostNowName, state, mask, t, te }
  * The fifth question's basis is **the row alone** (`gateFromRow`); a caller cannot hand a gate in from
  * elsewhere — that is exactly what used to make one audit row answer differently after a policy change.
  */
-export function composeSix({ row, callerName, effect, proposal, hostNowName, recordState, mask, resultWord, resultMeaning, t, te }) {
-  const object = objectLine({ effect, proposal, hostNowName, state: recordState, mask, t, te })
+export function composeSix({ row, callerName, effect, proposal, hostNowName, proposalName, recordState, mask, resultWord, resultMeaning, t, te }) {
+  const object = objectLine({ effect, proposal, hostNowName, proposalName, state: recordState, mask, t, te })
   const change = changeLine({ effect, hostNowName, mask, t, te })
   const confirmation = confirmationLine({ gate: gateFromRow(row), outcome: row?.outcome, callerName, t })
   return [

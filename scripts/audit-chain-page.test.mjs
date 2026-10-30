@@ -173,9 +173,14 @@ test('a held or refused call takes its object from the confirmation record', () 
   )
   assert.match(
     script,
-    /proposal: e \? null : proposalArgumentOf\(row\)/,
+    /const proposal = e \? null : proposalArgumentOf\(row\)/,
+    'the page no longer derives the proposal for a row with no ledger row',
+  )
+  assert.match(
+    script,
+    /composeSix\(\{[\s\S]*?\bproposal,/,
     'the six answers no longer receive the proposal',
   )
   assert.match(script, /toolResultType\(proposal\.toolName\)/, 'the object type is not taken from the tool declaration')
-  assert.match(script, /objectLine\(\{ effect: e, proposal, /, 'the object column no longer receives the proposal')
+  assert.match(script, /objectLine\(\{[\s\S]*?\bproposal,/, 'the object column no longer receives the proposal')
 })
