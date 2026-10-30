@@ -108,6 +108,15 @@ load keelbase-m7-reader.sql
 load keelbase-brand-names.sql
 load keelbase-operate-log-nullable.sql
 
+# 上游 REST 写的**旁路留痕**表（`keelbase_bypass_log`）：宿主的 `YudaoBypassAuditJdbcSink` 每次写往里插一行。
+# 必须 `load` —— 表不在时宿主照常跑（这一层 best-effort），但**一条痕迹也留不下**，只每小时刷一条「写不进去」
+# 的警告；而「留痕」正是这一层存在的理由。它不落任何菜单行，故与 `module-scope.sql` 的保留清单无关。
+# The upstream-REST **bypass trail** table (`keelbase_bypass_log`): the host's `YudaoBypassAuditJdbcSink`
+# inserts one row per write. It has to be on `load` — without the table the host still runs (this layer is
+# best-effort), but **no trace lands at all**, only a "could not write" warning; and leaving a trace is the
+# whole reason this layer exists. It lays no menu row, so the `module-scope.sql` keep list does not apply.
+load keelbase-bypass-audit.sql
+
 # ---------------------------------------------------------------------------
 # separate — run by their own step / 由各自的步骤跑
 # ---------------------------------------------------------------------------
