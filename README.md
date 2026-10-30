@@ -21,6 +21,8 @@ identity bridge, tool governance, confirmation, decision trace, audit and revoke
 > **In a hurry?** [KEELBASE-HOST.md](keelbase-docs/KEELBASE-HOST.md) — why this repository exists, what
 > it does and does not claim, and where its line stands.
 
+**Articles** — the long-form essays behind these decisions, on AI execution governance and AI audit evidence: [keelbase.hashnode.dev](https://keelbase.hashnode.dev/).
+
 <!-- BEGIN keelbase-family:en sha256:92e82fd34f0a15d22b119841121b79f97caa1bfb8f5d77dcdcf73002c9257be0 -->
 ## 🧬 The KeelBase family
 

@@ -19,6 +19,8 @@
 > **赶时间？** [KEELBASE-HOST.md](keelbase-docs/KEELBASE-HOST.zh-CN.md) —— 本仓为什么存在、它主张什么与
 > 不主张什么、以及这条线现在站在哪。
 
+**系列长文** —— 这些决定背后的长文，分「AI 执行治理」「AI 审计证据」两条线：[OSChina 文集](https://my.oschina.net/u/4166179/blog)。
+
 <!-- BEGIN keelbase-family:zh sha256:7870abdc3207482b1d3d1a8f7018f0479182ac0d42b052cd6496d3be34f4eba1 -->
 ## 🧬 KeelBase 家族
 
