@@ -8,11 +8,15 @@
 # authoritative: `maven.yml` never triggers on this repository's branches. The host's own Java tests
 # and the ai1 module's own tests run for real in `conformance`, below.
 #
-# Eight jobs, and each answers a question the others cannot (one carries a step that answers a
+# Nine jobs, and each answers a question the others cannot (one carries a step that answers a
 # question of its own, marked where it appears):
 #
 #   path-refs            every path this repository writes about itself — in a comment, a doc, a
 #                        script — points at a file it actually holds;
+#   script-tests         every `scripts/*.test.mjs` this repository ships actually runs — one glob
+#                        rather than a list, so a test added later is covered without editing this
+#                        workflow; the topical jobs still name their own files, because a failure
+#                        there should be read inside that job's question;
 #   governance-boundary  no bean of ours hands a tool to Spring AI, which is the fact `D42`'s
 #                        boundary rests on and is one `@Bean` away from no longer being true;
 #   rendered-copy        every line of copy this layer's UI **renders** — locale messages through
@@ -63,10 +67,13 @@
 # 测试 skip 开关在本仓**不作数**：`maven.yml` 在本仓的分支上根本不触发。宿主自己的 Java 测试、以及 ai1
 # 模块自己的测试，都在下面的 `conformance` 里**真跑**。
 #
-# 八道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
+# 九道 job，各答一个别的 job 答不了的问题（其中一道还带着一个自己回答问题的 step，在它出现的地方标出）：
 #
 #   path-refs            本仓写到自己身上的每一条路径——注释里的、文档里的、脚本里的——都指向一个它
 #                        确实持有的文件；
+#   script-tests         本仓带的每个 `scripts/*.test.mjs` 都真的跑得起来 —— 用一条 glob 而不是一份清单，
+#                        故以后新加的测试不改这个 workflow 就已经在射程内；分题的 job 仍各自点名自己的
+#                        文件，因为那里的失败应当在**那道 job 的问题**里去读；
 #   governance-boundary  我们自己没有任何 bean 把工具交给 Spring AI —— `D42` 那条边界所倚的**事实**，
 #                        而它离「不再成立」只差一个 `@Bean`；
 #   rendered-copy        这一层界面**渲染出来**的每一行字——词条经 vue-i18n、模板文本经 Vue 自己的解析器、
@@ -122,6 +129,23 @@ jobs:
       # same note, for the same reason, is in the sibling repositories' workflows.
       - name: Cited paths must exist
         run: node scripts/check-path-refs.mjs
+
+  script-tests:
+    name: Every script test this repository ships runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # One glob rather than a list — a list is exactly what left nine of these files outside CI
+      # (seven page/helper tests that predate this job, plus the two this week's fixes added). A test
+      # file that no step names is a test that never runs, and nothing about it looks wrong.
+      # 一条 glob 而不是一份清单 —— 正是清单让这几个文件留在了 CI 之外（7 个早于这道 job 的页面/助手
+      # 测试，加上本周两笔修复带来的两个）。没有任何 step 点名的测试文件 = 永远不跑的测试，而它表面上
+      # 看不出任何不对。
+      - name: Run every script test
+        run: node --test scripts/*.test.mjs
 
   governance-boundary:
     name: No bean of ours hands a tool to Spring AI
