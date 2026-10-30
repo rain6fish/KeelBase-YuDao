@@ -306,7 +306,7 @@ const REFUSED_WITH_PROPOSAL = {
   proposal: { resultType: 'crm_customer', resultId: 9004 },
 }
 
-const refusedAnswers = (proposal) =>
+const refusedAnswers = (proposal, proposalName = '') =>
   six.composeSix({
     row: REFUSED_WITH_PROPOSAL.row,
     callerName: 'KeelBase',
@@ -314,6 +314,7 @@ const refusedAnswers = (proposal) =>
     effect: null,
     proposal,
     hostNowName: '',
+    proposalName,
     recordState: '',
     mask,
     resultWord: 'Declined',
@@ -327,6 +328,18 @@ test('the refused call names the record its proposal was about', () => {
   assert.equal(object.text, 'Customer · #9004', `got "${object.text}"`)
   assert.equal(object.answered, true, 'the refused call still answers the third question with 「未记录」')
   assert.doesNotMatch(object.text, /crm_customer/)
+})
+
+test('the refused call carries the record name the host answered, masked', () => {
+  // 被拒那次没有台账行，记录名只能来自确认记录那条提议；宿主回的是**已掩码**的名字（`YudaoRecordNames`），
+  // 这里再掩一次是幂等的。名字是补充，不是答案的前提——没有它时上一块用例的 `Customer · #9004` 仍成立。
+  //
+  // The refused call has no ledger row, so the name can only come from its proposal; the host answers it
+  // **already masked**, and masking again is idempotent. The name is an addition, not a precondition — the
+  // case above still holds `Customer · #9004` without it.
+  const object = refusedAnswers(REFUSED_WITH_PROPOSAL.proposal, '改****').find((a) => a.key === 'object')
+  assert.equal(object.text, 'Customer · #9004 · 改****', `got "${object.text}"`)
+  assert.deepEqual(six.leaksIn(object.text), [], 'a masked record name must not read as a leak')
 })
 
 test('with the proposal the refused operation answers all six questions', () => {
