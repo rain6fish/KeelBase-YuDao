@@ -167,6 +167,20 @@ jobs:
       - name: No message prints Markdown at the reader
         run: node --test scripts/i18n-no-markdown.test.mjs
 
+      # 上一步管的是消息里**写了什么**，这一步管消息**在不在**。2026-10-29 走查读到审计链页表头原样印着
+      # `keelbase.audit.colObject`：模板用了它，整个界面层零定义，而构建与既有门禁全绿 —— 缺键不是语法
+      # 错误，它只在渲染那一刻变成读者眼前的一串键名。这道测试把本层模板与补丁新增行里用到的每个
+      # `keelbase.*` 键，对上补丁里那两棵消息树；只往一边加，也一并判红。
+      #
+      # The step above is about what a message **says**; this one is about whether it is there at all. The
+      # 2026-10-29 walk read `keelbase.audit.colObject` printed in the audit chain page's header: the
+      # template used it, nothing in this layer defined it, yet the build and every existing gate stayed
+      # green — a missing key is not a syntax error; it becomes the key name in front of the reader only
+      # at render time. This test matches every `keelbase.*` key this layer's templates and patch
+      # additions use against the patch's two message trees, and turns red on a key added to one side only.
+      - name: Every keelbase key a page renders is defined, in both languages
+        run: node --test scripts/i18n-key-coverage.test.mjs
+
       # 展开审计行是 M7 的证据面：展开块里调用的每个 helper 都必须在同一文件里有定义或导入。
       # 2026-10-25 实测：`toolRisk` 既没定义也没导入，展开任意一行时表体整块不渲染，而构建与既有门禁全绿。
       # The audit row's expansion is M7's evidence surface: every helper the expand block calls must
