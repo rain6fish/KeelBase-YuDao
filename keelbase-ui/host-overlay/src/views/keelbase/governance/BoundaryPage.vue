@@ -75,34 +75,47 @@
       <div class="mb-2px">
         <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryHeld') }}</span>
         <el-tag
-          v-for="id in heldPathIds"
-          :key="id"
+          v-for="a in heldActionIds"
+          :key="a"
           size="small"
-          :type="postureTagType(postureOf(id))"
+          type="success"
           class="mr-4px mb-4px"
         >
-          {{ t(`keelbase.boundary.path.${id}`) }}
+          {{ t(`keelbase.boundary.actions.${a}`) }}
+        </el-tag>
+      </div>
+      <div class="mb-2px">
+        <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryAudited') }}</span>
+        <el-tag
+          v-for="a in auditedActionIds"
+          :key="a"
+          size="small"
+          type="warning"
+          effect="plain"
+          class="mr-4px mb-4px"
+        >
+          {{ t(`keelbase.boundary.actions.${a}`) }}
         </el-tag>
       </div>
       <div class="mb-2px">
         <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryNotHeld') }}</span>
         <el-tag
-          v-for="id in notHeldPathIds"
-          :key="id"
+          v-for="a in ungovernedActionIds"
+          :key="a"
           size="small"
           type="danger"
           effect="plain"
           class="mr-4px mb-4px"
         >
-          {{ t(`keelbase.boundary.path.${id}`) }}
+          {{ t(`keelbase.boundary.actions.${a}`) }}
         </el-tag>
       </div>
       <div class="text-12px text-[var(--el-text-color-secondary)] mb-10px">
         {{
           t('keelbase.boundary.summaryNote', {
-            total: boundary.stated.paths.length,
-            held: heldPathIds.length,
-            none: notHeldPathIds.length
+            held: heldActionIds.length,
+            audited: auditedActionIds.length,
+            none: ungovernedActionIds.length
           })
         }}
       </div>
@@ -139,6 +152,19 @@
              (`holds.includes(control)`). The tags used to read as a run-on string, so seeing which path
              misses which control meant comparing rows; as a matrix the answer is one horizontal read.
              Nothing is derived here — a control absent from `stated.paths` simply never ticks. -->
+        <el-table-column :label="t('keelbase.boundary.colActions')" min-width="260">
+          <template #default="{ row }">
+            <el-tag
+              v-for="a in row.actions"
+              :key="a"
+              size="small"
+              effect="plain"
+              class="mr-4px mb-4px"
+            >
+              {{ t(`keelbase.boundary.actions.${a}`) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('keelbase.boundary.colHolds')" align="center">
           <el-table-column
             v-for="c in CONTROLS"
@@ -211,6 +237,8 @@ type PathRow = {
   posture: 'governed' | 'partially-governed' | 'not-governed'
   holds: string[]
   doesNotHold: string[]
+  /** 这条路上可被模型调用的业务动作（id，词由这一页给）。 / Business actions callable on this path (ids). */
+  actions: string[]
   gap: 'none' | 'one-bean-away' | 'declaration-quality' | 'shell-on-host' | 'retrieval-unlogged'
   /** 代码出处（`文件:行`）—— 与产物同源，读者可核对。 / code coordinates (`file:line`), from the same record. */
   sources: string[]
@@ -258,19 +286,16 @@ const boundary = ref<Boundary | null>(null)
 const error = ref('')
 const missing = ref(false)
 
-/** 按 `posture` 把五条路径归成两个集合：受治理的（含部分）与完全不设防的。
- *  只是分组，不重算 —— 与表格同一份记录。 / Grouped by `posture`; nothing is recomputed. */
-const heldPathIds = computed(() =>
+/** 按 `posture` 把**动作**归成三组：过治理层（写会被扣下等确认）、只经授权与审计、完全不设防。
+ *  只是分组，不重算 —— 与表格同一份记录。M7：读者此前只能读到检查项，读不到动作。
+ *  Grouped by `posture` into three action sets; nothing is recomputed. */
+const actionsOf = (posture: PathRow['posture']) =>
   (boundary.value?.stated.paths ?? [])
-    .filter((p) => p.posture === 'governed' || p.posture === 'partially-governed')
-    .map((p) => p.id)
-)
-const notHeldPathIds = computed(() =>
-  (boundary.value?.stated.paths ?? []).filter((p) => p.posture === 'not-governed').map((p) => p.id)
-)
-function postureOf(id: string): PathRow['posture'] {
-  return (boundary.value?.stated.paths ?? []).find((p) => p.id === id)?.posture ?? 'not-governed'
-}
+    .filter((p) => p.posture === posture)
+    .flatMap((p) => p.actions)
+const heldActionIds = computed(() => actionsOf('governed'))
+const auditedActionIds = computed(() => actionsOf('partially-governed'))
+const ungovernedActionIds = computed(() => actionsOf('not-governed'))
 
 // The UI build lays this file in from the gate's own `--emit`; nothing here recomputes it. `no-store`
 // because a console that showed a remembered boundary would be showing a build that is no longer the one

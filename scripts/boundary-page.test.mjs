@@ -189,6 +189,36 @@ test('the gate record pins the SKILL path as partially governed, and names where
   assert.match(row, /Ai1SkillToolFactory\.java:\d+/, 'the row cites the assembly point it describes');
 });
 
+test('every path declares business actions, and both languages label each action', () => {
+  const gate = read(GATE);
+  const { en, zh } = boundaryMessages();
+
+  // M7：读者答不出「哪些动作被扣」，因为页面此前只给检查项。动作 id 与两种语言的词条必须同时存在；
+  // 少一个词条就是页面上一条 `keelbase.boundary.actions.x` 原样漏出来。
+  // The M7 reader could not name actions because the page only offered controls. Each action id needs a
+  // label in both languages; a missing one leaks the raw key onto the page.
+  const ids = ['write-records', 'approve-records', 'model-tool-call', 'mcp-read', 'mcp-write',
+    'shell', 'file-read', 'file-write', 'knowledge-search'];
+  for (const id of ids) {
+    assert.match(gate, new RegExp(`'${id}'`), `the gate declares the action ${id}`);
+    assert.ok(en.actions?.[id], `English labels the action ${id}`);
+    assert.ok(zh.actions?.[id], `Chinese labels the action ${id}`);
+  }
+
+  const rows = gate.match(/id: '[^']+',[\s\S]*?actions: \[[^\]]*\]/g) ?? [];
+  assert.equal(rows.length, 5, 'all five paths declare at least one action');
+});
+
+test('the summary and the table speak in actions, not only controls', () => {
+  const vue = read(PAGE);
+  const tpl = templateOf(vue);
+  for (const set of ['heldActionIds', 'auditedActionIds', 'ungovernedActionIds']) {
+    assert.match(tpl, new RegExp(`v-for="a in ${set}"`), `the summary lists ${set}`);
+  }
+  assert.match(tpl, /v-for="a in row\.actions"/, 'the table has an action column');
+  assert.match(tpl, /keelbase\.boundary\.colActions/, 'the action column has its own heading');
+});
+
 test('the checks are drawn as a path × control matrix, ticked only by each row\'s own holds', () => {
   const vue = read(PAGE);
   const tpl = templateOf(vue);
