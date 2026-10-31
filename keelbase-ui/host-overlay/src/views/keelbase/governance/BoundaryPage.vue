@@ -69,8 +69,8 @@
 
       <!-- 一页结论：先给读者一句能复述的答案，再展开下面那张表。
            M7 F-9：此前只有五条路径铺开，读者读完整页仍说不出「哪些扣」，只能反推「扣不住之外的」。
-           这两行把同一份记录归并成两个集合 —— 仍不重算任何东西，只按 `posture` 分组。
-           / In one line: the restatable answer first, the table second. Same record, grouped by `posture`. -->
+           这三行把同一份记录归并成三个集合 —— 仍不重算任何东西，只按每一行自己的 `holds` 分组。
+           / In one line: the restatable answer first, the table second. Same record, grouped by each row's own `holds`. -->
       <div class="font-medium mt-16px mb-4px">{{ t('keelbase.boundary.summaryTitle') }}</div>
       <div class="mb-2px">
         <span class="text-12px mr-6px">{{ t('keelbase.boundary.summaryHeld') }}</span>
@@ -286,16 +286,25 @@ const boundary = ref<Boundary | null>(null)
 const error = ref('')
 const missing = ref(false)
 
-/** 按 `posture` 把**动作**归成三组：过治理层（写会被扣下等确认）、只经授权与审计、完全不设防。
- *  只是分组，不重算 —— 与表格同一份记录。M7：读者此前只能读到检查项，读不到动作。
- *  Grouped by `posture` into three action sets; nothing is recomputed. */
-const actionsOf = (posture: PathRow['posture']) =>
-  (boundary.value?.stated.paths ?? [])
-    .filter((p) => p.posture === posture)
-    .flatMap((p) => p.actions)
-const heldActionIds = computed(() => actionsOf('governed'))
-const auditedActionIds = computed(() => actionsOf('partially-governed'))
-const ungovernedActionIds = computed(() => actionsOf('not-governed'))
+/**
+ * 按**这一行自己声明的关卡**分组，而不是按 `posture` 分：姿态说的是**路径**被治理到什么程度，
+ * 而读者那一问「哪些动作会被扣住」问的是**动作**会不会停下来等人确认。两者不是同一件事 ——
+ * RAG 检索是受治理的读（授权、身份、审计行），从不等人确认；按姿态分组会把它摆进
+ * 「写会被扣下等确认」那一行。2026-10-31 复核实测。
+ *
+ * Grouped by the row's own `holds`, not by `posture`: posture describes a **path**, while the M7
+ * question — which actions are held — is about an **action** stopping for confirmation. The RAG read is
+ * governed (authorization, identity, an audit row) and never waits for confirmation; grouping by posture
+ * put it under "a write waits for confirmation". Measured 2026-10-31. Nothing is recomputed: `holds` is
+ * the record's own field, read the same way the matrix reads it.
+ */
+const actionsWhere = (test: (p: PathRow) => boolean) =>
+  (boundary.value?.stated.paths ?? []).filter(test).flatMap((p) => p.actions)
+const heldActionIds = computed(() => actionsWhere((p) => p.holds.includes('confirmation')))
+const auditedActionIds = computed(() =>
+  actionsWhere((p) => p.posture !== 'not-governed' && !p.holds.includes('confirmation'))
+)
+const ungovernedActionIds = computed(() => actionsWhere((p) => p.posture === 'not-governed'))
 
 // The UI build lays this file in from the gate's own `--emit`; nothing here recomputes it. `no-store`
 // because a console that showed a remembered boundary would be showing a build that is no longer the one
