@@ -133,6 +133,18 @@ jobs:
   script-tests:
     name: Every script test this repository ships runs
     runs-on: ubuntu-latest
+    env:
+      # 两个**数渲染**的测试要一份铺好的界面检出（`target/yudao-ui-admin-vue3`，或 `KEELBASE_YUDAO_UI`
+      # 指过去）：闸门要用那个检出的 Vue 工具链，而干净 clone 里没有 `node_modules`。它们没有检出时**按
+      # 设计红**（不悄悄跳过），所以不能在这个 job 里跑 —— 它们由 `rendered-copy` job 跑，那里正是铺检出
+      # 的那一步。名字只在这里写一次，排除与守卫读同一份。
+      #
+      # The two **render-measuring** tests need a UI checkout laid down (`target/yudao-ui-admin-vue3`, or
+      # `KEELBASE_YUDAO_UI` pointing at one): the gate resolves the Vue toolchain from that checkout, and a
+      # clean clone has no `node_modules`. With no checkout they go **red by design** (never a quiet skip),
+      # so they cannot run in this job — they run in `rendered-copy`, which is the job that lays the
+      # checkout down. The names are written once, here, and both the exclusion and the guard read them.
+      UI_DEPENDENT_TESTS: 'scripts/rendered-copy-expressions.test.mjs scripts/rendered-copy-components.test.mjs'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -144,8 +156,28 @@ jobs:
       # 一条 glob 而不是一份清单 —— 正是清单让这几个文件留在了 CI 之外（7 个早于这道 job 的页面/助手
       # 测试，加上本周两笔修复带来的两个）。没有任何 step 点名的测试文件 = 永远不跑的测试，而它表面上
       # 看不出任何不对。
+      #
+      # 上面那两个要检出的文件按名排除 —— 但**排除不等于没人跑**：下一条 step 对每个名字断言「本流水线里
+      # 另有一步用 `node --test` 点名它」。少一个、或那一句被删掉，这里就红，于是「没人跑」仍然是一条能
+      # 读到的红，而不是一条看不见的遗漏。
+      #
+      # The two files that need the checkout are excluded **by name** — but **exclusion is not "nobody runs
+      # it"**: the next step asserts, for each name, that another step in this pipeline runs `node --test`
+      # on it. Lose one, or lose that line, and this job goes red — so "nobody runs it" stays a red somebody
+      # can read rather than an omission nobody can see.
       - name: Run every script test
-        run: node --test scripts/*.test.mjs
+        run: |
+          pattern=$(echo "$UI_DEPENDENT_TESTS" | tr ' ' '|')
+          node --test $(ls scripts/*.test.mjs | grep -Ev "^($pattern)$")
+      - name: Every excluded test is run by another step
+        run: |
+          for f in $UI_DEPENDENT_TESTS; do
+            if ! grep -q "node --test $f" .github/workflows/ci.yml; then
+              echo "::error::$f is excluded from script-tests, and no step runs it — exclusion must not become 'never runs'"
+              exit 1
+            fi
+            echo "ok    $f runs elsewhere in this pipeline"
+          done
 
   governance-boundary:
     name: No bean of ours hands a tool to Spring AI
